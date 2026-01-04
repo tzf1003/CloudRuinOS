@@ -58,9 +58,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   /**
    * 上报错误到监控服务
+   * 当前实现：存储到 localStorage 供调试查看
    */
   private reportError(error: Error, errorInfo: ErrorInfo): void {
-    // TODO: 集成错误监控服务 (如 Sentry)
     const errorReport = {
       message: error.message,
       stack: error.stack,

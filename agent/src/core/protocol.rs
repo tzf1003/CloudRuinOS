@@ -198,7 +198,67 @@ impl SystemInfo {
         Self {
             platform: std::env::consts::OS.to_string(),
             version: env!("CARGO_PKG_VERSION").to_string(),
-            uptime: 0, // TODO: 实现系统运行时间获取
+            uptime: Self::get_system_uptime(),
+        }
+    }
+
+    /// 获取系统运行时间（秒）
+    fn get_system_uptime() -> u64 {
+        #[cfg(target_os = "linux")]
+        {
+            // Linux: 读取 /proc/uptime
+            if let Ok(content) = std::fs::read_to_string("/proc/uptime") {
+                if let Some(uptime_str) = content.split_whitespace().next() {
+                    if let Ok(uptime) = uptime_str.parse::<f64>() {
+                        return uptime as u64;
+                    }
+                }
+            }
+            0
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            // macOS: 使用 sysctl kern.boottime
+            use std::process::Command;
+            if let Ok(output) = Command::new("sysctl")
+                .args(&["-n", "kern.boottime"])
+                .output()
+            {
+                if output.status.success() {
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    // 解析格式: { sec = 1234567890, usec = 123456 }
+                    if let Some(sec_start) = stdout.find("sec = ") {
+                        let sec_str = &stdout[sec_start + 6..];
+                        if let Some(sec_end) = sec_str.find(',') {
+                            if let Ok(boot_time) = sec_str[..sec_end].trim().parse::<u64>() {
+                                let now = std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap_or_default()
+                                    .as_secs();
+                                return now.saturating_sub(boot_time);
+                            }
+                        }
+                    }
+                }
+            }
+            0
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            // Windows: 使用 GetTickCount64
+            #[link(name = "kernel32")]
+            extern "system" {
+                fn GetTickCount64() -> u64;
+            }
+            // GetTickCount64 返回毫秒，转换为秒
+            unsafe { GetTickCount64() / 1000 }
+        }
+
+        #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+        {
+            0
         }
     }
 }

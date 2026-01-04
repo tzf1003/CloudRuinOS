@@ -1,7 +1,19 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Terminal, Play, Square, RotateCcw, Trash2, Copy, Download } from 'lucide-react';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { useNotifications } from '../contexts/UIContext';
 import { TerminalMessage, CommandExecution } from '../types/api';
+
+// 常用命令列表（用于自动补全）
+const COMMON_COMMANDS = [
+  'ls', 'cd', 'pwd', 'cat', 'echo', 'grep', 'find', 'ps', 'top', 'kill',
+  'mkdir', 'rm', 'cp', 'mv', 'chmod', 'chown', 'df', 'du', 'head', 'tail',
+  'whoami', 'hostname', 'uname', 'date', 'uptime', 'free', 'netstat', 'ping',
+  'curl', 'wget', 'tar', 'gzip', 'unzip', 'ssh', 'scp', 'systemctl', 'service',
+  // Windows 命令
+  'dir', 'type', 'copy', 'move', 'del', 'rd', 'md', 'cls', 'tasklist', 'taskkill',
+  'ipconfig', 'netsh', 'sc', 'net', 'reg', 'wmic', 'powershell', 'cmd'
+];
 
 // Terminal 组件配置
 interface WebSocketTerminalProps {
@@ -67,6 +79,7 @@ export function WebSocketTerminal({
     connect,
     disconnect,
     sendCommand,
+    sendMessage,
     clearMessages,
     error
   } = useWebSocket(deviceId, sessionId, { autoConnect });
@@ -77,6 +90,13 @@ export function WebSocketTerminal({
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isCommandRunning, setIsCommandRunning] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [showCopySuccess, setShowCopySuccess] = useState(false);
+  const [autoCompleteSuggestions, setAutoCompleteSuggestions] = useState<string[]>([]);
+  const [showAutoComplete, setShowAutoComplete] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
+
+  // 通知系统
+  const { addNotification } = useNotifications();
 
   // 引用管理
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -174,17 +194,109 @@ export function WebSocketTerminal({
         
       case 'Tab':
         event.preventDefault();
-        // TODO: 实现自动补全功能
+        if (showAutoComplete && autoCompleteSuggestions.length > 0) {
+          // 如果已显示补全列表，选择当前项
+          const selectedCommand = autoCompleteSuggestions[selectedSuggestionIndex];
+          applyAutoComplete(selectedCommand);
+        } else {
+          // 触发自动补全
+          triggerAutoComplete();
+        }
         break;
         
       case 'c':
         if (event.ctrlKey) {
           event.preventDefault();
-          // TODO: 发送中断信号
+          // 发送中断信号
+          if (isCommandRunning) {
+            sendInterruptSignal();
+            addNotification({
+              type: 'info',
+              title: '中断信号已发送',
+              message: '已发送 SIGINT 中断信号到远程设备',
+              duration: 2000
+            });
+          } else {
+            // 没有运行中的命令时，清空当前输入
+            setCurrentCommand('');
+          }
         }
         break;
+        
+      case 'Escape':
+        // 关闭自动补全菜单
+        setShowAutoComplete(false);
+        setAutoCompleteSuggestions([]);
+        break;
+        
+      case 'ArrowDown':
+        if (showAutoComplete) {
+          event.preventDefault();
+          setSelectedSuggestionIndex(prev => 
+            Math.min(prev + 1, autoCompleteSuggestions.length - 1)
+          );
+          return;
+        }
+        // 原有的历史记录导航逻辑在下面处理
+        break;
+        
+      case 'ArrowUp':
+        if (showAutoComplete) {
+          event.preventDefault();
+          setSelectedSuggestionIndex(prev => Math.max(prev - 1, 0));
+          return;
+        }
+        // 原有的历史记录导航逻辑在上面已处理
+        break;
     }
-  }, [commandHistory, historyIndex, handleCommandSubmit]);
+  }, [commandHistory, historyIndex, handleCommandSubmit, showAutoComplete, autoCompleteSuggestions, selectedSuggestionIndex, isCommandRunning]);
+
+  // 自动补全触发
+  const triggerAutoComplete = useCallback(() => {
+    const input = currentCommand.trim().toLowerCase();
+    if (!input) {
+      setShowAutoComplete(false);
+      return;
+    }
+
+    // 从历史记录和常用命令中搜索匹配项
+    const historyMatches = commandHistory
+      .filter(cmd => cmd.toLowerCase().startsWith(input))
+      .slice(0, 5);
+    
+    const commandMatches = COMMON_COMMANDS
+      .filter(cmd => cmd.startsWith(input) && !historyMatches.includes(cmd))
+      .slice(0, 5);
+
+    const suggestions = [...historyMatches, ...commandMatches];
+    
+    if (suggestions.length > 0) {
+      setAutoCompleteSuggestions(suggestions);
+      setSelectedSuggestionIndex(0);
+      setShowAutoComplete(true);
+    } else {
+      setShowAutoComplete(false);
+    }
+  }, [currentCommand, commandHistory]);
+
+  // 应用自动补全
+  const applyAutoComplete = useCallback((command: string) => {
+    setCurrentCommand(command);
+    setShowAutoComplete(false);
+    setAutoCompleteSuggestions([]);
+    inputRef.current?.focus();
+  }, []);
+
+  // 发送中断信号
+  const sendInterruptSignal = useCallback(() => {
+    // 发送特殊的中断消息
+    sendMessage({
+      type: 'interrupt',
+      signal: 'SIGINT',
+      timestamp: Date.now()
+    } as any);
+    setIsCommandRunning(false);
+  }, [sendMessage]);
 
   // 连接/断开连接
   const handleConnect = useCallback(async () => {
@@ -212,11 +324,26 @@ export function WebSocketTerminal({
     }).join('\n');
     
     navigator.clipboard.writeText(content).then(() => {
-      // TODO: 显示复制成功提示
+      // 显示复制成功提示
+      setShowCopySuccess(true);
+      setTimeout(() => setShowCopySuccess(false), 2000);
+      
+      addNotification({
+        type: 'success',
+        title: '复制成功',
+        message: `已复制 ${messages.length} 条终端消息到剪贴板`,
+        duration: 2000
+      });
     }).catch(error => {
       console.error('Failed to copy terminal content:', error);
+      addNotification({
+        type: 'error',
+        title: '复制失败',
+        message: '无法访问剪贴板，请检查浏览器权限',
+        duration: 3000
+      });
     });
-  }, [messages]);
+  }, [messages, addNotification]);
 
   // 导出终端日志
   const handleExport = useCallback(() => {
@@ -408,7 +535,7 @@ export function WebSocketTerminal({
       </div>
       
       {/* 命令输入区域 */}
-      <div className={`p-3 ${currentTheme.border} border-t`}>
+      <div className={`p-3 ${currentTheme.border} border-t relative`}>
         <div className="flex items-center space-x-2">
           <span className={`text-sm font-mono ${currentTheme.foreground} select-none`}>
             $
@@ -417,23 +544,50 @@ export function WebSocketTerminal({
             ref={inputRef}
             type="text"
             value={currentCommand}
-            onChange={(e) => setCurrentCommand(e.target.value)}
+            onChange={(e) => {
+              setCurrentCommand(e.target.value);
+              setShowAutoComplete(false); // 输入时关闭自动补全
+            }}
             onKeyDown={handleKeyDown}
             disabled={!isConnected || isCommandRunning}
-            placeholder={isConnected ? "Enter command..." : "Connect to enable input"}
+            placeholder={isConnected ? "Enter command... (Tab for autocomplete, Ctrl+C to interrupt)" : "Connect to enable input"}
             className={`flex-1 bg-transparent ${currentTheme.foreground} font-mono text-sm outline-none placeholder-gray-500 disabled:opacity-50`}
             style={{ fontSize: `${fontSize}px` }}
           />
           {isCommandRunning && (
             <div className="flex items-center space-x-1 text-yellow-400">
               <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-              <span className="text-xs">Running...</span>
+              <span className="text-xs">Running... (Ctrl+C to stop)</span>
             </div>
           )}
         </div>
         
+        {/* 自动补全下拉菜单 */}
+        {showAutoComplete && autoCompleteSuggestions.length > 0 && (
+          <div className="absolute bottom-full left-0 right-0 mb-1 mx-3 bg-gray-800 border border-gray-600 rounded-lg shadow-lg overflow-hidden z-10">
+            <div className="text-xs text-gray-400 px-3 py-1 border-b border-gray-700">
+              命令补全 (↑↓ 选择, Tab 确认, Esc 取消)
+            </div>
+            <div className="max-h-40 overflow-y-auto">
+              {autoCompleteSuggestions.map((suggestion, index) => (
+                <button
+                  key={suggestion}
+                  onClick={() => applyAutoComplete(suggestion)}
+                  className={`w-full text-left px-3 py-2 font-mono text-sm transition-colors ${
+                    index === selectedSuggestionIndex
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-300 hover:bg-gray-700'
+                  }`}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        
         {/* 命令历史提示 */}
-        {commandHistory.length > 0 && (
+        {commandHistory.length > 0 && !showAutoComplete && (
           <div className="mt-2 text-xs text-gray-500">
             Use ↑/↓ arrows to navigate command history ({commandHistory.length} commands)
           </div>

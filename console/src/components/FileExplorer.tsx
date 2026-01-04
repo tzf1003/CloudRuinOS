@@ -14,6 +14,7 @@ import {
 import { FileInfo } from '../types/api';
 import { apiClient } from '../lib/api-client';
 import { FilePreviewModal } from './FilePreviewModal';
+import { useNotifications } from '../contexts/UIContext';
 
 interface FileExplorerProps {
   deviceId: string;
@@ -40,6 +41,9 @@ export function FileExplorer({
   const [downloadingFiles, setDownloadingFiles] = useState<Set<string>>(new Set());
   const [previewFile, setPreviewFile] = useState<FileInfo | null>(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  
+  // 通知系统
+  const { addNotification } = useNotifications();
 
   // Handle file/directory click
   const handleItemClick = (file: FileInfo) => {
@@ -76,9 +80,24 @@ export function FileExplorer({
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
+      
+      // 显示下载成功通知
+      addNotification({
+        type: 'success',
+        title: '下载成功',
+        message: `文件 ${file.name} 已成功下载`,
+        duration: 3000
+      });
     } catch (error) {
       console.error('Download failed:', error);
-      // TODO: Show error notification
+      // 显示错误通知
+      addNotification({
+        type: 'error',
+        title: '下载失败',
+        message: `无法下载文件 ${file.name}: ${error instanceof Error ? error.message : '未知错误'}`,
+        duration: 5000,
+        persistent: true
+      });
     } finally {
       setDownloadingFiles(prev => {
         const newSet = new Set(prev);
@@ -365,7 +384,7 @@ export function FileExplorer({
         <div className="flex items-center space-x-4">
           <div className="flex items-center">
             <Folder className="h-4 w-4 mr-1" />
-            <span>{files.filter(f => f.is_directory).length} 个文件夹</span>
+            <span>{files.filter(f => f.isDirectory).length} 个文件夹</span>
           </div>
           <div className="flex items-center">
             <File className="h-4 w-4 mr-1" />
@@ -377,7 +396,7 @@ export function FileExplorer({
           <HardDrive className="h-4 w-4 mr-1" />
           <span>
             总大小: {formatFileSize(
-              files.filter(f => !f.is_directory).reduce((sum, f) => sum + f.size, 0)
+              files.filter(f => !f.isDirectory).reduce((sum, f) => sum + f.size, 0)
             )}
           </span>
         </div>
