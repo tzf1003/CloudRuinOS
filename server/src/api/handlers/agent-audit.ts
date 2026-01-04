@@ -235,7 +235,7 @@ export async function getDeviceAuditLogs(
   ctx: ExecutionContext
 ): Promise<Response> {
   try {
-    // TODO: 添加管理员认证
+    // 认证已在路由层通过 withAdminAuth 中间件处理
 
     const url = new URL(request.url);
     const pathParts = url.pathname.split('/');

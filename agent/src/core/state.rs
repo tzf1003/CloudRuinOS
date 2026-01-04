@@ -173,7 +173,7 @@ impl StateManager {
     pub async fn update_heartbeat(&self) -> Result<()> {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .map_err(|e| anyhow!("System time error: {}", e))?
             .as_secs();
 
         let mut state = self.state.write().await;
@@ -187,7 +187,7 @@ impl StateManager {
     pub async fn record_heartbeat_failure(&self, error: String) -> Result<()> {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .map_err(|e| anyhow!("System time error: {}", e))?
             .as_secs();
 
         let mut state = self.state.write().await;
@@ -328,7 +328,7 @@ impl Default for RuntimeStats {
     fn default() -> Self {
         let start_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
 
         Self {

@@ -81,3 +81,6 @@ NONCE_WINDOW = "300"        # 5 minutes
 # ENROLLMENT_SECRET - 用于生成 enrollment tokens
 # JWT_SECRET - 用于 JWT 签名
 # WEBHOOK_SECRET - 用于 webhook 验证
+# DB_ENCRYPTION_KEY - 用于数据库加密
+# ADMIN_API_KEY - 管理员 API 密钥 (已废弃，保留兼容)
+# ADMIN_PASSWORD - 管理员登录密码 (必需)

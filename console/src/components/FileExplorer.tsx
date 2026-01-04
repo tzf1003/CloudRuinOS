@@ -43,7 +43,7 @@ export function FileExplorer({
 
   // Handle file/directory click
   const handleItemClick = (file: FileInfo) => {
-    if (file.is_directory) {
+    if (file.isDirectory) {
       // Navigate to directory
       const newPath = currentPath === '/' 
         ? `/${file.name}` 
@@ -60,7 +60,7 @@ export function FileExplorer({
 
   // Handle file download
   const handleDownload = async (file: FileInfo) => {
-    if (file.is_directory) return;
+    if (file.isDirectory) return;
 
     setDownloadingFiles(prev => new Set(prev).add(file.path));
     
@@ -90,7 +90,7 @@ export function FileExplorer({
 
   // Handle file preview
   const handlePreview = (file: FileInfo) => {
-    if (file.is_directory) return;
+    if (file.isDirectory) return;
     
     setPreviewFile(file);
     setShowPreviewModal(true);
@@ -98,7 +98,7 @@ export function FileExplorer({
 
   // Handle select all/none
   const handleSelectAll = () => {
-    const allSelected = files.every(file => !file.is_directory && selectedFiles[file.path]);
+    const allSelected = files.every(file => !file.isDirectory && selectedFiles[file.path]);
     
     if (allSelected) {
       // Deselect all
@@ -107,7 +107,7 @@ export function FileExplorer({
       // Select all files (not directories)
       const newSelection: SelectedFiles = {};
       files.forEach(file => {
-        if (!file.is_directory) {
+        if (!file.isDirectory) {
           newSelection[file.path] = true;
         }
       });
@@ -121,7 +121,7 @@ export function FileExplorer({
     
     for (const filePath of selectedFilePaths) {
       const file = files.find(f => f.path === filePath);
-      if (file && !file.is_directory) {
+      if (file && !file.isDirectory) {
         await handleDownload(file);
       }
     }
@@ -147,7 +147,7 @@ export function FileExplorer({
 
   // Get file icon
   const getFileIcon = (file: FileInfo) => {
-    if (file.is_directory) {
+    if (file.isDirectory) {
       return <Folder className="h-5 w-5 text-blue-500" />;
     }
     
@@ -177,7 +177,7 @@ export function FileExplorer({
   };
 
   const selectedCount = Object.values(selectedFiles).filter(Boolean).length;
-  const fileCount = files.filter(f => !f.is_directory).length;
+  const fileCount = files.filter(f => !f.isDirectory).length;
 
   if (loading) {
     return (
@@ -283,7 +283,7 @@ export function FileExplorer({
               <tr key={file.path} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
-                    {!file.is_directory && (
+                    {!file.isDirectory && (
                       <button
                         onClick={() => handleItemClick(file)}
                         className="mr-3"
@@ -302,7 +302,7 @@ export function FileExplorer({
                     >
                       {getFileIcon(file)}
                       <span className={`ml-3 font-medium ${
-                        file.is_directory ? 'text-blue-600 hover:text-blue-800' : 'text-gray-900'
+                        file.isDirectory ? 'text-blue-600 hover:text-blue-800' : 'text-gray-900'
                       }`}>
                         {file.name}
                       </span>
@@ -311,7 +311,7 @@ export function FileExplorer({
                 </td>
                 
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {file.is_directory ? '-' : formatFileSize(file.size)}
+                  {file.isDirectory ? '-' : formatFileSize(file.size)}
                 </td>
                 
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -322,7 +322,7 @@ export function FileExplorer({
                 </td>
                 
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {!file.is_directory && (
+                  {!file.isDirectory && (
                     <div className="flex items-center space-x-2">
                       <button
                         onClick={() => handleDownload(file)}

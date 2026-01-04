@@ -42,7 +42,7 @@ export function FilePreviewModal({ isOpen, onClose, file, deviceId }: FilePrevie
 
   // Load file content for preview
   const loadFileContent = async () => {
-    if (!file || file.is_directory) return;
+    if (!file || file.isDirectory) return;
 
     setLoading(true);
     setError(null);
@@ -69,7 +69,7 @@ export function FilePreviewModal({ isOpen, onClose, file, deviceId }: FilePrevie
 
   // Handle file download
   const handleDownload = async () => {
-    if (!file || file.is_directory) return;
+    if (!file || file.isDirectory) return;
 
     try {
       const blob = await apiClient.downloadFile(deviceId, file.path);
@@ -101,7 +101,7 @@ export function FilePreviewModal({ isOpen, onClose, file, deviceId }: FilePrevie
 
   // Update preview type when file changes
   useEffect(() => {
-    if (file && !file.is_directory) {
+    if (file && !file.isDirectory) {
       const type = getPreviewType(file.name);
       setPreviewType(type);
     }
@@ -109,7 +109,7 @@ export function FilePreviewModal({ isOpen, onClose, file, deviceId }: FilePrevie
 
   // Load content when modal opens and file is previewable
   useEffect(() => {
-    if (isOpen && file && !file.is_directory && previewType !== 'unsupported') {
+    if (isOpen && file && !file.isDirectory && previewType !== 'unsupported') {
       loadFileContent();
     }
     

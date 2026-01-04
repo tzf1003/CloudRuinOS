@@ -60,7 +60,7 @@ graph TB
 #### 服务端 (Cloudflare Workers)
 - **运行时**: Cloudflare Workers V8 Runtime
 - **语言**: TypeScript
-- **框架**: Hono.js (轻量级 Web 框架)
+- **框架**: itty-router (轻量级路由框架)
 - **数据库**: Cloudflare D1 (SQLite)
 - **缓存**: Cloudflare KV
 - **存储**: Cloudflare R2 (S3 兼容)

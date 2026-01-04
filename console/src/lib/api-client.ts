@@ -180,7 +180,7 @@ class ApiClient {
     return {
       token: response.data.token,
       description: response.data.description,
-      expires_at: response.data.expiresAt,
+      expiresAt: response.data.expiresAt,
       expiresIn: response.data.expiresIn,
       maxUsage: response.data.maxUsage,
       createdBy: response.data.createdBy,

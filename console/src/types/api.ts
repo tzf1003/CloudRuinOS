@@ -9,10 +9,8 @@ export interface Device {
   lastSeen: number;
   enrolledAt: number;
   publicKey: string;
-  // 添加组件中使用的时间戳字段
-  created_at?: number;
-  updated_at?: number;
-  last_seen?: number;
+  createdAt?: number;
+  updatedAt?: number;
 }
 
 // Enhanced Device Info for detailed view
@@ -96,27 +94,22 @@ export interface SystemMetrics {
 
 export interface Session {
   id: string;
-  device_id: string;
+  deviceId: string;
   durableObjectId?: string;
   status: 'pending' | 'active' | 'connected' | 'inactive' | 'expired';
-  created_at: number;
-  expires_at: number;
-  last_activity?: number;
-  device_platform?: string;
-  device_version?: string;
-  // 兼容字段
-  deviceId?: string;
-  createdAt?: number;
-  expiresAt?: number;
+  createdAt: number;
+  expiresAt: number;
   lastActivity?: number;
+  devicePlatform?: string;
+  deviceVersion?: string;
 }
 
 export interface AuditLog {
   id: number;
-  device_id: string;
-  session_id?: string;
-  action_type: string;
-  action_data?: string;
+  deviceId: string;
+  sessionId?: string;
+  actionType: string;
+  actionData?: string;
   result?: string;
   timestamp: number;
 }
@@ -125,7 +118,7 @@ export interface FileInfo {
   name: string;
   path: string;
   size: number;
-  is_directory: boolean;
+  isDirectory: boolean;
   modified: number;
   permissions?: string;
 }
@@ -133,7 +126,7 @@ export interface FileInfo {
 export interface CommandResult {
   id: string;
   command: string;
-  exit_code: number;
+  exitCode: number;
   stdout: string;
   stderr: string;
   timestamp: number;
@@ -288,7 +281,7 @@ export interface EnrollmentTokenRequest {
 export interface EnrollmentTokenResponse {
   token: string;
   description?: string;
-  expires_at: number | null;
+  expiresAt: number | null;
   expiresIn: number | 'never';
   maxUsage: number;
   createdBy: string;
@@ -312,20 +305,20 @@ export interface EnrollmentToken {
 }
 
 export interface SessionCreateRequest {
-  device_id: string;
+  deviceId: string;
 }
 
 export interface SessionCreateResponse {
-  session_id: string;
-  websocket_url: string;
-  expires_at: number;
+  sessionId: string;
+  websocketUrl: string;
+  expiresAt: number;
 }
 
 export interface AuditFilters {
-  device_id?: string;
-  action_type?: string;
-  start_time?: number;
-  end_time?: number;
+  deviceId?: string;
+  actionType?: string;
+  startTime?: number;
+  endTime?: number;
   limit?: number;
   offset?: number;
   severity?: 'info' | 'warning' | 'error';
@@ -348,7 +341,7 @@ export interface AuditLogEntry {
 export interface AuditResponse {
   logs: AuditLog[];
   total: number;
-  has_more: boolean;
+  hasMore: boolean;
 }
 
 export interface ApiError {

@@ -47,11 +47,11 @@ export function SessionDetailsModal({ session, isOpen, onClose }: SessionDetails
 
   const statusColor = getSessionStatusColor(currentSession.status);
   
-  // 获取设备ID（兼容不同字段名）
-  const deviceId = currentSession.device_id || currentSession.deviceId || '';
-  const createdAt = currentSession.created_at || currentSession.createdAt || 0;
-  const expiresAt = currentSession.expires_at || currentSession.expiresAt || 0;
-  const lastActivity = currentSession.last_activity || currentSession.lastActivity;
+  // 获取会话字段
+  const deviceId = currentSession.deviceId || '';
+  const createdAt = currentSession.createdAt || 0;
+  const expiresAt = currentSession.expiresAt || 0;
+  const lastActivity = currentSession.lastActivity;
 
   // 计算会话统计信息
   const getSessionStats = () => {

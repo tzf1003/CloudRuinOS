@@ -571,7 +571,7 @@ export async function createCommand(
   ctx: ExecutionContext
 ): Promise<Response> {
   try {
-    // TODO: 添加管理员认证
+    // 认证已在路由层通过 withAdminAuth 中间件处理
     
     const body = await request.json() as CreateCommandRequest;
 
@@ -607,7 +607,7 @@ export async function createCommand(
       expires_at: now + (expiresIn * 1000),
       retry_count: 0,
       max_retries: body.max_retries || 3,
-      created_by: 'admin', // TODO: 从认证上下文获取
+      created_by: 'admin', // 管理员操作，已通过 JWT 认证
     };
 
     // 入队
@@ -668,7 +668,7 @@ export async function getCommandStatus(
   ctx: ExecutionContext
 ): Promise<Response> {
   try {
-    // TODO: 添加管理员认证
+    // 认证已在路由层通过 withAdminAuth 中间件处理
     
     const url = new URL(request.url);
     const pathParts = url.pathname.split('/');
@@ -719,7 +719,7 @@ export async function getDeviceCommandHistory(
   ctx: ExecutionContext
 ): Promise<Response> {
   try {
-    // TODO: 添加管理员认证
+    // 认证已在路由层通过 withAdminAuth 中间件处理
     
     const url = new URL(request.url);
     const pathParts = url.pathname.split('/');

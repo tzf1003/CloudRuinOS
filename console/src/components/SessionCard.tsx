@@ -31,11 +31,11 @@ export function SessionCard({
 }: SessionCardProps) {
   const statusColor = getSessionStatusColor(session.status);
   
-  // 获取设备ID（兼容不同字段名）
-  const deviceId = session.device_id || session.deviceId || '';
-  const createdAt = session.created_at || session.createdAt || 0;
-  const expiresAt = session.expires_at || session.expiresAt || 0;
-  const lastActivity = session.last_activity || session.lastActivity;
+  // 获取会话字段
+  const deviceId = session.deviceId || '';
+  const createdAt = session.createdAt || 0;
+  const expiresAt = session.expiresAt || 0;
+  const lastActivity = session.lastActivity;
   
   // 活动状态颜色
   const getActivityStatusColor = (status: string) => {

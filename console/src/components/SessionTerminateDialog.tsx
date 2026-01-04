@@ -39,9 +39,9 @@ export function SessionTerminateDialog({
 
   // 检查会话是否活跃
   const isActiveSession = session.status === 'active' || session.status === 'connected';
-  const deviceId = session.device_id || session.deviceId || '';
-  const createdAt = session.created_at || session.createdAt || 0;
-  const lastActivity = session.last_activity || session.lastActivity;
+  const deviceId = session.deviceId || '';
+  const createdAt = session.createdAt || 0;
+  const lastActivity = session.lastActivity;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

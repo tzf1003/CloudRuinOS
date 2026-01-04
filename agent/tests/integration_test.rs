@@ -77,9 +77,33 @@ async fn test_crypto_functionality() {
 async fn test_platform_abstraction() {
     use rmm_agent::platform::{create_command_executor, create_file_system};
     
-    // 测试平台抽象
-    let _executor = create_command_executor();
-    let _filesystem = create_file_system();
+    // 测试平台抽象 - 现在返回 Result
+    let executor_result = create_command_executor();
+    let filesystem_result = create_file_system();
+    
+    // 在支持的平台上应该成功
+    #[cfg(any(
+        all(target_os = "windows", feature = "windows"),
+        all(target_os = "linux", feature = "linux"),
+        all(target_os = "macos", feature = "macos")
+    ))]
+    {
+        assert!(executor_result.is_ok(), "命令执行器创建应该成功");
+        assert!(filesystem_result.is_ok(), "文件系统创建应该成功");
+        let _executor = executor_result.unwrap();
+        let _filesystem = filesystem_result.unwrap();
+    }
+    
+    // 在不支持的平台上应该返回错误
+    #[cfg(not(any(
+        all(target_os = "windows", feature = "windows"),
+        all(target_os = "linux", feature = "linux"),
+        all(target_os = "macos", feature = "macos")
+    )))]
+    {
+        assert!(executor_result.is_err(), "不支持的平台应该返回错误");
+        assert!(filesystem_result.is_err(), "不支持的平台应该返回错误");
+    }
     
     println!("✅ 平台抽象验证通过");
 }

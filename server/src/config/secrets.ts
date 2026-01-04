@@ -23,6 +23,7 @@ export interface Environment {
   WEBHOOK_SECRET: string;
   DB_ENCRYPTION_KEY: string;
   ADMIN_API_KEY: string;
+  ADMIN_PASSWORD: string;  // 管理员登录密码
   
   // Environment variables
   ENVIRONMENT: string;
@@ -42,7 +43,8 @@ export function validateSecrets(env: Environment): SecretsConfig {
     'JWT_SECRET', 
     'WEBHOOK_SECRET',
     'DB_ENCRYPTION_KEY',
-    'ADMIN_API_KEY'
+    'ADMIN_API_KEY',
+    'ADMIN_PASSWORD'  // 管理员密码
   ] as const;
 
   const missingSecrets: string[] = [];

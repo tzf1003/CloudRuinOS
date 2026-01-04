@@ -109,7 +109,7 @@ export function SessionDiagnostics({ session, isOpen, onClose }: SessionDiagnost
 
         case 'session-timeout':
           const now = Date.now();
-          const expiresAt = (session.expires_at || session.expiresAt || 0) * 1000;
+          const expiresAt = (session.expiresAt || 0) * 1000;
           const timeRemaining = expiresAt - now;
           
           if (timeRemaining > 300000) { // 5分钟以上
@@ -215,7 +215,7 @@ export function SessionDiagnostics({ session, isOpen, onClose }: SessionDiagnost
 
   if (!isOpen) return null;
 
-  const deviceId = session.device_id || session.deviceId || '';
+  const deviceId = session.deviceId || '';
   const failedCount = diagnostics.filter(d => d.status === 'failed').length;
   const warningCount = diagnostics.filter(d => d.status === 'warning').length;
   const passedCount = diagnostics.filter(d => d.status === 'passed').length;

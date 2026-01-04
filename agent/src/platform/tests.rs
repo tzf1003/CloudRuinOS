@@ -116,7 +116,7 @@ mod platform_isolation_tests {
             (cmd, args) in arb_command()
         ) {
             // 创建平台特定的命令执行器
-            let executor = create_command_executor();
+            let executor = create_command_executor().expect("应该能创建命令执行器");
             
             // 验证执行器实现了 CommandExecutor trait
             // 这确保了平台差异被正确隔离在 trait 接口后面
@@ -135,7 +135,7 @@ mod platform_isolation_tests {
             data in arb_file_data()
         ) {
             // 创建平台特定的文件系统
-            let fs = create_file_system();
+            let fs = create_file_system().expect("应该能创建文件系统");
             
             // 验证文件系统实现了 FileSystem trait
             // 这确保了平台差异被正确隔离在 trait 接口后面
@@ -151,8 +151,8 @@ mod platform_isolation_tests {
         #[test]
         fn test_platform_factory_consistency(_dummy in 0..100u32) {
             // 测试命令执行器工厂
-            let executor1 = create_command_executor();
-            let executor2 = create_command_executor();
+            let executor1 = create_command_executor().expect("应该能创建命令执行器");
+            let executor2 = create_command_executor().expect("应该能创建命令执行器");
             
             // 验证工厂函数总是返回实现了相同 trait 的对象
             // 这确保了平台选择逻辑的一致性
@@ -160,8 +160,8 @@ mod platform_isolation_tests {
             let _: &dyn CommandExecutor = executor2.as_ref();
             
             // 测试文件系统工厂
-            let fs1 = create_file_system();
-            let fs2 = create_file_system();
+            let fs1 = create_file_system().expect("应该能创建文件系统");
+            let fs2 = create_file_system().expect("应该能创建文件系统");
             
             // 验证工厂函数总是返回实现了相同 trait 的对象
             let _: &dyn FileSystem = fs1.as_ref();
@@ -174,8 +174,8 @@ mod platform_isolation_tests {
     #[tokio::test]
     async fn test_platform_trait_interface_consistency() {
         // 这个测试验证所有平台实现都遵循相同的 trait 接口
-        let executor = create_command_executor();
-        let fs = create_file_system();
+        let executor = create_command_executor().expect("应该能创建命令执行器");
+        let fs = create_file_system().expect("应该能创建文件系统");
 
         // 验证 trait 对象可以正常创建和使用
         let _executor_trait: &dyn CommandExecutor = executor.as_ref();
@@ -189,8 +189,8 @@ mod platform_isolation_tests {
     #[test]
     fn test_platform_conditional_compilation() {
         // 验证条件编译正确工作
-        let executor = create_command_executor();
-        let fs = create_file_system();
+        let executor = create_command_executor().expect("应该能创建命令执行器");
+        let fs = create_file_system().expect("应该能创建文件系统");
         
         // 验证工厂函数在不同平台上返回正确的实现
         // 这是编译时和运行时的双重检查
@@ -206,8 +206,8 @@ mod platform_isolation_tests {
     #[test]
     fn test_platform_abstraction_completeness() {
         // 验证平台抽象的完整性
-        let _executor = create_command_executor();
-        let _fs = create_file_system();
+        let _executor = create_command_executor().expect("应该能创建命令执行器");
+        let _fs = create_file_system().expect("应该能创建文件系统");
 
         // 验证所有必需的 trait 方法都可用
         // 这是编译时检查，确保平台实现完整
@@ -221,8 +221,8 @@ mod platform_isolation_tests {
         // 这是核心的平台接口隔离属性测试
         
         // 创建平台特定的实现
-        let executor = create_command_executor();
-        let fs = create_file_system();
+        let executor = create_command_executor().expect("应该能创建命令执行器");
+        let fs = create_file_system().expect("应该能创建文件系统");
         
         // 验证可以通过统一接口使用不同平台的实现
         let _executor_trait: &dyn CommandExecutor = executor.as_ref();

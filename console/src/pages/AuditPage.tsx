@@ -20,7 +20,7 @@ export function AuditPage() {
   });
   
   // Sorting state
-  const [sortBy, setSortBy] = useState<'timestamp' | 'action_type' | 'device_id'>('timestamp');
+  const [sortBy, setSortBy] = useState<'timestamp' | 'actionType' | 'deviceId'>('timestamp');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   
   // Pagination state
@@ -50,13 +50,13 @@ export function AuditPage() {
           aValue = a.timestamp;
           bValue = b.timestamp;
           break;
-        case 'action_type':
-          aValue = a.action_type;
-          bValue = b.action_type;
+        case 'actionType':
+          aValue = a.actionType;
+          bValue = b.actionType;
           break;
-        case 'device_id':
-          aValue = a.device_id;
-          bValue = b.device_id;
+        case 'deviceId':
+          aValue = a.deviceId;
+          bValue = b.deviceId;
           break;
         default:
           return 0;
@@ -109,17 +109,17 @@ export function AuditPage() {
     if (!searchTerm) return true;
     const searchLower = searchTerm.toLowerCase();
     return (
-      log.device_id.toLowerCase().includes(searchLower) ||
-      log.action_type.toLowerCase().includes(searchLower) ||
-      (log.session_id && log.session_id.toLowerCase().includes(searchLower)) ||
-      (log.action_data && log.action_data.toLowerCase().includes(searchLower))
+      log.deviceId.toLowerCase().includes(searchLower) ||
+      log.actionType.toLowerCase().includes(searchLower) ||
+      (log.sessionId && log.sessionId.toLowerCase().includes(searchLower)) ||
+      (log.actionData && log.actionData.toLowerCase().includes(searchLower))
     );
   });
 
   // Calculate statistics
   const stats = {
     total: totalLogs,
-    success: logs.filter(l => l.result === 'success' || (!l.result && l.action_type === 'device_heartbeat')).length,
+    success: logs.filter(l => l.result === 'success' || (!l.result && l.actionType === 'device_heartbeat')).length,
     error: logs.filter(l => l.result === 'error' || l.result === 'failed').length,
     today: logs.filter(l => {
       const logDate = new Date(l.timestamp * 1000);
@@ -349,8 +349,8 @@ export function AuditPage() {
                 <div className="relative">
                   <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <select
-                    value={filters.action_type || ''}
-                    onChange={(e) => updateFilter('action_type', e.target.value)}
+                    value={filters.actionType || ''}
+                    onChange={(e) => updateFilter('actionType', e.target.value)}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   >
                     {actionTypes.map((type) => (
@@ -367,8 +367,8 @@ export function AuditPage() {
                 <input
                   type="text"
                   placeholder="过滤设备..."
-                  value={filters.device_id || ''}
-                  onChange={(e) => updateFilter('device_id', e.target.value)}
+                  value={filters.deviceId || ''}
+                  onChange={(e) => updateFilter('deviceId', e.target.value)}}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
               </div>
@@ -411,8 +411,8 @@ export function AuditPage() {
                   <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
                     type="datetime-local"
-                    value={filters.start_time ? new Date(filters.start_time * 1000).toISOString().slice(0, 16) : ''}
-                    onChange={(e) => updateFilter('start_time', e.target.value ? Math.floor(new Date(e.target.value).getTime() / 1000) : null)}
+                    value={filters.startTime ? new Date(filters.startTime * 1000).toISOString().slice(0, 16) : ''}
+                    onChange={(e) => updateFilter('startTime', e.target.value ? Math.floor(new Date(e.target.value).getTime() / 1000) : null)}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   />
                 </div>
@@ -424,8 +424,8 @@ export function AuditPage() {
                   <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
                     type="datetime-local"
-                    value={filters.end_time ? new Date(filters.end_time * 1000).toISOString().slice(0, 16) : ''}
-                    onChange={(e) => updateFilter('end_time', e.target.value ? Math.floor(new Date(e.target.value).getTime() / 1000) : null)}
+                    value={filters.endTime ? new Date(filters.endTime * 1000).toISOString().slice(0, 16) : ''}
+                    onChange={(e) => updateFilter('endTime', e.target.value ? Math.floor(new Date(e.target.value).getTime() / 1000) : null)}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   />
                 </div>
@@ -453,28 +453,28 @@ export function AuditPage() {
                 )}
               </button>
               <button
-                onClick={() => handleSort('action_type')}
+                onClick={() => handleSort('actionType')}
                 className={`inline-flex items-center px-3 py-1 rounded-md text-sm font-medium ${
-                  sortBy === 'action_type'
+                  sortBy === 'actionType'
                     ? 'bg-blue-100 text-blue-700'
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
                 操作类型
-                {sortBy === 'action_type' && (
+                {sortBy === 'actionType' && (
                   <ArrowUpDown className={`ml-1 h-3 w-3 ${sortOrder === 'desc' ? 'rotate-180' : ''}`} />
                 )}
               </button>
               <button
-                onClick={() => handleSort('device_id')}
+                onClick={() => handleSort('deviceId')}
                 className={`inline-flex items-center px-3 py-1 rounded-md text-sm font-medium ${
-                  sortBy === 'device_id'
+                  sortBy === 'deviceId'
                     ? 'bg-blue-100 text-blue-700'
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
                 设备
-                {sortBy === 'device_id' && (
+                {sortBy === 'deviceId' && (
                   <ArrowUpDown className={`ml-1 h-3 w-3 ${sortOrder === 'desc' ? 'rotate-180' : ''}`} />
                 )}
               </button>

@@ -81,7 +81,7 @@ export function SessionsPage() {
   // Filter sessions based on search and status
   const filteredSessions = sessions.filter(session => {
     const sessionId = session.id || '';
-    const deviceId = session.device_id || session.deviceId || '';
+    const deviceId = session.deviceId || '';
     
     const matchesSearch = sessionId.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          deviceId.toLowerCase().includes(searchTerm.toLowerCase());

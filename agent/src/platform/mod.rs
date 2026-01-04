@@ -178,38 +178,51 @@ pub mod linux;
 pub mod macos;
 
 // 平台工厂函数
-pub fn create_command_executor() -> Box<dyn CommandExecutor + Send + Sync> {
+
+/// 创建平台特定的命令执行器
+/// 
+/// # Errors
+/// 如果当前平台不受支持或缺少对应的 feature flag，返回错误
+pub fn create_command_executor() -> Result<Box<dyn CommandExecutor + Send + Sync>> {
     #[cfg(all(target_os = "windows", feature = "windows"))]
-    return Box::new(windows::WindowsCommandExecutor::new());
+    return Ok(Box::new(windows::WindowsCommandExecutor::new()));
     
     #[cfg(all(target_os = "linux", feature = "linux"))]
-    return Box::new(linux::LinuxCommandExecutor::new());
+    return Ok(Box::new(linux::LinuxCommandExecutor::new()));
     
     #[cfg(all(target_os = "macos", feature = "macos"))]
-    return Box::new(macos::MacOSCommandExecutor::new());
+    return Ok(Box::new(macos::MacOSCommandExecutor::new()));
     
     #[cfg(not(any(
         all(target_os = "windows", feature = "windows"),
         all(target_os = "linux", feature = "linux"),
         all(target_os = "macos", feature = "macos")
     )))]
-    panic!("Unsupported platform or missing platform feature flag");
+    Err(anyhow!("Unsupported platform or missing platform feature flag. \
+        Current OS: {}. Please enable the appropriate feature: windows, linux, or macos", 
+        std::env::consts::OS))
 }
 
-pub fn create_file_system() -> Box<dyn FileSystem + Send + Sync> {
+/// 创建平台特定的文件系统操作器
+/// 
+/// # Errors
+/// 如果当前平台不受支持或缺少对应的 feature flag，返回错误
+pub fn create_file_system() -> Result<Box<dyn FileSystem + Send + Sync>> {
     #[cfg(all(target_os = "windows", feature = "windows"))]
-    return Box::new(windows::WindowsFileSystem::new());
+    return Ok(Box::new(windows::WindowsFileSystem::new()));
     
     #[cfg(all(target_os = "linux", feature = "linux"))]
-    return Box::new(linux::LinuxFileSystem::new());
+    return Ok(Box::new(linux::LinuxFileSystem::new()));
     
     #[cfg(all(target_os = "macos", feature = "macos"))]
-    return Box::new(macos::MacOSFileSystem::new());
+    return Ok(Box::new(macos::MacOSFileSystem::new()));
     
     #[cfg(not(any(
         all(target_os = "windows", feature = "windows"),
         all(target_os = "linux", feature = "linux"),
         all(target_os = "macos", feature = "macos")
     )))]
-    panic!("Unsupported platform or missing platform feature flag");
+    Err(anyhow!("Unsupported platform or missing platform feature flag. \
+        Current OS: {}. Please enable the appropriate feature: windows, linux, or macos", 
+        std::env::consts::OS))
 }

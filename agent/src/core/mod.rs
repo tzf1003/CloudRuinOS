@@ -86,8 +86,8 @@ impl Agent {
         let reconnect_manager = ReconnectManager::new(reconnect_strategy);
         
         // 创建平台特定的执行器
-        let command_executor = create_command_executor();
-        let file_system = create_file_system();
+        let command_executor = create_command_executor()?;
+        let file_system = create_file_system()?;
 
         // 尝试加载现有凭证
         let crypto_manager = Self::load_credentials(&config_dir).await?;
@@ -154,8 +154,8 @@ impl Agent {
         let reconnect_manager = ReconnectManager::new(reconnect_strategy);
         
         // 创建平台特定的执行器
-        let command_executor = create_command_executor();
-        let file_system = create_file_system();
+        let command_executor = create_command_executor()?;
+        let file_system = create_file_system()?;
 
         // 尝试加载现有凭证
         let crypto_manager = Self::load_credentials_from_config(&config_manager).await?;

@@ -1,6 +1,11 @@
 /**
  * 认证中间件
- * 实现签名验证、API密钥验证、权限检查
+ * 实现签名验证、JWT Token 验证、权限检查
+ * 
+ * API 分类:
+ * - Agent API (/agent/*): 使用 Ed25519 签名验证
+ * - Admin API (/admin/*, /devices/*, /commands/*, 等): 使用 JWT Token 验证
+ * 
  * Requirements: 7.2, 7.3, 7.4
  */
 
@@ -8,6 +13,7 @@ import { Env } from '../index';
 import { validateAdminApiKey, secureCompare, SecretsConfig } from '../config/secrets';
 import { verifyEd25519Signature } from '../api/utils/crypto';
 import { getDeviceById } from '../api/utils/database';
+import { verifyAdminToken, extractBearerToken, isTokenBlacklisted, AdminTokenPayload } from '../api/handlers/admin-auth';
 
 // ==================== 类型定义 ====================
 
@@ -273,12 +279,12 @@ export async function authenticateDevice(
 
 /**
  * 管理 API 认证中间件
- * 验证管理员 API 密钥
+ * 验证管理员 JWT Token
  */
-export function authenticateAdmin(
+export async function authenticateAdmin(
   request: Request,
   env: Env
-): AuthResult {
+): Promise<AuthResult> {
   const secrets = (env as any).secrets as SecretsConfig;
   
   if (!secrets) {
@@ -288,8 +294,43 @@ export function authenticateAdmin(
       errorCode: 'CONFIG_ERROR'
     };
   }
+
+  // 提取 Bearer Token
+  const token = extractBearerToken(request);
   
-  return verifyAdminApiKey(request, secrets);
+  if (!token) {
+    return {
+      authenticated: false,
+      error: 'Authorization token required',
+      errorCode: 'MISSING_TOKEN'
+    };
+  }
+
+  // 验证 JWT Token
+  const result = await verifyAdminToken(token, secrets.jwtSecret);
+  
+  if (!result.valid || !result.payload) {
+    return {
+      authenticated: false,
+      error: result.error || 'Invalid token',
+      errorCode: 'INVALID_TOKEN'
+    };
+  }
+
+  // 检查 Token 是否在黑名单中 (已登出)
+  const isBlacklisted = await isTokenBlacklisted(result.payload.token_id, env.KV);
+  if (isBlacklisted) {
+    return {
+      authenticated: false,
+      error: 'Token has been revoked',
+      errorCode: 'TOKEN_REVOKED'
+    };
+  }
+
+  return {
+    authenticated: true,
+    isAdmin: true
+  };
 }
 
 /**
@@ -385,12 +426,13 @@ export function withDeviceAuth(
 
 /**
  * 创建管理员认证中间件包装器
+ * 验证 JWT Token，确保只有管理员可以访问
  */
 export function withAdminAuth(
   handler: (request: Request, env: Env, ctx: ExecutionContext, authResult: AuthResult) => Promise<Response>
 ) {
   return async (request: Request, env: Env, ctx: ExecutionContext): Promise<Response> => {
-    const authResult = authenticateAdmin(request, env);
+    const authResult = await authenticateAdmin(request, env);
     
     if (!authResult.authenticated) {
       return new Response(JSON.stringify({

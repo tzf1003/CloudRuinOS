@@ -8,6 +8,7 @@ import { validateSecrets, getEnvironmentConfig, type Environment } from './confi
 import { addCorsHeaders } from './middleware/cors';
 import { verifyEd25519Signature } from './api/utils/crypto';
 import { getDeviceById } from './api/utils/database';
+import { NotificationService } from './monitoring/notifications';
 
 export interface Env extends Environment {}
 
@@ -62,8 +63,11 @@ export class SessionDurableObject {
   private deviceSessions: Map<string, string> = new Map(); // deviceId -> sessionId
   private sessionMetadata: Map<string, SessionMetadata> = new Map();
   private cleanupInterval: number | null = null;
+  private notificationService: NotificationService;
 
   constructor(private state: DurableObjectState, private env: Env) {
+    // 初始化通知服务
+    this.notificationService = new NotificationService(env);
     // 启动定期清理任务
     this.startCleanupTask();
   }
@@ -376,8 +380,92 @@ export class SessionDurableObject {
       stderr: message.stderr?.substring(0, 1000)
     });
     
-    // 转发结果到管理端 (通过 KV 或其他机制)
-    // TODO: 实现管理端通知机制
+    // 转发命令结果到管理端
+    await this.forwardCommandResultToAdmin(deviceId, sessionId, message);
+    
+    // 如果命令执行失败，发送通知
+    if (message.exitCode !== 0) {
+      await this.notificationService.notifyCommandFailed(
+        deviceId,
+        message.id,
+        'command_execute',
+        message.stderr || `Exit code: ${message.exitCode}`
+      );
+    }
+  }
+
+  /**
+   * 转发命令结果到管理端
+   * 通过 KV 存储命令结果，管理端可通过轮询或 WebSocket 获取
+   */
+  private async forwardCommandResultToAdmin(
+    deviceId: string,
+    sessionId: string,
+    message: CommandResultMessage
+  ): Promise<void> {
+    try {
+      // 存储命令结果到 KV，供管理端获取
+      const resultKey = `cmd_result:${message.id}`;
+      const resultData = {
+        commandId: message.id,
+        deviceId,
+        sessionId,
+        exitCode: message.exitCode,
+        stdout: message.stdout,
+        stderr: message.stderr,
+        completedAt: Date.now(),
+      };
+      
+      await this.env.KV.put(resultKey, JSON.stringify(resultData), {
+        expirationTtl: 3600, // 1 小时过期
+      });
+
+      // 将结果 ID 添加到设备的结果队列中
+      const queueKey = `cmd_result_queue:${deviceId}`;
+      const existingQueue = await this.env.KV.get<string[]>(queueKey, 'json') || [];
+      existingQueue.push(message.id);
+      
+      // 只保留最近 50 条结果
+      if (existingQueue.length > 50) {
+        existingQueue.splice(0, existingQueue.length - 50);
+      }
+      
+      await this.env.KV.put(queueKey, JSON.stringify(existingQueue), {
+        expirationTtl: 3600,
+      });
+
+      // 通过 WebSocket 广播给在线的管理端 (如果有连接)
+      await this.broadcastToAdminSessions({
+        type: 'command_result',
+        deviceId,
+        commandId: message.id,
+        exitCode: message.exitCode,
+        stdout: message.stdout?.substring(0, 500),
+        stderr: message.stderr?.substring(0, 500),
+        timestamp: Date.now(),
+      });
+      
+    } catch (error) {
+      console.error('Failed to forward command result:', error);
+    }
+  }
+
+  /**
+   * 广播消息到所有管理端会话
+   */
+  private async broadcastToAdminSessions(message: any): Promise<void> {
+    // 遍历所有活动会话，向管理端会话发送消息
+    for (const [sessionId, ws] of this.sessions.entries()) {
+      try {
+        const metadata = this.sessionMetadata.get(sessionId);
+        // 检查是否是管理端会话 (可以通过 metadata 标记区分)
+        if (metadata?.status === 'connected' || metadata?.status === 'authenticated') {
+          ws.send(JSON.stringify(message));
+        }
+      } catch (error) {
+        console.error(`Failed to broadcast to session ${sessionId}:`, error);
+      }
+    }
   }
 
   /**
@@ -389,12 +477,69 @@ export class SessionDurableObject {
     deviceId: string, 
     message: FileOperationResultMessage
   ) {
+    const success = 'success' in message ? message.success : true;
+    const errorMessage = 'error' in message ? (message as any).error : undefined;
+    
     // 记录审计日志
     await this.logAuditEvent(deviceId, sessionId, 'file_operation_result', {
       operationId: message.id,
       operationType: message.type,
-      success: 'success' in message ? message.success : true
+      success
     });
+    
+    // 转发文件操作结果到管理端
+    await this.forwardFileOperationResultToAdmin(deviceId, sessionId, message, success);
+    
+    // 如果操作失败，发送通知
+    if (!success) {
+      await this.notificationService.notifyCommandFailed(
+        deviceId,
+        message.id,
+        `file_${message.type}`,
+        errorMessage || `File operation ${message.type} failed`
+      );
+    }
+  }
+
+  /**
+   * 转发文件操作结果到管理端
+   */
+  private async forwardFileOperationResultToAdmin(
+    deviceId: string,
+    sessionId: string,
+    message: FileOperationResultMessage,
+    success: boolean
+  ): Promise<void> {
+    try {
+      // 存储文件操作结果到 KV
+      const resultKey = `file_result:${message.id}`;
+      const resultData = {
+        operationId: message.id,
+        deviceId,
+        sessionId,
+        type: message.type,
+        success,
+        data: 'data' in message ? message.data : undefined,
+        error: 'error' in message ? (message as any).error : undefined,
+        completedAt: Date.now(),
+      };
+      
+      await this.env.KV.put(resultKey, JSON.stringify(resultData), {
+        expirationTtl: 3600,
+      });
+
+      // 广播给管理端
+      await this.broadcastToAdminSessions({
+        type: 'file_operation_result',
+        deviceId,
+        operationId: message.id,
+        operationType: message.type,
+        success,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error('Failed to forward file operation result:', error);
+    }
   }
 
   /**
@@ -465,6 +610,45 @@ export class SessionDurableObject {
     await this.logAuditEvent(deviceId, sessionId, 'session_disconnected', {
       reason: 'websocket_closed'
     });
+    
+    // 通知管理端设备离线
+    await this.notifyDeviceOffline(deviceId, sessionId);
+  }
+
+  /**
+   * 通知管理端设备离线
+   */
+  private async notifyDeviceOffline(deviceId: string, sessionId: string): Promise<void> {
+    try {
+      // 获取设备元数据
+      const metadata = this.sessionMetadata.get(sessionId);
+      const lastSeen = Date.now();
+      const platform = metadata?.platform || 'unknown';
+      
+      // 发送设备离线通知
+      await this.notificationService.notifyDeviceOffline(deviceId, lastSeen, platform);
+      
+      // 广播给在线的管理端会话
+      await this.broadcastToAdminSessions({
+        type: 'device_status',
+        deviceId,
+        status: 'offline',
+        sessionId,
+        timestamp: Date.now(),
+      });
+      
+      // 更新 KV 中的设备状态
+      const statusKey = `device_status:${deviceId}`;
+      await this.env.KV.put(statusKey, JSON.stringify({
+        deviceId,
+        status: 'offline',
+        lastSeen: Date.now(),
+      }), {
+        expirationTtl: 86400, // 24 小时过期
+      });
+    } catch (error) {
+      console.error('Failed to notify device offline:', error);
+    }
   }
 
   /**

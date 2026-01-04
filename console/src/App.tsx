@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Layout } from './components/Layout';
+import { ErrorBoundary, RouteErrorBoundary } from './components/ErrorBoundary';
 import { DashboardPage } from './pages/DashboardPage';
 import { DevicesPage } from './pages/DevicesPage';
 import { FileManagerPage } from './pages/FileManagerPage';
@@ -25,30 +26,64 @@ const queryClient = new QueryClient({
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <UIProvider>
-        <Router>
-          <Layout>
-            <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/devices" element={<DevicesPage />} />
-              <Route path="/files" element={<FileManagerPage />} />
-              <Route path="/sessions" element={<SessionsPage />} />
-              <Route path="/tokens" element={<TokensPage />} />
-              <Route path="/audit" element={<AuditPage />} />
-              <Route path="/status" element={<StatusPage />} />
-              <Route path="/terminal-test" element={<TerminalTestPage />} />
-            </Routes>
-          </Layout>
-          
-          {/* 全局UI组件 */}
-          <GlobalLoadingOverlay />
-          <OperationProgress />
-          <NotificationSystem />
-        </Router>
-      </UIProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <UIProvider>
+          <Router>
+            <Layout>
+              <Routes>
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/dashboard" element={
+                  <RouteErrorBoundary routeName="仪表盘">
+                    <DashboardPage />
+                  </RouteErrorBoundary>
+                } />
+                <Route path="/devices" element={
+                  <RouteErrorBoundary routeName="设备管理">
+                    <DevicesPage />
+                  </RouteErrorBoundary>
+                } />
+                <Route path="/files" element={
+                  <RouteErrorBoundary routeName="文件管理">
+                    <FileManagerPage />
+                  </RouteErrorBoundary>
+                } />
+                <Route path="/sessions" element={
+                  <RouteErrorBoundary routeName="会话管理">
+                    <SessionsPage />
+                  </RouteErrorBoundary>
+                } />
+                <Route path="/tokens" element={
+                  <RouteErrorBoundary routeName="令牌管理">
+                    <TokensPage />
+                  </RouteErrorBoundary>
+                } />
+                <Route path="/audit" element={
+                  <RouteErrorBoundary routeName="审计日志">
+                    <AuditPage />
+                  </RouteErrorBoundary>
+                } />
+                <Route path="/status" element={
+                  <RouteErrorBoundary routeName="系统状态">
+                    <StatusPage />
+                  </RouteErrorBoundary>
+                } />
+                <Route path="/terminal-test" element={
+                  <RouteErrorBoundary routeName="终端测试">
+                    <TerminalTestPage />
+                  </RouteErrorBoundary>
+                } />
+              </Routes>
+            </Layout>
+            
+            {/* 全局UI组件 */}
+            <GlobalLoadingOverlay />
+            <OperationProgress />
+            <NotificationSystem />
+          </Router>
+        </UIProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
