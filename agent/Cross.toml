@@ -1,0 +1,47 @@
+# Cross 跨平台编译配置文件
+
+[build]
+# 默认镜像配置
+default-target = "x86_64-unknown-linux-musl"
+
+[target.x86_64-unknown-linux-musl]
+# 使用 Alpine Linux 进行静态链接编译
+image = "ghcr.io/cross-rs/x86_64-unknown-linux-musl:main"
+
+[target.x86_64-unknown-linux-gnu]
+# 标准 Linux GNU 编译
+image = "ghcr.io/cross-rs/x86_64-unknown-linux-gnu:main"
+
+[target.x86_64-pc-windows-gnu]
+# Windows GNU 工具链编译
+image = "ghcr.io/cross-rs/x86_64-pc-windows-gnu:main"
+
+[target.aarch64-unknown-linux-musl]
+# ARM64 Linux 静态链接编译
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-musl:main"
+
+[target.aarch64-unknown-linux-gnu]
+# ARM64 Linux GNU 编译
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-gnu:main"
+
+# 环境变量配置
+[build.env]
+passthrough = [
+    "RUST_LOG",
+    "CARGO_BUILD_TARGET_DIR",
+]
+
+# 静态链接配置
+[target.x86_64-unknown-linux-musl.env]
+CC_x86_64_unknown_linux_musl = "x86_64-linux-musl-gcc"
+CXX_x86_64_unknown_linux_musl = "x86_64-linux-musl-g++"
+AR_x86_64_unknown_linux_musl = "x86_64-linux-musl-ar"
+CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER = "x86_64-linux-musl-gcc"
+RUSTFLAGS = "-C target-feature=+crt-static"
+
+[target.aarch64-unknown-linux-musl.env]
+CC_aarch64_unknown_linux_musl = "aarch64-linux-musl-gcc"
+CXX_aarch64_unknown_linux_musl = "aarch64-linux-musl-g++"
+AR_aarch64_unknown_linux_musl = "aarch64-linux-musl-ar"
+CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER = "aarch64-linux-musl-gcc"
+RUSTFLAGS = "-C target-feature=+crt-static"

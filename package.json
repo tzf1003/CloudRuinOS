@@ -1,0 +1,29 @@
+{
+  "name": "lightweight-rmm",
+  "version": "0.1.0",
+  "description": "轻量化 RMM 系统 - Remote Monitoring and Management System",
+  "private": true,
+  "workspaces": [
+    "server",
+    "console"
+  ],
+  "scripts": {
+    "dev:server": "cd server && npm run dev",
+    "dev:console": "cd console && npm run dev",
+    "build:server": "cd server && npm run build",
+    "build:console": "cd console && npm run build",
+    "build:agent": "cd agent && cargo build --release",
+    "test": "npm run test --workspaces",
+    "test:e2e:hybrid": "cd server && npm run test:e2e:hybrid",
+    "test:integration:cloud": "cd server && npm run test:integration:cloud",
+    "deploy:test": "cd server && wrangler deploy --env test",
+    "deploy:prod": "cd server && wrangler deploy --env production"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,169 @@
+name: Deploy Console to Cloudflare Pages
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'console/**'
+      - '.github/workflows/deploy-console.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'console/**'
+
+jobs:
+  test:
+    name: Test Console
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'console/package-lock.json'
+
+      - name: Install dependencies
+        run: |
+          cd console
+          npm ci
+
+      - name: Run type check
+        run: |
+          cd console
+          npm run type-check
+
+      - name: Run linting
+        run: |
+          cd console
+          npm run lint
+
+      - name: Run tests
+        run: |
+          cd console
+          npm run test
+
+      - name: Build application
+        run: |
+          cd console
+          npm run build
+        env:
+          VITE_API_BASE_URL: https://rmm-server-test.your-subdomain.workers.dev
+
+  deploy-test:
+    name: Deploy to Test Environment
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/develop'
+    environment: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'console/package-lock.json'
+
+      - name: Install dependencies
+        run: |
+          cd console
+          npm ci
+
+      - name: Build for test environment
+        run: |
+          cd console
+          npm run build
+        env:
+          VITE_API_BASE_URL: ${{ secrets.TEST_API_BASE_URL }}
+
+      - name: Deploy to Cloudflare Pages (Test)
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: rmm-console-test
+          directory: console/dist
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'console/package-lock.json'
+
+      - name: Install dependencies
+        run: |
+          cd console
+          npm ci
+
+      - name: Build for production
+        run: |
+          cd console
+          npm run build
+        env:
+          VITE_API_BASE_URL: ${{ secrets.PROD_API_BASE_URL }}
+
+      - name: Deploy to Cloudflare Pages (Production)
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: rmm-console-prod
+          directory: console/dist
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Health check
+        run: |
+          sleep 30
+          curl -f https://rmm-console-prod.pages.dev/ || exit 1
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'console/package-lock.json'
+
+      - name: Install dependencies
+        run: |
+          cd console
+          npm ci
+
+      - name: Run security audit
+        run: |
+          cd console
+          npm audit --audit-level=high
+
+      - name: Build and analyze bundle
+        run: |
+          cd console
+          npm run build
+          npx bundlesize

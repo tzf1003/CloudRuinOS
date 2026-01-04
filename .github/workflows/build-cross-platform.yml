@@ -1,0 +1,217 @@
+name: Cross-Platform Build
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows 目标
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            features: "windows,tls-strict"
+            artifact_name: rmm-agent-windows-x64.exe
+            use_cross: false
+            
+          - target: x86_64-pc-windows-gnu
+            os: windows-latest
+            features: "windows,tls-strict"
+            artifact_name: rmm-agent-windows-x64-gnu.exe
+            use_cross: false
+            
+          # Linux 目标
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            features: "linux,tls-strict,doh,static-link"
+            artifact_name: rmm-agent-linux-x64-static
+            use_cross: true
+            
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            features: "linux,tls-strict,doh"
+            artifact_name: rmm-agent-linux-x64
+            use_cross: false
+            
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            features: "linux,tls-strict,doh,static-link"
+            artifact_name: rmm-agent-linux-arm64-static
+            use_cross: true
+            
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            features: "linux,tls-strict,doh"
+            artifact_name: rmm-agent-linux-arm64
+            use_cross: true
+            
+          # macOS 目标
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            features: "macos,tls-strict,doh"
+            artifact_name: rmm-agent-macos-x64
+            use_cross: false
+            
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            features: "macos,tls-strict,doh"
+            artifact_name: rmm-agent-macos-arm64
+            use_cross: false
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+
+    - name: Install cross
+      if: matrix.use_cross
+      run: cargo install cross --git https://github.com/cross-rs/cross
+
+    - name: Cache cargo registry
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+
+    - name: Cache target directory
+      uses: actions/cache@v3
+      with:
+        path: agent/target
+        key: ${{ runner.os }}-${{ matrix.target }}-target-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.target }}-target-
+
+    - name: Build with cargo
+      if: '!matrix.use_cross'
+      working-directory: agent
+      run: cargo build --release --target ${{ matrix.target }} --features "${{ matrix.features }}"
+
+    - name: Build with cross
+      if: matrix.use_cross
+      working-directory: agent
+      run: cross build --release --target ${{ matrix.target }} --features "${{ matrix.features }}"
+
+    - name: Prepare artifact (Windows)
+      if: runner.os == 'Windows'
+      working-directory: agent
+      run: |
+        mkdir -p artifacts
+        $exe_path = "target/${{ matrix.target }}/release/rmm-agent.exe"
+        if (Test-Path $exe_path) {
+          Copy-Item $exe_path "artifacts/${{ matrix.artifact_name }}"
+        }
+
+    - name: Prepare artifact (Unix)
+      if: runner.os != 'Windows'
+      working-directory: agent
+      run: |
+        mkdir -p artifacts
+        exe_path="target/${{ matrix.target }}/release/rmm-agent"
+        if [ -f "$exe_path" ]; then
+          cp "$exe_path" "artifacts/${{ matrix.artifact_name }}"
+          chmod +x "artifacts/${{ matrix.artifact_name }}"
+        fi
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ matrix.artifact_name }}
+        path: agent/artifacts/${{ matrix.artifact_name }}
+        if-no-files-found: error
+
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            features: "linux,tls-strict,test-local"
+          - os: windows-latest
+            features: "windows,tls-strict,test-local"
+          - os: macos-latest
+            features: "macos,tls-strict,test-local"
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache cargo registry
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Run tests
+      working-directory: agent
+      run: cargo test --features "${{ matrix.features }}"
+
+  release:
+    name: Create Release
+    needs: [build, test]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      with:
+        path: artifacts
+
+    - name: Create release archives
+      run: |
+        mkdir -p release
+        
+        # Windows 归档
+        cd artifacts
+        tar -czf ../release/rmm-agent-windows.tar.gz rmm-agent-windows-*/*
+        
+        # Linux 归档
+        tar -czf ../release/rmm-agent-linux.tar.gz rmm-agent-linux-*/*
+        
+        # macOS 归档
+        tar -czf ../release/rmm-agent-macos.tar.gz rmm-agent-macos-*/*
+        
+        cd ..
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          release/*.tar.gz
+          artifacts/*/*
+        draft: false
+        prerelease: ${{ contains(github.ref, '-') }}
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

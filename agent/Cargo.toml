@@ -1,0 +1,76 @@
+[package]
+name = "rmm-agent"
+version = "0.1.0"
+edition = "2021"
+description = "RMM Agent - Cross-platform remote management client"
+authors = ["RMM Team"]
+license = "MIT"
+
+[features]
+default = ["tls-strict"]
+
+# 平台支持
+windows = ["winapi"]
+linux = ["nix"]
+macos = ["nix"]
+
+# 网络增强功能
+doh = ["dep:trust-dns-resolver"]
+ech = []  # 预留，MVP 阶段可选
+tls-pinning = ["dep:rustls-native-certs"]
+tls-strict = []
+
+# 可选功能
+screenshots = []  # 截图功能，后期实现
+
+# 测试功能
+test-local = []  # 连接本地 Worker 进行测试
+
+# 静态链接配置
+static-link = []
+
+[dependencies]
+# 使用 workspace 依赖
+reqwest = { workspace = true, features = ["rustls-tls"] }
+tokio = { workspace = true }
+tokio-tungstenite = { workspace = true }
+ed25519-dalek = { workspace = true }
+rand = { workspace = true }
+rustls = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = "0.8"
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+futures = { workspace = true }
+async-trait = { workspace = true }
+dirs = { workspace = true }
+base64 = "0.21"
+sha2 = "0.10"
+hex = "0.4"
+
+# 可选依赖
+trust-dns-resolver = { workspace = true, optional = true }
+rustls-native-certs = { workspace = true, optional = true }
+
+# 平台特定依赖
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winuser", "processthreadsapi", "winsvc", "winreg"], optional = true }
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.27", optional = true }
+
+# 静态链接配置
+[target.'cfg(target_env = "musl")'.dependencies]
+openssl = { version = "0.10", features = ["vendored"] }
+
+[dev-dependencies]
+proptest = { workspace = true }
+tokio-test = "0.4"
+tempfile = "3.8"
+
+[[bin]]
+name = "rmm-agent"
+path = "src/main.rs"

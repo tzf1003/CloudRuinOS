@@ -1,0 +1,38 @@
+{
+  "name": "rmm-server",
+  "version": "0.1.0",
+  "description": "RMM Server - Cloudflare Workers API",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev --local",
+    "dev:remote": "wrangler dev --remote",
+    "deploy": "wrangler deploy",
+    "deploy:test": "wrangler deploy --env test",
+    "deploy:prod": "wrangler deploy --env production",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "test:e2e:hybrid": "vitest --run --config vitest.e2e.config.ts",
+    "test:integration:cloud": "vitest --run --config vitest.integration.config.ts",
+    "db:migrate": "node scripts/migrate.js",
+    "db:migrate:test": "node scripts/migrate.js --env=test",
+    "db:migrate:prod": "node scripts/migrate.js --env=production",
+    "db:migrate:dry-run": "node scripts/migrate.js --dry-run",
+    "db:apply": "wrangler d1 execute rmm-db --file=migrations/0001_initial_schema.sql",
+    "db:apply:test": "wrangler d1 execute rmm-db-test --file=migrations/0001_initial_schema.sql --env=test",
+    "db:apply:prod": "wrangler d1 execute rmm-db-prod --file=migrations/0001_initial_schema.sql --env=production",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cloudflare/workers-types": "^4.20231218.0",
+    "itty-router": "^4.0.0",
+    "tweetnacl": "^1.0.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^20.0.0",
+    "fast-check": "^4.5.3",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0",
+    "wrangler": "^4.54.0"
+  }
+}

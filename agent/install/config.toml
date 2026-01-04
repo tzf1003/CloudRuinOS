@@ -1,0 +1,125 @@
+# RMM Agent 配置文件模板
+# 此文件包含 Agent 的默认配置设置
+
+[agent]
+# Agent 基本配置
+name = "rmm-agent"
+version = "0.1.0"
+device_id = ""  # 将在注册时自动填充
+
+[server]
+# 服务端连接配置
+base_url = "https://your-rmm-server.example.com"
+enrollment_endpoint = "/agent/enroll"
+heartbeat_endpoint = "/agent/heartbeat"
+websocket_endpoint = "/sessions"
+
+# 连接超时设置（秒）
+connect_timeout = 30
+request_timeout = 60
+
+[heartbeat]
+# 心跳配置
+interval = 30  # 心跳间隔（秒）
+retry_attempts = 3
+retry_delay = 5  # 重试延迟（秒）
+
+[security]
+# 安全配置
+tls_verify = true
+certificate_pinning = false
+# certificate_pins = []  # 证书固定列表（可选）
+
+# DoH 配置
+doh_enabled = false
+doh_providers = [
+    "https://cloudflare-dns.com/dns-query",
+    "https://dns.google/dns-query",
+    "https://dns.quad9.net/dns-query"
+]
+
+# ECH 配置（实验性功能）
+ech_enabled = false
+
+[logging]
+# 日志配置
+level = "info"  # trace, debug, info, warn, error
+file_path = ""  # 空字符串表示输出到控制台
+max_file_size = "10MB"
+max_files = 5
+
+[paths]
+# 路径配置
+config_dir = ""     # 将根据平台自动设置
+data_dir = ""       # 将根据平台自动设置
+log_dir = ""        # 将根据平台自动设置
+credentials_file = "credentials.json"
+
+[file_operations]
+# 文件操作安全策略
+max_file_size = "100MB"
+allow_hidden_files = false
+
+# 允许的路径（为空表示使用默认策略）
+allowed_paths = []
+
+# 禁止的路径
+blocked_paths = [
+    "/etc/passwd",
+    "/etc/shadow",
+    "/root/.ssh",
+    "C:\\Windows\\System32",
+    "C:\\Users\\*\\AppData\\Local\\Microsoft\\Windows\\UsrClass.dat"
+]
+
+[commands]
+# 命令执行配置
+default_timeout = 300  # 默认超时时间（秒）
+max_concurrent = 5     # 最大并发命令数
+
+# 禁止的命令模式
+blocked_commands = [
+    "rm -rf /",
+    "del /f /s /q C:\\*",
+    "format",
+    "fdisk",
+    "mkfs",
+    "dd if=/dev/zero"
+]
+
+[reconnect]
+# 重连策略配置
+initial_delay = 1      # 初始延迟（秒）
+max_delay = 300        # 最大延迟（秒）
+backoff_factor = 2.0   # 退避因子
+max_attempts = 0       # 最大重试次数（0 表示无限制）
+jitter = true          # 是否添加随机抖动
+
+[service]
+# 服务配置（仅在作为系统服务运行时使用）
+auto_start = true
+restart_on_failure = true
+restart_delay = 10  # 重启延迟（秒）
+
+# Windows 服务配置
+[service.windows]
+service_name = "RMMAgent"
+display_name = "RMM Agent Service"
+description = "Remote Monitoring and Management Agent"
+start_type = "automatic"  # automatic, manual, disabled
+
+# Linux systemd 配置
+[service.linux]
+service_name = "rmm-agent"
+description = "Remote Monitoring and Management Agent"
+user = "rmm-agent"
+group = "rmm-agent"
+restart = "always"
+restart_sec = 10
+
+# macOS launchd 配置
+[service.macos]
+label = "com.example.rmm-agent"
+program_arguments = []  # 将自动填充
+run_at_load = true
+keep_alive = true
