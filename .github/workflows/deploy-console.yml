@@ -16,8 +16,8 @@ on:
       - 'console/**'
 
 jobs:
-  test:
-    name: Test Console
+  build:
+    name: Build Console
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -36,103 +36,11 @@ jobs:
       - name: Build application
         run: npm run -w console build
         env:
-          VITE_API_BASE_URL: https://rmm-server-test.your-subdomain.workers.dev
+          VITE_API_BASE_URL: https://rmm-server.your-subdomain.workers.dev
 
-  deploy-test:
-    name: Deploy to Test Environment
-    runs-on: ubuntu-latest
-    needs: test
-    if: github.ref == 'refs/heads/develop'
-    environment: test
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
         with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: 'package-lock.json'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build for test environment
-        run: npm run -w console build
-        env:
-          VITE_API_BASE_URL: ${{ secrets.TEST_API_BASE_URL }}
-
-      - name: Deploy to Cloudflare Pages (Test)
-        uses: cloudflare/pages-action@v1
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: rmm-console-test
-          directory: console/dist
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-
-  deploy-production:
-    name: Deploy to Production
-    runs-on: ubuntu-latest
-    needs: test
-    if: github.ref == 'refs/heads/main'
-    environment: production
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: 'package-lock.json'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build for production
-        run: npm run -w console build
-        env:
-          VITE_API_BASE_URL: ${{ secrets.PROD_API_BASE_URL }}
-
-      - name: Deploy to Cloudflare Pages (Production)
-        uses: cloudflare/pages-action@v1
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: rmm-console-prod
-          directory: console/dist
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Health check
-        run: |
-          sleep 30
-          curl -f https://rmm-console-prod.pages.dev/ || exit 1
-
-  security-scan:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    needs: test
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: 'package-lock.json'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run security audit
-        run: npm audit --audit-level=high -w console
-
-      - name: Build and analyze bundle
-        run: |
-          npm run -w console build
-          cd console && npx bundlesize
+          name: console-dist
+          path: console/dist/
+          retention-days: 7

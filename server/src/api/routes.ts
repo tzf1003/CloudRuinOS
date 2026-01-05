@@ -73,40 +73,40 @@ export function createRouter() {
   // 管理员认证端点 (无需认证)
   router.post('/admin/login', adminLogin);
   // 管理员认证验证和登出 (需要认证)
-  router.get('/admin/verify', withAdminAuth(async (req, env, ctx) => verifyAdminSession(req, env, ctx)));
-  router.post('/admin/logout', withAdminAuth(async (req, env, ctx) => adminLogout(req, env, ctx)));
+  router.get('/admin/verify', withAdminAuth(async (req, env) => verifyAdminSession(req, env)));
+  router.post('/admin/logout', withAdminAuth(async (req, env) => adminLogout(req, env)));
 
   // 命令管理 API (管理员)
-  router.post('/commands', withAdminAuth(async (req, env, ctx) => createCommand(req, env, ctx)));
-  router.get('/commands/:id', withAdminAuth(async (req, env, ctx) => getCommandStatus(req, env, ctx)));
+  router.post('/commands', withAdminAuth(async (req, env) => createCommand(req, env)));
+  router.get('/commands/:id', withAdminAuth(async (req, env) => getCommandStatus(req, env)));
 
   // 注册令牌管理 API (管理员)
-  router.post('/enrollment/token', withAdminAuth(async (req, env, ctx) => generateEnrollmentTokenHandler(req, env, ctx)));
-  router.get('/enrollment/tokens', withAdminAuth(async (req, env, ctx) => getEnrollmentTokensHandler(req, env, ctx)));
-  router.get('/enrollment/token/:token', withAdminAuth(async (req, env, ctx) => validateEnrollmentTokenHandler(req, env, ctx)));
-  router.put('/enrollment/token/:id', withAdminAuth(async (req, env, ctx) => updateEnrollmentTokenHandler(req, env, ctx)));
-  router.delete('/enrollment/token/:id', withAdminAuth(async (req, env, ctx) => deleteEnrollmentTokenHandler(req, env, ctx)));
+  router.post('/enrollment/token', withAdminAuth(async (req, env) => generateEnrollmentTokenHandler(req, env)));
+  router.get('/enrollment/tokens', withAdminAuth(async (req, env) => getEnrollmentTokensHandler(req, env)));
+  router.get('/enrollment/token/:token', withAdminAuth(async (req, env) => validateEnrollmentTokenHandler(req, env)));
+  router.put('/enrollment/token/:id', withAdminAuth(async (req, env) => updateEnrollmentTokenHandler(req, env)));
+  router.delete('/enrollment/token/:id', withAdminAuth(async (req, env) => deleteEnrollmentTokenHandler(req, env)));
 
   // 设备管理 API (管理员)
-  router.get('/devices', withAdminAuth(async (req, env, ctx) => getDevices(req, env, ctx)));
-  router.get('/devices/:id', withAdminAuth(async (req, env, ctx) => getDevice(req, env, ctx)));
-  router.get('/devices/:id/commands', withAdminAuth(async (req, env, ctx) => getDeviceCommandHistory(req, env, ctx)));
-  router.get('/devices/:id/audit', withAdminAuth(async (req, env, ctx) => getDeviceAuditLogs(req, env, ctx)));
-  router.put('/devices/:id', withAdminAuth(async (req, env, ctx) => updateDevice(req, env, ctx)));
-  router.delete('/devices/:id', withAdminAuth(async (req, env, ctx) => deleteDevice(req, env, ctx)));
+  router.get('/devices', withAdminAuth(async (req, env) => getDevices(req, env)));
+  router.get('/devices/:id', withAdminAuth(async (req, env) => getDevice(req, env)));
+  router.get('/devices/:id/commands', withAdminAuth(async (req, env) => getDeviceCommandHistory(req, env)));
+  router.get('/devices/:id/audit', withAdminAuth(async (req, env) => getDeviceAuditLogs(req, env)));
+  router.put('/devices/:id', withAdminAuth(async (req, env) => updateDevice(req, env)));
+  router.delete('/devices/:id', withAdminAuth(async (req, env) => deleteDevice(req, env)));
 
   // 会话管理 API (管理员)
-  router.get('/sessions', withAdminAuth(async (req, env, ctx) => getSessions(req, env, ctx)));
-  router.post('/sessions', withAdminAuth(async (req, env, ctx) => createSession(req, env, ctx)));
-  router.get('/sessions/:id', withAdminAuth(async (req, env, ctx) => getSession(req, env, ctx)));
+  router.get('/sessions', withAdminAuth(async (req, env) => getSessions(req, env)));
+  router.post('/sessions', withAdminAuth(async (req, env) => createSession(req, env)));
+  router.get('/sessions/:id', withAdminAuth(async (req, env) => getSession(req, env)));
 
   // 文件管理 API (管理员)
-  router.post('/files/list', withAdminAuth(async (req, env, ctx) => listFiles(req, env, ctx)));
-  router.get('/files/download', withAdminAuth(async (req, env, ctx) => downloadFile(req, env, ctx)));
-  router.post('/files/upload', withAdminAuth(async (req, env, ctx) => uploadFile(req, env, ctx)));
+  router.post('/files/list', withAdminAuth(async (req, env) => listFiles(req, env)));
+  router.get('/files/download', withAdminAuth(async (req, env) => downloadFile(req, env)));
+  router.post('/files/upload', withAdminAuth(async (req, env) => uploadFile(req, env)));
 
   // 审计日志 API (管理员)
-  router.get('/audit', withAdminAuth(async (req, env, ctx) => getAuditLogsHandler(req, env, ctx)));
+  router.get('/audit', withAdminAuth(async (req, env) => getAuditLogsHandler(req, env)));
 
   // WebSocket 升级端点
   router.get('/ws', handleWebSocketUpgrade);
