@@ -28,27 +28,22 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-          cache-dependency-path: 'server/package-lock.json'
+          cache-dependency-path: 'package-lock.json'
 
       - name: Install dependencies
-        run: |
-          cd server
-          npm ci
+        run: npm ci
 
       - name: Run type check
-        run: |
-          cd server
-          npm run type-check
+        working-directory: server
+        run: npm run type-check
 
       - name: Run tests
-        run: |
-          cd server
-          npm run test
+        working-directory: server
+        run: npm run test
 
       - name: Run integration tests
-        run: |
-          cd server
-          npm run test:integration
+        working-directory: server
+        run: npm run test:integration
 
   deploy-test:
     name: Deploy to Test Environment
@@ -65,12 +60,10 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-          cache-dependency-path: 'server/package-lock.json'
+          cache-dependency-path: 'package-lock.json'
 
       - name: Install dependencies
-        run: |
-          cd server
-          npm ci
+        run: npm ci
 
       - name: Deploy to Cloudflare Workers (Test)
         uses: cloudflare/wrangler-action@v3
@@ -103,12 +96,10 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-          cache-dependency-path: 'server/package-lock.json'
+          cache-dependency-path: 'package-lock.json'
 
       - name: Install dependencies
-        run: |
-          cd server
-          npm ci
+        run: npm ci
 
       - name: Deploy to Cloudflare Workers (Production)
         uses: cloudflare/wrangler-action@v3
@@ -135,7 +126,7 @@ jobs:
     name: Rollback on Failure
     runs-on: ubuntu-latest
     needs: [deploy-production]
-    if: failure() && github.ref == 'refs/heads/main'
+    if: always() && needs.deploy-production.result == 'failure' && github.ref == 'refs/heads/main'
     environment: production
     steps:
       - name: Checkout code
