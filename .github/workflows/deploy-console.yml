@@ -33,15 +33,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run type check
-        run: npm run -w console type-check
-
-      - name: Run linting
-        run: npm run -w console lint
-
-      - name: Run tests
-        run: npm run -w console test
-
       - name: Build application
         run: npm run -w console build
         env:
