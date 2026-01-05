@@ -318,13 +318,16 @@ export async function authenticateAdmin(
   }
 
   // 检查 Token 是否在黑名单中 (已登出)
-  const isBlacklisted = await isTokenBlacklisted(result.payload.token_id, env.KV);
-  if (isBlacklisted) {
-    return {
-      authenticated: false,
-      error: 'Token has been revoked',
-      errorCode: 'TOKEN_REVOKED'
-    };
+  // 本地开发模式下 KV 可能不可用，跳过黑名单检查
+  if (env.KV) {
+    const isBlacklisted = await isTokenBlacklisted(result.payload.token_id, env.KV);
+    if (isBlacklisted) {
+      return {
+        authenticated: false,
+        error: 'Token has been revoked',
+        errorCode: 'TOKEN_REVOKED'
+      };
+    }
   }
 
   return {

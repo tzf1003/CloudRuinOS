@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
+import { getStoredToken } from '../contexts/AuthContext';
 import {
   Device,
   Session,
@@ -52,6 +53,18 @@ class ApiClient {
         'Content-Type': 'application/json',
       },
     });
+
+    // Request interceptor for adding auth token
+    this.client.interceptors.request.use(
+      (config) => {
+        const token = getStoredToken();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
 
     // Response interceptor for error handling
     this.client.interceptors.response.use(
