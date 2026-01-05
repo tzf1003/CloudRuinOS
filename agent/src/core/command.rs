@@ -381,6 +381,12 @@ mod tests {
     use crate::platform::tests::MockCommandExecutor;
     use std::process::Output;
 
+    #[cfg(windows)]
+    use std::os::windows::process::ExitStatusExt;
+
+    #[cfg(unix)]
+    use std::os::unix::process::ExitStatusExt;
+
     #[tokio::test]
     async fn test_command_execution() {
         let mut mock_executor = MockCommandExecutor::new();

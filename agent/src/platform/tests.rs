@@ -7,6 +7,9 @@ use std::process::Output;
 #[cfg(windows)]
 use std::os::windows::process::ExitStatusExt;
 
+#[cfg(unix)]
+use std::os::unix::process::ExitStatusExt;
+
 /// Mock CommandExecutor for testing
 pub struct MockCommandExecutor {
     expected_calls: std::sync::Mutex<Vec<(String, Vec<String>)>>,
