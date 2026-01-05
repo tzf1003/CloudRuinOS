@@ -284,23 +284,23 @@ export function StatusPage() {
                 <div className="space-y-4">
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">请求总数</span>
-                    <span className="text-sm font-medium">{metrics.requestCount.toLocaleString()}</span>
+                    <span className="text-sm font-medium">{(metrics.requestCount ?? 0).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">错误率</span>
                     <span className="text-sm font-medium">
-                      {(metrics.errorRate * 100).toFixed(2)}%
+                      {((metrics.errorRate ?? 0) * 100).toFixed(2)}%
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">平均响应时间</span>
                     <span className="text-sm font-medium">
-                      {metrics.averageResponseTime.toFixed(0)}ms
+                      {(metrics.averageResponseTime ?? 0).toFixed(0)}ms
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">活跃连接</span>
-                    <span className="text-sm font-medium">{metrics.activeConnections}</span>
+                    <span className="text-sm font-medium">{metrics.activeConnections ?? 0}</span>
                   </div>
                   {metrics.memoryUsage && (
                     <div className="flex justify-between">
