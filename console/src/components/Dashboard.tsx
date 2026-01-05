@@ -163,7 +163,7 @@ export function Dashboard({
       let auditActivity = { today: 0, thisWeek: 0 };
       try {
         const auditResponse = await apiClient.getAuditLogs({
-          start_time: weekStart,
+          startTime: weekStart,
           limit: 1000
         });
         

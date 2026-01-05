@@ -45,6 +45,7 @@ const createMockEnv = (overrides: Partial<Env> = {}): Env => ({
   WEBHOOK_SECRET: 'test-webhook-secret',
   DB_ENCRYPTION_KEY: 'test-db-encryption-key',
   ADMIN_API_KEY: 'test-admin-api-key',
+  ADMIN_PASSWORD: 'test-admin-password',
   ENVIRONMENT: 'test',
   API_VERSION: 'v1',
   MAX_FILE_SIZE: '10485760',

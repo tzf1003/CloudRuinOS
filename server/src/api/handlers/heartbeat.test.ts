@@ -117,6 +117,7 @@ function createTestEnv(): Env {
     WEBHOOK_SECRET: 'test-webhook-secret',
     DB_ENCRYPTION_KEY: 'test-db-encryption-key-32-chars-long-12345678',
     ADMIN_API_KEY: 'test-admin-api-key',
+    ADMIN_PASSWORD: 'test-admin-password',
   };
 }
 

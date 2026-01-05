@@ -14,7 +14,7 @@ export function EnrollmentTokenDialog({ isOpen, onClose }: EnrollmentTokenDialog
   const generateToken = useGenerateEnrollmentToken();
 
   const handleGenerate = () => {
-    generateToken.mutate({ expires_in: expiresIn });
+    generateToken.mutate({ expiresIn: expiresIn });
   };
 
   const handleCopy = async () => {
@@ -120,7 +120,7 @@ export function EnrollmentTokenDialog({ isOpen, onClose }: EnrollmentTokenDialog
                 <div className="flex items-center space-x-2 text-sm text-yellow-800">
                   <Clock className="h-4 w-4" />
                   <span>
-                    令牌将于 {formatTimestamp(generateToken.data.expires_at)} 过期
+                    令牌将于 {formatTimestamp(generateToken.data.expiresAt)} 过期
                   </span>
                 </div>
               </div>

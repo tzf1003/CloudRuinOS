@@ -19,7 +19,7 @@ export function CreateSessionDialog({ isOpen, onClose, preselectedDevice }: Crea
   const handleCreate = () => {
     if (selectedDeviceId) {
       createSession.mutate(
-        { device_id: selectedDeviceId },
+        { deviceId: selectedDeviceId },
         {
           onSuccess: () => {
             onClose();

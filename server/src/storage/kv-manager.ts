@@ -20,6 +20,9 @@ import {
   BatchDeleteOperation,
   BatchOperationResult,
   KVStorageStats,
+  CommandRecord,
+  CommandQueueIndex,
+  CommandStatus,
 } from '../types/kv-storage';
 
 export class CloudflareKVManager implements KVStorageManager {
@@ -344,6 +347,159 @@ export class CloudflareKVManager implements KVStorageManager {
     } catch (error) {
       console.error('Failed to delete device cache:', error);
       return false;
+    }
+  }
+
+  // ==================== 命令队列操作 ====================
+
+  async enqueueCommand(command: CommandRecord): Promise<boolean> {
+    try {
+      const key = KVKeyGenerator.command(command.id);
+      const ttl = TTLCalculator.getCommandQueueTTL();
+      await this.kv.put(key, JSON.stringify(command), { expirationTtl: ttl });
+      
+      // 更新设备的命令队列索引
+      const indexKey = KVKeyGenerator.commandQueueIndex(command.device_id);
+      const indexValue = await this.kv.get(indexKey);
+      let index: CommandQueueIndex;
+      
+      if (indexValue) {
+        index = JSON.parse(indexValue);
+        index.command_ids.push(command.id);
+      } else {
+        index = {
+          device_id: command.device_id,
+          command_ids: [command.id],
+          updated_at: Date.now(),
+        };
+      }
+      
+      index.updated_at = Date.now();
+      await this.kv.put(indexKey, JSON.stringify(index), { expirationTtl: ttl });
+      return true;
+    } catch (error) {
+      console.error('Failed to enqueue command:', error);
+      return false;
+    }
+  }
+
+  async getDeviceCommands(deviceId: string, limit: number = 10): Promise<CommandRecord[]> {
+    try {
+      const indexKey = KVKeyGenerator.commandQueueIndex(deviceId);
+      const indexValue = await this.kv.get(indexKey);
+      
+      if (!indexValue) {
+        return [];
+      }
+      
+      const index: CommandQueueIndex = JSON.parse(indexValue);
+      const commands: CommandRecord[] = [];
+      
+      for (const commandId of index.command_ids.slice(0, limit)) {
+        const command = await this.getCommand(commandId);
+        if (command && command.status === 'pending') {
+          commands.push(command);
+        }
+      }
+      
+      return commands;
+    } catch (error) {
+      console.error('Failed to get device commands:', error);
+      return [];
+    }
+  }
+
+  async getCommand(commandId: string): Promise<CommandRecord | null> {
+    try {
+      const key = KVKeyGenerator.command(commandId);
+      const value = await this.kv.get(key);
+      
+      if (!value) {
+        return null;
+      }
+      
+      return JSON.parse(value) as CommandRecord;
+    } catch (error) {
+      console.error('Failed to get command:', error);
+      return null;
+    }
+  }
+
+  async updateCommandStatus(commandId: string, status: CommandStatus, result?: any, error?: string): Promise<boolean> {
+    try {
+      const command = await this.getCommand(commandId);
+      if (!command) {
+        return false;
+      }
+      
+      command.status = status;
+      if (result !== undefined) {
+        command.result = result;
+      }
+      if (error !== undefined) {
+        command.error = error;
+      }
+      if (status === 'delivered') {
+        command.delivered_at = Date.now();
+      }
+      if (status === 'completed' || status === 'failed') {
+        command.completed_at = Date.now();
+      }
+      
+      const key = KVKeyGenerator.command(commandId);
+      const remainingTtl = Math.max(0, Math.floor((command.expires_at - Date.now()) / 1000));
+      await this.kv.put(key, JSON.stringify(command), { expirationTtl: remainingTtl || 3600 });
+      return true;
+    } catch (error) {
+      console.error('Failed to update command status:', error);
+      return false;
+    }
+  }
+
+  async deleteCommand(commandId: string): Promise<boolean> {
+    try {
+      const key = KVKeyGenerator.command(commandId);
+      await this.kv.delete(key);
+      return true;
+    } catch (error) {
+      console.error('Failed to delete command:', error);
+      return false;
+    }
+  }
+
+  async cleanExpiredCommands(deviceId: string): Promise<number> {
+    try {
+      const indexKey = KVKeyGenerator.commandQueueIndex(deviceId);
+      const indexValue = await this.kv.get(indexKey);
+      
+      if (!indexValue) {
+        return 0;
+      }
+      
+      const index: CommandQueueIndex = JSON.parse(indexValue);
+      const now = Date.now();
+      let cleaned = 0;
+      const validCommandIds: string[] = [];
+      
+      for (const commandId of index.command_ids) {
+        const command = await this.getCommand(commandId);
+        if (!command || command.expires_at < now) {
+          await this.deleteCommand(commandId);
+          cleaned++;
+        } else {
+          validCommandIds.push(commandId);
+        }
+      }
+      
+      // 更新索引
+      index.command_ids = validCommandIds;
+      index.updated_at = Date.now();
+      await this.kv.put(indexKey, JSON.stringify(index), { expirationTtl: TTLCalculator.getCommandQueueTTL() });
+      
+      return cleaned;
+    } catch (error) {
+      console.error('Failed to clean expired commands:', error);
+      return 0;
     }
   }
 

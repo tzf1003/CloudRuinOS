@@ -31,17 +31,17 @@ const actionNames = {
 export function AuditLogDetailsModal({ log, isOpen, onClose }: AuditLogDetailsModalProps) {
   if (!isOpen || !log) return null;
 
-  const IconComponent = actionIcons[log.action_type as keyof typeof actionIcons] || FileText;
-  const actionName = actionNames[log.action_type as keyof typeof actionNames] || log.action_type;
+  const IconComponent = actionIcons[log.actionType as keyof typeof actionIcons] || FileText;
+  const actionName = actionNames[log.actionType as keyof typeof actionNames] || log.actionType;
 
   let actionData;
   try {
-    actionData = log.action_data ? JSON.parse(log.action_data) : null;
+    actionData = log.actionData ? JSON.parse(log.actionData) : null;
   } catch {
     actionData = null;
   }
 
-  const isSuccess = log.result === 'success' || (!log.result && log.action_type === 'device_heartbeat');
+  const isSuccess = log.result === 'success' || (!log.result && log.actionType === 'device_heartbeat');
   const isError = log.result === 'error' || log.result === 'failed';
 
   return (
@@ -106,18 +106,18 @@ export function AuditLogDetailsModal({ log, isOpen, onClose }: AuditLogDetailsMo
                   <span className="text-sm text-gray-600">设备 ID</span>
                 </div>
                 <span className="text-sm font-mono text-gray-900">
-                  {log.device_id}
+                  {log.deviceId}
                 </span>
               </div>
               
-              {log.session_id && (
+              {log.sessionId && (
                 <div className="bg-gray-50 rounded-lg p-3">
                   <div className="flex items-center space-x-2 mb-1">
                     <Radio className="h-4 w-4 text-gray-400" />
                     <span className="text-sm text-gray-600">会话 ID</span>
                   </div>
                   <span className="text-sm font-mono text-gray-900">
-                    {log.session_id}
+                    {log.sessionId}
                   </span>
                 </div>
               )}
@@ -129,7 +129,7 @@ export function AuditLogDetailsModal({ log, isOpen, onClose }: AuditLogDetailsMo
             <div>
               <h4 className="text-sm font-medium text-gray-900 mb-3">操作详情</h4>
               <div className="bg-gray-50 rounded-lg p-3">
-                {log.action_type === 'command_execution' && (
+                {log.actionType === 'command_execution' && (
                   <div className="space-y-2">
                     {actionData.command && (
                       <div>
@@ -164,7 +164,7 @@ export function AuditLogDetailsModal({ log, isOpen, onClose }: AuditLogDetailsMo
                   </div>
                 )}
 
-                {log.action_type === 'file_operation' && (
+                {log.actionType === 'file_operation' && (
                   <div className="space-y-2">
                     {actionData.operation && (
                       <div>
@@ -189,7 +189,7 @@ export function AuditLogDetailsModal({ log, isOpen, onClose }: AuditLogDetailsMo
                   </div>
                 )}
 
-                {log.action_type === 'device_enrollment' && (
+                {log.actionType === 'device_enrollment' && (
                   <div className="space-y-2">
                     {actionData.platform && (
                       <div>
@@ -214,7 +214,7 @@ export function AuditLogDetailsModal({ log, isOpen, onClose }: AuditLogDetailsMo
                   </div>
                 )}
 
-                {(log.action_type === 'session_created' || log.action_type === 'session_closed') && (
+                {(log.actionType === 'session_created' || log.actionType === 'session_closed') && (
                   <div className="space-y-2">
                     {actionData.session_id && (
                       <div>
@@ -234,7 +234,7 @@ export function AuditLogDetailsModal({ log, isOpen, onClose }: AuditLogDetailsMo
                 )}
 
                 {/* Generic JSON display for other action types */}
-                {!['command_execution', 'file_operation', 'device_enrollment', 'session_created', 'session_closed'].includes(log.action_type) && (
+                {!['command_execution', 'file_operation', 'device_enrollment', 'session_created', 'session_closed'].includes(log.actionType) && (
                   <pre className="text-xs bg-white p-2 rounded border overflow-x-auto">
                     {JSON.stringify(actionData, null, 2)}
                   </pre>

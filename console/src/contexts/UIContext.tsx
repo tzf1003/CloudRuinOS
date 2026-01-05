@@ -267,12 +267,13 @@ export function useNotifications() {
   const { state, dispatch } = useUI();
   
   const addNotification = (notification: Omit<Notification, 'id' | 'timestamp'>) => {
+    const id = Date.now().toString();
     dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
     
     // 自动移除通知（如果设置了duration）
     if (notification.duration && !notification.persistent) {
       setTimeout(() => {
-        dispatch({ type: 'REMOVE_NOTIFICATION', payload: notification.id || '' });
+        dispatch({ type: 'REMOVE_NOTIFICATION', payload: id });
       }, notification.duration);
     }
   };

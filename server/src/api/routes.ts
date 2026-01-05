@@ -81,19 +81,19 @@ export function createRouter() {
   router.get('/commands/:id', withAdminAuth(async (req, env, ctx) => getCommandStatus(req, env, ctx)));
 
   // 注册令牌管理 API (管理员)
-  router.post('/enrollment/token', withAdminAuth(async (req, env, ctx) => generateEnrollmentTokenHandler(req, env, ctx)));
-  router.get('/enrollment/tokens', withAdminAuth(async (req, env, ctx) => getEnrollmentTokensHandler(req, env, ctx)));
-  router.get('/enrollment/token/:token', withAdminAuth(async (req, env, ctx) => validateEnrollmentTokenHandler(req, env, ctx)));
-  router.put('/enrollment/token/:id', withAdminAuth(async (req, env, ctx) => updateEnrollmentTokenHandler(req, env, ctx)));
-  router.delete('/enrollment/token/:id', withAdminAuth(async (req, env, ctx) => deleteEnrollmentTokenHandler(req, env, ctx)));
+  router.post('/enrollment/token', withAdminAuth(async (req, env, ctx) => generateEnrollmentTokenHandler(req, env)));
+  router.get('/enrollment/tokens', withAdminAuth(async (req, env, ctx) => getEnrollmentTokensHandler(req, env)));
+  router.get('/enrollment/token/:token', withAdminAuth(async (req, env, ctx) => validateEnrollmentTokenHandler(req, env)));
+  router.put('/enrollment/token/:id', withAdminAuth(async (req, env, ctx) => updateEnrollmentTokenHandler(req, env)));
+  router.delete('/enrollment/token/:id', withAdminAuth(async (req, env, ctx) => deleteEnrollmentTokenHandler(req, env)));
 
   // 设备管理 API (管理员)
-  router.get('/devices', withAdminAuth(async (req, env, ctx) => getDevices(req, env, ctx)));
-  router.get('/devices/:id', withAdminAuth(async (req, env, ctx) => getDevice(req, env, ctx)));
+  router.get('/devices', withAdminAuth(async (req, env, ctx) => getDevices(req, env)));
+  router.get('/devices/:id', withAdminAuth(async (req, env, ctx) => getDevice(req, env)));
   router.get('/devices/:id/commands', withAdminAuth(async (req, env, ctx) => getDeviceCommandHistory(req, env, ctx)));
   router.get('/devices/:id/audit', withAdminAuth(async (req, env, ctx) => getDeviceAuditLogs(req, env, ctx)));
-  router.put('/devices/:id', withAdminAuth(async (req, env, ctx) => updateDevice(req, env, ctx)));
-  router.delete('/devices/:id', withAdminAuth(async (req, env, ctx) => deleteDevice(req, env, ctx)));
+  router.put('/devices/:id', withAdminAuth(async (req, env, ctx) => updateDevice(req, env)));
+  router.delete('/devices/:id', withAdminAuth(async (req, env, ctx) => deleteDevice(req, env)));
 
   // 会话管理 API (管理员)
   router.get('/sessions', withAdminAuth(async (req, env, ctx) => getSessions(req, env, ctx)));

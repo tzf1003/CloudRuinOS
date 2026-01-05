@@ -74,6 +74,9 @@ function createTestEnv(): Env {
     ENROLLMENT_SECRET: 'test-secret',
     JWT_SECRET: 'test-jwt-secret',
     WEBHOOK_SECRET: 'test-webhook-secret',
+    DB_ENCRYPTION_KEY: 'test-db-encryption-key-32-chars-long-12345678',
+    ADMIN_API_KEY: 'test-admin-api-key',
+    ADMIN_PASSWORD: 'test-admin-password',
     SERVER_PUBLIC_KEY: 'test-server-public-key',
   };
 }

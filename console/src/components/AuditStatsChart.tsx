@@ -138,13 +138,13 @@ export function AuditStatsChart({
       const startTime = endTime - timeRange;
       
       const filters: AuditFilters = {
-        start_time: startTime,
-        end_time: endTime,
+        startTime: startTime,
+        endTime: endTime,
         limit: 10000 // 获取足够多的数据进行统计
       };
       
-      if (deviceId) filters.device_id = deviceId;
-      if (actionType) filters.action_type = actionType;
+      if (deviceId) filters.deviceId = deviceId;
+      if (actionType) filters.actionType = actionType;
       
       const response = await apiClient.getAuditLogs(filters);
       const logs = response.logs;
@@ -152,8 +152,8 @@ export function AuditStatsChart({
       // 统计操作类型分布
       const actionTypeMap = new Map<string, number>();
       logs.forEach(log => {
-        const count = actionTypeMap.get(log.action_type) || 0;
-        actionTypeMap.set(log.action_type, count + 1);
+        const count = actionTypeMap.get(log.actionType) || 0;
+        actionTypeMap.set(log.actionType, count + 1);
       });
       
       const totalActions = logs.length;
@@ -188,8 +188,8 @@ export function AuditStatsChart({
       // 统计设备活动
       const deviceMap = new Map<string, { count: number; lastActivity: number }>();
       logs.forEach(log => {
-        const existing = deviceMap.get(log.device_id) || { count: 0, lastActivity: 0 };
-        deviceMap.set(log.device_id, {
+        const existing = deviceMap.get(log.deviceId) || { count: 0, lastActivity: 0 };
+        deviceMap.set(log.deviceId, {
           count: existing.count + 1,
           lastActivity: Math.max(existing.lastActivity, log.timestamp)
         });
@@ -209,9 +209,9 @@ export function AuditStatsChart({
       logs.forEach(log => {
         // 根据操作类型推断严重程度
         let severity: 'info' | 'warning' | 'error' = 'info';
-        if (log.action_type.includes('error') || log.action_type === 'session_terminate') {
+        if (log.actionType.includes('error') || log.actionType === 'session_terminate') {
           severity = 'error';
-        } else if (log.action_type.includes('configuration') || log.action_type === 'command_execution') {
+        } else if (log.actionType.includes('configuration') || log.actionType === 'command_execution') {
           severity = 'warning';
         }
         

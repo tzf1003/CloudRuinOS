@@ -57,9 +57,15 @@ export function useEnhancedQuery<TData, TError = Error>(
   return query;
 }
 
+// 定义 mutation 上下文类型
+interface MutationContext {
+  operationId?: string;
+  [key: string]: unknown;
+}
+
 // 增强的变更Hook，自动处理操作进度和通知
 export function useEnhancedMutation<TData, TError = Error, TVariables = void>(
-  options: UseMutationOptions<TData, TError, TVariables> & {
+  options: UseMutationOptions<TData, TError, TVariables, MutationContext> & {
     operationType?: 'upload' | 'download' | 'api' | 'websocket';
     operationMessage?: string;
     successMessage?: string;
@@ -70,7 +76,7 @@ export function useEnhancedMutation<TData, TError = Error, TVariables = void>(
   const { startOperation, updateOperation, completeOperation } = useOperations();
   const toast = useToast();
 
-  const mutation = useMutation({
+  const mutation = useMutation<TData, TError, TVariables, MutationContext>({
     ...options,
     onMutate: (variables) => {
       let operationId: string | undefined;
@@ -87,7 +93,8 @@ export function useEnhancedMutation<TData, TError = Error, TVariables = void>(
       }
 
       const result = options.onMutate?.(variables);
-      return { ...result, operationId };
+      const baseResult = (result && typeof result === 'object') ? result as Record<string, unknown> : {};
+      return { ...baseResult, operationId };
     },
     onSuccess: (data, variables, context) => {
       if (context?.operationId) {

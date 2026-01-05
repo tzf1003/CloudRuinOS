@@ -38,18 +38,18 @@ const actionNames = {
 };
 
 export function AuditLogCard({ log, onSelect }: AuditLogCardProps) {
-  const IconComponent = actionIcons[log.action_type as keyof typeof actionIcons] || FileText;
-  const actionColor = actionColors[log.action_type as keyof typeof actionColors] || 'text-gray-600 bg-gray-100';
-  const actionName = actionNames[log.action_type as keyof typeof actionNames] || log.action_type;
+  const IconComponent = actionIcons[log.actionType as keyof typeof actionIcons] || FileText;
+  const actionColor = actionColors[log.actionType as keyof typeof actionColors] || 'text-gray-600 bg-gray-100';
+  const actionName = actionNames[log.actionType as keyof typeof actionNames] || log.actionType;
 
   let actionData;
   try {
-    actionData = log.action_data ? JSON.parse(log.action_data) : null;
+    actionData = log.actionData ? JSON.parse(log.actionData) : null;
   } catch {
     actionData = null;
   }
 
-  const isSuccess = log.result === 'success' || (!log.result && log.action_type === 'device_heartbeat');
+  const isSuccess = log.result === 'success' || (!log.result && log.actionType === 'device_heartbeat');
   const isError = log.result === 'error' || log.result === 'failed';
 
   return (
@@ -89,26 +89,26 @@ export function AuditLogCard({ log, onSelect }: AuditLogCardProps) {
           
           <div className="mt-1 text-sm text-gray-600">
             <div className="flex items-center space-x-4">
-              <span>设备: {log.device_id.substring(0, 8)}...</span>
-              {log.session_id && (
-                <span>会话: {log.session_id.substring(0, 8)}...</span>
+              <span>设备: {log.deviceId.substring(0, 8)}...</span>
+              {log.sessionId && (
+                <span>会话: {log.sessionId.substring(0, 8)}...</span>
               )}
             </div>
           </div>
 
           {actionData && (
             <div className="mt-2 text-xs text-gray-500">
-              {log.action_type === 'command_execution' && actionData.command && (
+              {log.actionType === 'command_execution' && actionData.command && (
                 <div className="font-mono bg-gray-100 px-2 py-1 rounded">
                   $ {actionData.command}
                 </div>
               )}
-              {log.action_type === 'file_operation' && actionData.path && (
+              {log.actionType === 'file_operation' && actionData.path && (
                 <div className="font-mono bg-gray-100 px-2 py-1 rounded">
                   {actionData.operation}: {actionData.path}
                 </div>
               )}
-              {log.action_type === 'device_enrollment' && actionData.platform && (
+              {log.actionType === 'device_enrollment' && actionData.platform && (
                 <div>
                   平台: {actionData.platform} | 版本: {actionData.version}
                 </div>
