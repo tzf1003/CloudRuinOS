@@ -74,31 +74,15 @@ jobs:
             features: "windows,tls-strict"
             artifact_name: rmm-agent-windows-x64.exe
             use_cross: false
+            binary_ext: ".exe"
             
-          # Linux 目标
-          - target: x86_64-unknown-linux-musl
-            os: ubuntu-latest
-            features: "linux,tls-strict,doh,static-link"
-            artifact_name: rmm-agent-linux-x64-static
-            use_cross: true
-            
+          # Linux 目标 (GNU libc - 最常用)
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             features: "linux,tls-strict,doh"
             artifact_name: rmm-agent-linux-x64
             use_cross: false
-            
-          - target: aarch64-unknown-linux-musl
-            os: ubuntu-latest
-            features: "linux,tls-strict,doh,static-link"
-            artifact_name: rmm-agent-linux-arm64-static
-            use_cross: true
-            
-          - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
-            features: "linux,tls-strict,doh"
-            artifact_name: rmm-agent-linux-arm64
-            use_cross: true
+            binary_ext: ""
             
           # macOS 目标
           - target: x86_64-apple-darwin
@@ -106,12 +90,14 @@ jobs:
             features: "macos,tls-strict,doh"
             artifact_name: rmm-agent-macos-x64
             use_cross: false
+            binary_ext: ""
             
           - target: aarch64-apple-darwin
             os: macos-latest
             features: "macos,tls-strict,doh"
             artifact_name: rmm-agent-macos-arm64
             use_cross: false
+            binary_ext: ""
 
     steps:
     - name: Checkout code
@@ -123,10 +109,6 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
       with:
         targets: ${{ matrix.target }}
-
-    - name: Install cross
-      if: matrix.use_cross
-      run: cargo install cross --git https://github.com/cross-rs/cross
 
     - name: Cache cargo registry
       uses: actions/cache@v4
@@ -146,24 +128,30 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-${{ matrix.target }}-target-
 
-    - name: Build with cargo
-      if: '!matrix.use_cross'
+    - name: Build release binary
       working-directory: agent
       run: cargo build --release --target ${{ matrix.target }} --features "${{ matrix.features }}"
 
-    - name: Build with cross
-      if: matrix.use_cross
-      working-directory: agent
-      run: cross build --release --target ${{ matrix.target }} --features "${{ matrix.features }}"
+    - name: List build output (debug)
+      shell: bash
+      run: |
+        echo "Listing agent/target/${{ matrix.target }}/release/"
+        ls -la agent/target/${{ matrix.target }}/release/ || echo "Directory not found"
 
     - name: Prepare artifact (Windows)
       if: runner.os == 'Windows'
+      shell: pwsh
       working-directory: agent
       run: |
-        mkdir -p artifacts
+        New-Item -ItemType Directory -Force -Path artifacts
         $exe_path = "target/${{ matrix.target }}/release/rmm-agent.exe"
         if (Test-Path $exe_path) {
           Copy-Item $exe_path "artifacts/${{ matrix.artifact_name }}"
+          Write-Host "Artifact prepared: artifacts/${{ matrix.artifact_name }}"
+        } else {
+          Write-Host "Binary not found at: $exe_path"
+          Get-ChildItem -Recurse target/${{ matrix.target }}/release/*.exe
+          exit 1
         }
 
     - name: Prepare artifact (Unix)
@@ -175,6 +163,11 @@ jobs:
         if [ -f "$exe_path" ]; then
           cp "$exe_path" "artifacts/${{ matrix.artifact_name }}"
           chmod +x "artifacts/${{ matrix.artifact_name }}"
+          echo "Artifact prepared: artifacts/${{ matrix.artifact_name }}"
+        else
+          echo "Binary not found at: $exe_path"
+          find target/${{ matrix.target }}/release/ -type f -perm +111 2>/dev/null || true
+          exit 1
         fi
 
     - name: Upload artifact
