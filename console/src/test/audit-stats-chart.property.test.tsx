@@ -309,7 +309,7 @@ describe('AuditStatsChart Properties', () => {
               expect.objectContaining({
                 start_time: expect.any(Number),
                 end_time: expect.any(Number),
-                limit: 10000,
+                limit: 1000,
                 ...(deviceId && { device_id: deviceId }),
                 ...(actionType && { action_type: actionType })
               })

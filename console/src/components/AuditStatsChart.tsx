@@ -140,7 +140,7 @@ export function AuditStatsChart({
       const filters: AuditFilters = {
         start_time: startTime,
         end_time: endTime,
-        limit: 10000 // 获取足够多的数据进行统计
+        limit: 1000 // 服务器最大允许 1000
       };
       
       if (deviceId) filters.device_id = deviceId;
