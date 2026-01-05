@@ -1,20 +1,69 @@
-name: Cross-Platform Build
+name: Agent CI/CD
 
 on:
   workflow_dispatch:
   push:
     branches: [ main, develop ]
     tags: [ 'v*' ]
+    paths:
+      - 'agent/**'
+      - '.github/workflows/build-cross-platform.yml'
   pull_request:
     branches: [ main ]
+    paths:
+      - 'agent/**'
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # ==================== 测试阶段 ====================
+  test:
+    name: Test Agent
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          agent/target
+        key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-test-
+
+    - name: Check formatting
+      working-directory: agent
+      run: cargo fmt --all -- --check
+
+    - name: Run clippy
+      working-directory: agent
+      run: cargo clippy --all-targets --all-features -- -W clippy::all
+      continue-on-error: true
+
+    - name: Run unit tests
+      working-directory: agent
+      run: cargo test --lib --features "linux,tls-strict,test-local"
+
+    - name: Run integration tests
+      working-directory: agent
+      run: cargo test --test integration_test --features "linux,tls-strict,test-local"
+      continue-on-error: true
+
+  # ==================== 构建阶段 ====================
   build:
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
+    needs: test
     strategy:
       fail-fast: false
       matrix:
@@ -24,12 +73,6 @@ jobs:
             os: windows-latest
             features: "windows,tls-strict"
             artifact_name: rmm-agent-windows-x64.exe
-            use_cross: false
-            
-          - target: x86_64-pc-windows-gnu
-            os: windows-latest
-            features: "windows,tls-strict"
-            artifact_name: rmm-agent-windows-x64-gnu.exe
             use_cross: false
             
           # Linux 目标
@@ -141,29 +184,7 @@ jobs:
         path: agent/artifacts/${{ matrix.artifact_name }}
         if-no-files-found: error
 
-  test:
-    name: Test on ubuntu-latest
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
-
-    - name: Cache cargo registry
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-    - name: Run tests
-      working-directory: agent
-      run: cargo test --features "linux,tls-strict,test-local"
-
+  # ==================== 发布阶段 ====================
   release:
     name: Create Release
     needs: [build, test]
