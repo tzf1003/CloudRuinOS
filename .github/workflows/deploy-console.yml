@@ -28,32 +28,22 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-          cache-dependency-path: 'console/package-lock.json'
+          cache-dependency-path: 'package-lock.json'
 
       - name: Install dependencies
-        run: |
-          cd console
-          npm ci
+        run: npm ci
 
       - name: Run type check
-        run: |
-          cd console
-          npm run type-check
+        run: npm run -w console type-check
 
       - name: Run linting
-        run: |
-          cd console
-          npm run lint
+        run: npm run -w console lint
 
       - name: Run tests
-        run: |
-          cd console
-          npm run test
+        run: npm run -w console test
 
       - name: Build application
-        run: |
-          cd console
-          npm run build
+        run: npm run -w console build
         env:
           VITE_API_BASE_URL: https://rmm-server-test.your-subdomain.workers.dev
 
@@ -72,17 +62,13 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-          cache-dependency-path: 'console/package-lock.json'
+          cache-dependency-path: 'package-lock.json'
 
       - name: Install dependencies
-        run: |
-          cd console
-          npm ci
+        run: npm ci
 
       - name: Build for test environment
-        run: |
-          cd console
-          npm run build
+        run: npm run -w console build
         env:
           VITE_API_BASE_URL: ${{ secrets.TEST_API_BASE_URL }}
 
@@ -110,17 +96,13 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-          cache-dependency-path: 'console/package-lock.json'
+          cache-dependency-path: 'package-lock.json'
 
       - name: Install dependencies
-        run: |
-          cd console
-          npm ci
+        run: npm ci
 
       - name: Build for production
-        run: |
-          cd console
-          npm run build
+        run: npm run -w console build
         env:
           VITE_API_BASE_URL: ${{ secrets.PROD_API_BASE_URL }}
 
@@ -151,20 +133,15 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-          cache-dependency-path: 'console/package-lock.json'
+          cache-dependency-path: 'package-lock.json'
 
       - name: Install dependencies
-        run: |
-          cd console
-          npm ci
+        run: npm ci
 
       - name: Run security audit
-        run: |
-          cd console
-          npm audit --audit-level=high
+        run: npm audit --audit-level=high -w console
 
       - name: Build and analyze bundle
         run: |
-          cd console
-          npm run build
-          npx bundlesize
+          npm run -w console build
+          cd console && npx bundlesize
