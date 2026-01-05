@@ -909,6 +909,7 @@ interface SessionMetadata {
   connectedAt: number;
   lastActivity: number;
   status: 'connected' | 'authenticated' | 'busy' | 'idle';
+  platform?: string;
 }
 
 // WebSocket 消息类型

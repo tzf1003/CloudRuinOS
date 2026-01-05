@@ -85,15 +85,19 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             artifact_name: rmm-agent-linux-x64
+            features: linux,tls-strict
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact_name: rmm-agent-windows-x64.exe
+            features: windows,tls-strict
           - os: macos-latest
             target: x86_64-apple-darwin
             artifact_name: rmm-agent-macos-x64
+            features: macos,tls-strict
           - os: macos-latest
             target: aarch64-apple-darwin
             artifact_name: rmm-agent-macos-arm64
+            features: macos,tls-strict
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -118,11 +122,15 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --manifest-path agent/Cargo.toml --release --target ${{ matrix.target }}
+          args: --manifest-path agent/Cargo.toml --release --target ${{ matrix.target }} --features ${{ matrix.features }}
 
       - name: Strip binary (Linux/macOS)
         if: matrix.os != 'windows-latest'
-        run: strip agent/target/${{ matrix.target }}/release/rmm-agent
+        continue-on-error: true
+        run: |
+          if [ -f "agent/target/${{ matrix.target }}/release/rmm-agent" ]; then
+            strip agent/target/${{ matrix.target }}/release/rmm-agent
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

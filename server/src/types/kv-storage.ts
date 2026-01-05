@@ -136,7 +136,7 @@ export interface KVStorageManager {
   deleteSessionCache(sessionId: string): Promise<boolean>;
   
   // 注册令牌操作
-  setEnrollmentToken(token: string, expiresIn: number, createdBy?: string): Promise<boolean>;
+  setEnrollmentToken(token: string, expiresIn: number, createdBy?: string, description?: string): Promise<boolean>;
   getEnrollmentToken(token: string): Promise<EnrollmentTokenRecord | null>;
   markTokenUsed(token: string, deviceId: string): Promise<boolean>;
   

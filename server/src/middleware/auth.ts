@@ -431,8 +431,8 @@ export function withDeviceAuth(
  * 创建管理员认证中间件包装器
  * 验证 JWT Token，确保只有管理员可以访问
  */
-export function withAdminAuth(
-  handler: (request: Request, env: Env) => Promise<Response>
+export function withAdminAuth<T extends (request: Request, env: Env, ...args: any[]) => Promise<Response>>(
+  handler: T
 ) {
   return async (request: Request, env: Env, ctx: ExecutionContext): Promise<Response> => {
     const authResult = await authenticateAdmin(request, env);
@@ -447,7 +447,7 @@ export function withAdminAuth(
       });
     }
     
-    return handler(request, env);
+    return handler(request, env, ctx);
   };
 }
 
