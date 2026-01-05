@@ -2,16 +2,19 @@ use proptest::prelude::*;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tempfile::NamedTempFile;
 
+use crate::core::audit::{AuditEventType, AuditLogger, AuditResult, ThreatLevel};
 use crate::core::crypto::CryptoManager;
 use crate::core::heartbeat::{HeartbeatClient, HeartbeatConfig};
-use crate::core::protocol::{HeartbeatRequest, SystemInfo, WSMessage, PresenceStatus};
+use crate::core::protocol::{HeartbeatRequest, PresenceStatus, SystemInfo, WSMessage};
 use crate::core::state::StateManager;
-use crate::core::audit::{AuditLogger, AuditResult, AuditEventType, ThreatLevel};
-use crate::transport::{HttpClient, TlsConfig, WebSocketClient, ReconnectStrategy, TlsVerifyMode, TlsVersion, SecurityCheckResult};
 #[cfg(feature = "doh")]
-use crate::transport::{DohResolver, DohProvider};
+use crate::transport::{DohProvider, DohResolver};
 #[cfg(feature = "ech")]
 use crate::transport::{EchConfig, EchConfigEntry};
+use crate::transport::{
+    HttpClient, ReconnectStrategy, SecurityCheckResult, TlsConfig, TlsVerifyMode, TlsVersion,
+    WebSocketClient,
+};
 
 // Mock FileSystem for testing
 use async_trait::async_trait;
@@ -60,16 +63,16 @@ mod heartbeat_periodic_sending_tests {
                 // 创建 HTTP 客户端
                 let tls_config = TlsConfig::default();
                 let http_client = HttpClient::new(tls_config).unwrap();
-                
+
                 // 创建心跳客户端
                 let heartbeat_client = HeartbeatClient::new(config, http_client);
-                
+
                 // 验证心跳间隔设置正确
                 prop_assert_eq!(
                     heartbeat_client.heartbeat_interval(),
                     Duration::from_secs(heartbeat_interval_secs)
                 );
-                
+
                 Ok(())
             });
             result?;
@@ -118,7 +121,7 @@ mod heartbeat_periodic_sending_tests {
                 // 创建签名数据
                 use serde_json::json;
                 use crate::core::crypto::SignableData;
-                
+
                 let signable_data = SignableData {
                     device_id: device_id.clone(),
                     timestamp,
@@ -145,7 +148,7 @@ mod heartbeat_periodic_sending_tests {
                 prop_assert_eq!(request.system_info.version, version);
                 prop_assert!(!request.signature.is_empty());
                 prop_assert!(request.timestamp > 0);
-                
+
                 Ok(())
             });
             result?;
@@ -159,8 +162,8 @@ mod heartbeat_periodic_sending_tests {
 #[cfg(test)]
 mod request_signature_integrity_tests {
     use super::*;
-    use serde_json::json;
     use crate::core::crypto::SignableData;
+    use serde_json::json;
 
     proptest! {
         #[test]
@@ -236,7 +239,7 @@ mod request_signature_integrity_tests {
 
                 // 验证篡改时间戳的数据签名应该失败
                 prop_assert!(!crypto_manager.verify(&tampered_timestamp_bytes, &signature).unwrap());
-                
+
                 Ok(())
             });
             result?;
@@ -290,7 +293,7 @@ mod request_signature_integrity_tests {
                 prop_assert!(crypto_manager.verify(&signable_data2.to_bytes().unwrap(), &signature2).unwrap());
                 prop_assert!(!crypto_manager.verify(&signable_data1.to_bytes().unwrap(), &signature2).unwrap());
                 prop_assert!(!crypto_manager.verify(&signable_data2.to_bytes().unwrap(), &signature1).unwrap());
-                
+
                 Ok(())
             });
             result?;
@@ -346,7 +349,7 @@ mod request_signature_integrity_tests {
                 // 验证签名交叉验证失败（防重放）
                 prop_assert!(!crypto_manager.verify(&data1.to_bytes().unwrap(), &signature2).unwrap());
                 prop_assert!(!crypto_manager.verify(&data2.to_bytes().unwrap(), &signature1).unwrap());
-                
+
                 Ok(())
             });
             result?;
@@ -383,7 +386,7 @@ mod heartbeat_client_integration_tests {
                     heartbeat_client.heartbeat_interval(),
                     Duration::from_secs(heartbeat_interval)
                 );
-                
+
                 Ok(())
             });
             result?;
@@ -425,7 +428,7 @@ mod heartbeat_client_integration_tests {
                     heartbeat_client.heartbeat_interval(),
                     Duration::from_secs(new_interval)
                 );
-                
+
                 Ok(())
             });
             result?;
@@ -468,11 +471,11 @@ mod websocket_connection_establishment_tests {
                 // 验证客户端配置正确
                 // 注意：这里我们只验证客户端创建和配置，不实际连接
                 // 因为在属性测试中我们无法保证有真实的 WebSocket 服务器
-                
+
                 // 验证 WebSocket 客户端可以正确创建
                 // 这验证了连接建立的前置条件
                 prop_assert!(true); // 如果能创建客户端，说明配置正确
-                
+
                 Ok(())
             });
             result?;
@@ -535,7 +538,7 @@ mod websocket_connection_establishment_tests {
                     prop_assert_eq!(deserialized_cmd, command);
                     prop_assert_eq!(deserialized_args, args);
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -581,18 +584,18 @@ mod websocket_auto_reconnect_tests {
                         (current_delay.as_secs_f64() * backoff_factor)
                             .min(reconnect_strategy.max_delay.as_secs_f64())
                     );
-                    
+
                     // 验证延迟不超过最大值
                     prop_assert!(next_delay <= reconnect_strategy.max_delay);
-                    
+
                     // 验证延迟递增（除非达到最大值）
                     if current_delay < reconnect_strategy.max_delay {
                         prop_assert!(next_delay >= current_delay);
                     }
-                    
+
                     current_delay = next_delay;
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -617,33 +620,33 @@ mod websocket_auto_reconnect_tests {
 
                 // 模拟多次重连尝试，验证延迟边界
                 let mut current_delay = reconnect_strategy.initial_delay;
-                
+
                 for _attempt in 1..=10 {
                     // 计算下一次延迟
                     let next_delay_secs = current_delay.as_secs_f64() * backoff_factor;
                     let next_delay = Duration::from_secs_f64(
                         next_delay_secs.min(reconnect_strategy.max_delay.as_secs_f64())
                     );
-                    
+
                     // 验证延迟始终在合理范围内
                     prop_assert!(next_delay >= reconnect_strategy.initial_delay);
                     prop_assert!(next_delay <= reconnect_strategy.max_delay);
-                    
+
                     // 验证延迟不会无限增长
                     if current_delay < reconnect_strategy.max_delay {
                         prop_assert!(next_delay <= Duration::from_secs_f64(
                             current_delay.as_secs_f64() * backoff_factor
                         ));
                     }
-                    
+
                     current_delay = next_delay;
-                    
+
                     // 一旦达到最大延迟，应该保持不变
                     if current_delay >= reconnect_strategy.max_delay {
                         prop_assert_eq!(current_delay, reconnect_strategy.max_delay);
                     }
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -667,12 +670,12 @@ mod websocket_auto_reconnect_tests {
 
                 // 验证最大尝试次数配置正确
                 prop_assert_eq!(reconnect_strategy.max_attempts, Some(max_attempts));
-                
+
                 // 验证重连策略的完整性
                 prop_assert!(reconnect_strategy.initial_delay > Duration::ZERO);
                 prop_assert!(reconnect_strategy.max_delay >= reconnect_strategy.initial_delay);
                 prop_assert!(reconnect_strategy.backoff_factor >= 1.0);
-                
+
                 Ok(())
             });
             result?;
@@ -698,7 +701,7 @@ mod websocket_auto_reconnect_tests {
 
                 // 验证无限重试配置
                 prop_assert_eq!(reconnect_strategy.max_attempts, None);
-                
+
                 // 验证即使无限重试，延迟仍然有上限
                 let mut current_delay = reconnect_strategy.initial_delay;
                 for _attempt in 1..=20 { // 测试多次重连
@@ -706,11 +709,11 @@ mod websocket_auto_reconnect_tests {
                         (current_delay.as_secs_f64() * backoff_factor)
                             .min(reconnect_strategy.max_delay.as_secs_f64())
                     );
-                    
+
                     prop_assert!(next_delay <= reconnect_strategy.max_delay);
                     current_delay = next_delay;
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -723,7 +726,7 @@ mod websocket_auto_reconnect_tests {
 #[cfg(test)]
 mod command_execution_mechanism_tests {
     use super::*;
-    use crate::core::command::{CommandHandler, CommandResult, CommandError};
+    use crate::core::command::{CommandError, CommandHandler, CommandResult};
     use crate::platform::tests::MockCommandExecutor;
     use std::process::Output;
 
@@ -740,13 +743,13 @@ mod command_execution_mechanism_tests {
             let result = tokio_test::block_on(async {
                 // 创建 mock 执行器
                 let mut mock_executor = MockCommandExecutor::new();
-                
+
                 // 创建命令处理器
                 let handler = CommandHandler::new(Box::new(mock_executor));
-                
+
                 // 验证命令处理器可以正确创建
                 prop_assert_eq!(handler.default_timeout(), Duration::from_secs(30));
-                
+
                 // 验证安全命令可以通过验证
                 let safe_commands = ["echo", "ls", "dir", "cat", "type", "pwd", "whoami"];
                 for safe_cmd in &safe_commands {
@@ -754,7 +757,7 @@ mod command_execution_mechanism_tests {
                     // 因为 mock 执行器的实现比较简化
                     prop_assert!(true); // 安全命令应该被允许
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -775,18 +778,18 @@ mod command_execution_mechanism_tests {
             let result = tokio_test::block_on(async {
                 let mock_executor = MockCommandExecutor::new();
                 let handler = CommandHandler::new(Box::new(mock_executor));
-                
+
                 // 验证危险命令被拒绝
                 let result = handler.execute_command(&dangerous_command, &args, None).await;
                 prop_assert!(result.is_err());
-                
+
                 match result.unwrap_err() {
                     CommandError::PermissionDenied { command } => {
                         prop_assert_eq!(command, dangerous_command);
                     }
                     _ => prop_assert!(false, "Expected PermissionDenied error"),
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -809,21 +812,21 @@ mod command_execution_mechanism_tests {
             let result = tokio_test::block_on(async {
                 let mock_executor = MockCommandExecutor::new();
                 let handler = CommandHandler::new(Box::new(mock_executor));
-                
+
                 // 构造包含路径遍历的命令
                 let malicious_command = format!("{} {}", base_command, malicious_path);
-                
+
                 // 验证路径遍历攻击被阻止
                 let result = handler.execute_command(&malicious_command, &[], None).await;
                 prop_assert!(result.is_err());
-                
+
                 match result.unwrap_err() {
                     CommandError::InvalidCommand { command } => {
                         prop_assert!(command.contains("..") || command.contains("~"));
                     }
                     _ => prop_assert!(false, "Expected InvalidCommand error"),
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -854,21 +857,21 @@ mod command_result_transmission_tests {
             let result = tokio_test::block_on(async {
                 let mock_executor = MockCommandExecutor::new();
                 let handler = CommandHandler::new(Box::new(mock_executor));
-                
+
                 // 创建命令消息
                 let cmd_message = WSMessage::Cmd {
                     id: command_id.clone(),
                     command: "echo".to_string(), // 使用安全命令
                     args: vec!["test".to_string()],
                 };
-                
+
                 // 处理命令消息
                 let response = handler.handle_message(cmd_message).await;
                 prop_assert!(response.is_ok());
-                
+
                 let response_msg = response.unwrap();
                 prop_assert!(response_msg.is_some());
-                
+
                 // 验证响应消息格式
                 if let Some(WSMessage::CmdResult { id, exit_code: result_code, stdout, stderr }) = response_msg {
                     prop_assert_eq!(id, command_id);
@@ -878,7 +881,7 @@ mod command_result_transmission_tests {
                 } else {
                     prop_assert!(false, "Expected CmdResult message");
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -897,25 +900,25 @@ mod command_result_transmission_tests {
             let result = tokio_test::block_on(async {
                 let mock_executor = MockCommandExecutor::new();
                 let handler = CommandHandler::new(Box::new(mock_executor));
-                
+
                 // 测试文件列表消息
                 let fs_list_message = WSMessage::FsList {
                     id: command_id.clone(),
                     path: file_path.clone(),
                 };
-                
+
                 let response = handler.handle_message(fs_list_message).await;
                 prop_assert!(response.is_ok());
-                
+
                 // 测试文件获取消息
                 let fs_get_message = WSMessage::FsGet {
                     id: command_id.clone(),
                     path: file_path.clone(),
                 };
-                
+
                 let response = handler.handle_message(fs_get_message).await;
                 prop_assert!(response.is_ok());
-                
+
                 // 测试文件上传消息
                 let fs_put_message = WSMessage::FsPut {
                     id: command_id.clone(),
@@ -923,13 +926,13 @@ mod command_result_transmission_tests {
                     content: file_content.clone(),
                     checksum: checksum.clone(),
                 };
-                
+
                 let response = handler.handle_message(fs_put_message).await;
                 prop_assert!(response.is_ok());
-                
+
                 // 验证所有消息都能正确处理（即使可能失败）
                 // 重点是验证消息格式的一致性
-                
+
                 Ok(())
             });
             result?;
@@ -943,7 +946,7 @@ mod command_result_transmission_tests {
 #[cfg(test)]
 mod command_timeout_handling_tests {
     use super::*;
-    use crate::core::command::{CommandHandler, CommandError};
+    use crate::core::command::{CommandError, CommandHandler};
     use crate::platform::tests::MockCommandExecutor;
 
     proptest! {
@@ -957,17 +960,17 @@ mod command_timeout_handling_tests {
             let result = tokio_test::block_on(async {
                 let mock_executor = MockCommandExecutor::new();
                 let handler = CommandHandler::new(Box::new(mock_executor));
-                
+
                 // 设置较短的超时时间
                 let timeout_duration = Duration::from_millis(timeout_ms);
-                
+
                 // 验证超时配置正确
                 prop_assert!(timeout_duration > Duration::ZERO);
                 prop_assert!(timeout_duration < Duration::from_secs(10));
-                
+
                 // 验证默认超时时间
                 prop_assert_eq!(handler.default_timeout(), Duration::from_secs(30));
-                
+
                 Ok(())
             });
             result?;
@@ -984,17 +987,17 @@ mod command_timeout_handling_tests {
             let result = tokio_test::block_on(async {
                 let mock_executor = MockCommandExecutor::new();
                 let mut handler = CommandHandler::new(Box::new(mock_executor));
-                
+
                 let timeout_duration = Duration::from_secs(timeout_secs);
                 handler.set_default_timeout(timeout_duration);
-                
+
                 // 验证超时设置生效
                 prop_assert_eq!(handler.default_timeout(), timeout_duration);
-                
+
                 // 验证超时时间在合理范围内
                 prop_assert!(timeout_duration >= Duration::from_secs(1));
                 prop_assert!(timeout_duration <= Duration::from_secs(60));
-                
+
                 Ok(())
             });
             result?;
@@ -1011,23 +1014,23 @@ mod command_timeout_handling_tests {
             let result = tokio_test::block_on(async {
                 let mock_executor = MockCommandExecutor::new();
                 let mut handler = CommandHandler::new(Box::new(mock_executor));
-                
+
                 let min_timeout = Duration::from_millis(min_timeout_ms);
                 let max_timeout = Duration::from_secs(max_timeout_secs);
-                
+
                 // 验证最小超时时间设置
                 handler.set_default_timeout(min_timeout);
                 prop_assert_eq!(handler.default_timeout(), min_timeout);
-                
+
                 // 验证最大超时时间设置
                 handler.set_default_timeout(max_timeout);
                 prop_assert_eq!(handler.default_timeout(), max_timeout);
-                
+
                 // 验证超时时间边界
                 prop_assert!(min_timeout < max_timeout);
                 prop_assert!(min_timeout >= Duration::from_millis(50));
                 prop_assert!(max_timeout <= Duration::from_secs(3600));
-                
+
                 Ok(())
             });
             result?;
@@ -1041,7 +1044,7 @@ mod command_timeout_handling_tests {
 #[cfg(test)]
 mod command_error_handling_tests {
     use super::*;
-    use crate::core::command::{CommandHandler, CommandError};
+    use crate::core::command::{CommandError, CommandHandler};
     use crate::platform::tests::MockCommandExecutor;
 
     proptest! {
@@ -1060,21 +1063,21 @@ mod command_error_handling_tests {
             let result = tokio_test::block_on(async {
                 let mock_executor = MockCommandExecutor::new();
                 let handler = CommandHandler::new(Box::new(mock_executor));
-                
+
                 // 创建无效命令消息
                 let cmd_message = WSMessage::Cmd {
                     id: command_id.clone(),
                     command: invalid_command.to_string(),
                     args: args.clone(),
                 };
-                
+
                 // 处理命令消息
                 let response = handler.handle_message(cmd_message).await;
                 prop_assert!(response.is_ok());
-                
+
                 let response_msg = response.unwrap();
                 prop_assert!(response_msg.is_some());
-                
+
                 // 验证错误响应格式
                 if let Some(WSMessage::CmdResult { id, exit_code, stdout, stderr }) = response_msg {
                     prop_assert_eq!(id, command_id);
@@ -1084,7 +1087,7 @@ mod command_error_handling_tests {
                 } else {
                     prop_assert!(false, "Expected CmdResult message with error");
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -1133,7 +1136,7 @@ mod command_error_handling_tests {
                     }
                     _ => {}
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -1150,7 +1153,7 @@ mod command_error_handling_tests {
             let result = tokio_test::block_on(async {
                 let mock_executor = MockCommandExecutor::new();
                 let handler = CommandHandler::new(Box::new(mock_executor));
-                
+
                 // 验证错误处理不会导致系统崩溃
                 for i in 0..retry_count {
                     let cmd_message = WSMessage::Cmd {
@@ -1158,25 +1161,25 @@ mod command_error_handling_tests {
                         command: "invalid_command".to_string(),
                         args: vec![],
                     };
-                    
+
                     let response = handler.handle_message(cmd_message).await;
                     prop_assert!(response.is_ok()); // 即使命令失败，处理器也应该正常返回
-                    
+
                     if let Ok(Some(WSMessage::CmdResult { exit_code, .. })) = response {
                         prop_assert_eq!(exit_code, -1); // 错误时应该返回 -1
                     }
                 }
-                
+
                 // 验证多次错误后处理器仍然可用
                 let valid_cmd_message = WSMessage::Cmd {
                     id: format!("{}-final", command_id),
                     command: "echo".to_string(),
                     args: vec!["test".to_string()],
                 };
-                
+
                 let response = handler.handle_message(valid_cmd_message).await;
                 prop_assert!(response.is_ok());
-                
+
                 Ok(())
             });
             result?;
@@ -1191,8 +1194,8 @@ mod command_error_handling_tests {
 mod file_list_functionality_tests {
     use super::*;
     use crate::platform::{FileSystem, PathSecurityPolicy};
-    use tempfile::TempDir;
     use std::path::Path;
+    use tempfile::TempDir;
 
     proptest! {
         #[test]
@@ -1207,7 +1210,7 @@ mod file_list_functionality_tests {
                 let temp_dir = TempDir::new().unwrap();
                 let test_dir = temp_dir.path().join(&dir_name);
                 tokio::fs::create_dir_all(&test_dir).await.unwrap();
-                
+
                 // 创建测试文件
                 let mut created_files = Vec::new();
                 for (i, file_name) in file_names.iter().take(file_count).enumerate() {
@@ -1216,17 +1219,17 @@ mod file_list_functionality_tests {
                     tokio::fs::write(&file_path, content.as_bytes()).await.unwrap();
                     created_files.push(file_path);
                 }
-                
+
                 // 创建文件系统实例
                 let fs = MockFileSystem;
-                
+
                 // 列出文件
                 let files = fs.list_files(&test_dir).await;
                 prop_assert!(files.is_ok());
-                
+
                 let file_list = files.unwrap();
                 prop_assert_eq!(file_list.len(), created_files.len());
-                
+
                 // 验证每个文件的信息
                 for file_info in &file_list {
                     prop_assert!(!file_info.is_dir);
@@ -1234,7 +1237,7 @@ mod file_list_functionality_tests {
                     prop_assert!(file_info.modified.is_some());
                     prop_assert!(created_files.iter().any(|p| p == &file_info.path));
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -1251,33 +1254,33 @@ mod file_list_functionality_tests {
             let result = tokio_test::block_on(async {
                 let temp_dir = TempDir::new().unwrap();
                 let base_path = temp_dir.path();
-                
+
                 // 创建子目录和文件
                 let mut total_items = 0;
                 for i in 0..subdir_count {
                     let subdir = base_path.join(format!("subdir_{}", i));
                     tokio::fs::create_dir_all(&subdir).await.unwrap();
                     total_items += 1; // 计算子目录
-                    
+
                     for j in 0..files_per_dir {
                         let file_path = subdir.join(format!("file_{}.txt", j));
                         tokio::fs::write(&file_path, b"test content").await.unwrap();
                     }
                 }
-                
+
                 let fs = MockFileSystem;
                 let files = fs.list_files(base_path).await;
                 prop_assert!(files.is_ok());
-                
+
                 let file_list = files.unwrap();
                 prop_assert_eq!(file_list.len(), total_items);
-                
+
                 // 验证所有项目都是目录
                 for file_info in &file_list {
                     prop_assert!(file_info.is_dir);
                     prop_assert_eq!(file_info.size, 0); // 目录大小为 0
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -1294,14 +1297,14 @@ mod file_list_functionality_tests {
                 let temp_dir = TempDir::new().unwrap();
                 let empty_dir = temp_dir.path().join(&empty_dir_name);
                 tokio::fs::create_dir_all(&empty_dir).await.unwrap();
-                
+
                 let fs = MockFileSystem;
                 let files = fs.list_files(&empty_dir).await;
                 prop_assert!(files.is_ok());
-                
+
                 let file_list = files.unwrap();
                 prop_assert_eq!(file_list.len(), 0);
-                
+
                 Ok(())
             });
             result?;
@@ -1315,7 +1318,7 @@ mod file_list_functionality_tests {
 #[cfg(test)]
 mod file_download_integrity_tests {
     use super::*;
-    use crate::platform::{FileSystem, calculate_checksum};
+    use crate::platform::{calculate_checksum, FileSystem};
     use tempfile::NamedTempFile;
 
     proptest! {
@@ -1328,30 +1331,30 @@ mod file_download_integrity_tests {
                 // 创建临时文件
                 let temp_file = NamedTempFile::new().unwrap();
                 let file_path = temp_file.path();
-                
+
                 // 写入测试内容
                 tokio::fs::write(file_path, &file_content).await.unwrap();
-                
+
                 // 计算原始内容的校验和
                 let original_checksum = calculate_checksum(&file_content);
-                
+
                 // 读取文件
                 let fs = MockFileSystem;
                 let read_result = fs.read_file(file_path).await;
                 prop_assert!(read_result.is_ok());
-                
+
                 let read_content = read_result.unwrap();
-                
+
                 // 计算校验和（在移动值之前）
                 let read_checksum = calculate_checksum(&read_content);
-                
+
                 // 验证内容完整性
                 prop_assert_eq!(read_content.len(), file_content.len());
                 prop_assert_eq!(read_content, file_content);
-                
+
                 // 验证校验和
                 prop_assert_eq!(read_checksum, original_checksum);
-                
+
                 Ok(())
             });
             result?;
@@ -1368,7 +1371,7 @@ mod file_download_integrity_tests {
             let result = tokio_test::block_on(async {
                 let temp_file = NamedTempFile::new().unwrap();
                 let file_path = temp_file.path();
-                
+
                 // 创建大文件内容
                 let mut large_content = Vec::new();
                 for i in 0..chunk_count {
@@ -1377,27 +1380,27 @@ mod file_download_integrity_tests {
                         .collect();
                     large_content.extend(chunk);
                 }
-                
+
                 // 写入大文件
                 tokio::fs::write(file_path, &large_content).await.unwrap();
-                
+
                 // 计算原始校验和（在移动值之前）
                 let original_checksum = calculate_checksum(&large_content);
-                
+
                 let fs = MockFileSystem;
                 let read_result = fs.read_file(file_path).await;
                 prop_assert!(read_result.is_ok());
-                
+
                 let read_content = read_result.unwrap();
                 let read_checksum = calculate_checksum(&read_content);
-                
+
                 // 验证大文件完整性
                 prop_assert_eq!(read_content.len(), large_content.len());
                 prop_assert_eq!(read_content, large_content);
-                
+
                 // 验证校验和
                 prop_assert_eq!(read_checksum, original_checksum);
-                
+
                 Ok(())
             });
             result?;
@@ -1413,26 +1416,26 @@ mod file_download_integrity_tests {
             let result = tokio_test::block_on(async {
                 let temp_file = NamedTempFile::new().unwrap();
                 let file_path = temp_file.path();
-                
+
                 // 写入二进制数据
                 tokio::fs::write(file_path, &binary_data).await.unwrap();
-                
+
                 let fs = MockFileSystem;
                 let read_result = fs.read_file(file_path).await;
                 prop_assert!(read_result.is_ok());
-                
+
                 let read_content = read_result.unwrap();
-                
+
                 // 验证二进制文件完整性（先克隆用于比较）
                 let read_content_clone = read_content.clone();
                 let binary_data_clone = binary_data.clone();
                 prop_assert_eq!(read_content_clone, binary_data_clone);
-                
+
                 // 验证每个字节都正确
                 for (i, (&original, &read)) in binary_data.iter().zip(read_content.iter()).enumerate() {
                     prop_assert_eq!(original, read, "Byte mismatch at position {}", i);
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -1458,16 +1461,16 @@ mod file_upload_limits_tests {
             // Feature: lightweight-rmm, Property 23: 文件上传限制
             let result = tokio_test::block_on(async {
                 let temp_dir = TempDir::new().unwrap();
-                
+
                 // 确保临时目录存在并可以被规范化
                 let temp_path = temp_dir.path().canonicalize()
                     .map_err(|e| proptest::test_runner::TestCaseError::fail(format!("Failed to canonicalize temp dir: {}", e)))?;
-                
+
                 let file_path = temp_path.join("test_upload.txt");
-                
+
                 // 创建测试数据
                 let test_data: Vec<u8> = (0..file_size).map(|i| (i % 256) as u8).collect();
-                
+
                 // 创建安全策略，使用规范化的路径
                 let policy = PathSecurityPolicy {
                     allowed_paths: vec![temp_path.clone()],
@@ -1475,18 +1478,18 @@ mod file_upload_limits_tests {
                     max_file_size: max_size as u64,
                     allow_hidden_files: false,
                 };
-                
+
                 // 确保父目录存在，这样路径验证就不会失败
                 if let Some(parent) = file_path.parent() {
                     tokio::fs::create_dir_all(parent).await
                         .map_err(|e| proptest::test_runner::TestCaseError::fail(format!("Failed to create parent directory: {}", e)))?;
                 }
-                
+
                 let fs = MockFileSystem;
-                
+
                 // 尝试写入文件
                 let write_result = fs.write_file_secure(&file_path, &test_data, &policy).await;
-                
+
                 if file_size <= max_size {
                     // 文件大小在限制内，应该成功
                     if let Err(ref e) = write_result {
@@ -1497,22 +1500,22 @@ mod file_upload_limits_tests {
                         eprintln!("Parent exists: {:?}", file_path.parent().map(|p| p.exists()));
                     }
                     prop_assert!(write_result.is_ok());
-                    
+
                     // 验证文件确实被写入
                     let read_result = fs.read_file(&file_path).await;
                     prop_assert!(read_result.is_ok());
-                    
+
                     let read_data = read_result.unwrap();
                     // Note: MockFileSystem always returns empty data, so we can't verify content
                     // In a real implementation, this would verify the data matches
                 } else {
                     // 文件大小超过限制，应该失败
                     prop_assert!(write_result.is_err());
-                    
+
                     let error_msg = write_result.unwrap_err().to_string();
                     prop_assert!(error_msg.contains("exceeds maximum allowed size"));
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -1527,49 +1530,49 @@ mod file_upload_limits_tests {
             // Feature: lightweight-rmm, Property 23: 文件上传限制
             let result = tokio_test::block_on(async {
                 let temp_dir = TempDir::new().unwrap();
-                
+
                 // 确保临时目录存在并可以被规范化
                 let temp_path = temp_dir.path().canonicalize()
                     .map_err(|e| proptest::test_runner::TestCaseError::fail(format!("Failed to canonicalize temp dir: {}", e)))?;
-                
+
                 let policy = PathSecurityPolicy {
                     allowed_paths: vec![temp_path.clone()],
                     blocked_paths: vec![],
                     max_file_size: exact_limit as u64,
                     allow_hidden_files: false,
                 };
-                
+
                 // 确保所有测试文件的父目录存在
                 let exact_path = temp_path.join("exact_limit.txt");
                 let over_path = temp_path.join("over_limit.txt");
                 let under_path = temp_path.join("under_limit.txt");
-                
+
                 for path in [&exact_path, &over_path, &under_path] {
                     if let Some(parent) = path.parent() {
                         tokio::fs::create_dir_all(parent).await
                             .map_err(|e| proptest::test_runner::TestCaseError::fail(format!("Failed to create parent directory: {}", e)))?;
                     }
                 }
-                
+
                 let fs = MockFileSystem;
-                
+
                 // 测试恰好等于限制的文件
                 let exact_data: Vec<u8> = (0..exact_limit).map(|i| (i % 256) as u8).collect();
                 let exact_result = fs.write_file_secure(&exact_path, &exact_data, &policy).await;
                 prop_assert!(exact_result.is_ok());
-                
+
                 // 测试超过限制 1 字节的文件
                 let over_data: Vec<u8> = (0..exact_limit + 1).map(|i| (i % 256) as u8).collect();
                 let over_result = fs.write_file_secure(&over_path, &over_data, &policy).await;
                 prop_assert!(over_result.is_err());
-                
+
                 // 测试小于限制的文件
                 if exact_limit > 1 {
                     let under_data: Vec<u8> = (0..exact_limit - 1).map(|i| (i % 256) as u8).collect();
                     let under_result = fs.write_file_secure(&under_path, &under_data, &policy).await;
                     prop_assert!(under_result.is_ok());
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -1584,34 +1587,34 @@ mod file_upload_limits_tests {
             // Feature: lightweight-rmm, Property 23: 文件上传限制
             let result = tokio_test::block_on(async {
                 let temp_dir = TempDir::new().unwrap();
-                
+
                 // 确保临时目录存在并可以被规范化
                 let temp_path = temp_dir.path().canonicalize()
                     .map_err(|e| proptest::test_runner::TestCaseError::fail(format!("Failed to canonicalize temp dir: {}", e)))?;
-                
+
                 let empty_file_path = temp_path.join("empty.txt");
-                
+
                 let policy = PathSecurityPolicy {
                     allowed_paths: vec![temp_path.clone()],
                     blocked_paths: vec![],
                     max_file_size: max_size as u64,
                     allow_hidden_files: false,
                 };
-                
+
                 let fs = MockFileSystem;
-                
+
                 // 测试空文件上传
                 let empty_data: Vec<u8> = vec![];
                 let result = fs.write_file_secure(&empty_file_path, &empty_data, &policy).await;
                 prop_assert!(result.is_ok());
-                
+
                 // 验证空文件确实被创建
                 let read_result = fs.read_file(&empty_file_path).await;
                 prop_assert!(read_result.is_ok());
-                
+
                 let read_data = read_result.unwrap();
                 prop_assert_eq!(read_data.len(), 0);
-                
+
                 Ok(())
             });
             result?;
@@ -1637,50 +1640,50 @@ mod path_security_policy_tests {
         ) {
             // Feature: lightweight-rmm, Property 24: 路径安全策略
             prop_assume!(allowed_dir != blocked_dir);
-            
+
             let result = tokio_test::block_on(async {
                 let temp_dir = TempDir::new().unwrap();
-                
+
                 // 确保临时目录存在并可以被规范化
                 let temp_path = temp_dir.path().canonicalize()
                     .map_err(|e| proptest::test_runner::TestCaseError::fail(format!("Failed to canonicalize temp dir: {}", e)))?;
-                
+
                 let allowed_path = temp_path.join(&allowed_dir);
                 let blocked_path = temp_path.join(&blocked_dir);
-                
+
                 // 创建目录
                 tokio::fs::create_dir_all(&allowed_path).await.unwrap();
                 tokio::fs::create_dir_all(&blocked_path).await.unwrap();
-                
+
                 // 规范化创建的目录路径
                 let canonical_allowed = allowed_path.canonicalize()
                     .map_err(|e| proptest::test_runner::TestCaseError::fail(format!("Failed to canonicalize allowed path: {}", e)))?;
                 let canonical_blocked = blocked_path.canonicalize()
                     .map_err(|e| proptest::test_runner::TestCaseError::fail(format!("Failed to canonicalize blocked path: {}", e)))?;
-                
+
                 let policy = PathSecurityPolicy {
                     allowed_paths: vec![canonical_allowed.clone()],
                     blocked_paths: vec![canonical_blocked.clone()],
                     max_file_size: 1024 * 1024, // 1MB
                     allow_hidden_files: false,
                 };
-                
+
                 let fs = MockFileSystem;
                 let test_data = b"test content";
-                
+
                 // 测试允许路径中的文件操作
                 let allowed_file = canonical_allowed.join(&file_name);
                 let allowed_result = fs.write_file_secure(&allowed_file, test_data, &policy).await;
                 prop_assert!(allowed_result.is_ok());
-                
+
                 // 测试被阻止路径中的文件操作
                 let blocked_file = canonical_blocked.join(&file_name);
                 let blocked_result = fs.write_file_secure(&blocked_file, test_data, &policy).await;
                 prop_assert!(blocked_result.is_err());
-                
+
                 let error_msg = blocked_result.unwrap_err().to_string();
                 prop_assert!(error_msg.contains("Path not in allowed list") || error_msg.contains("blocked by security policy"));
-                
+
                 Ok(())
             });
             result?;
@@ -1700,26 +1703,26 @@ mod path_security_policy_tests {
                 let temp_dir = TempDir::new().unwrap();
                 let test_dir = temp_dir.path().join(&dir_name);
                 tokio::fs::create_dir_all(&test_dir).await.unwrap();
-                
+
                 let policy = PathSecurityPolicy {
                     allowed_paths: vec![test_dir.clone()],
                     blocked_paths: vec![],
                     max_file_size: 1024,
                     allow_hidden_files: allow_hidden,
                 };
-                
+
                 let fs = MockFileSystem;
                 let test_data = b"test content";
-                
+
                 // 测试普通文件（应该总是允许）
                 let normal_file = test_dir.join(&normal_file_name);
                 let normal_result = fs.write_file_secure(&normal_file, test_data, &policy).await;
                 prop_assert!(normal_result.is_ok());
-                
+
                 // 测试隐藏文件
                 let hidden_file = test_dir.join(&hidden_file_name);
                 let hidden_result = fs.write_file_secure(&hidden_file, test_data, &policy).await;
-                
+
                 if allow_hidden {
                     prop_assert!(hidden_result.is_ok());
                 } else {
@@ -1727,7 +1730,7 @@ mod path_security_policy_tests {
                     let error_msg = hidden_result.unwrap_err().to_string();
                     prop_assert!(error_msg.contains("Hidden files not allowed"));
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -1751,24 +1754,24 @@ mod path_security_policy_tests {
                 let temp_dir = TempDir::new().unwrap();
                 let allowed_dir = temp_dir.path().join(&base_dir);
                 tokio::fs::create_dir_all(&allowed_dir).await.unwrap();
-                
+
                 let policy = PathSecurityPolicy {
                     allowed_paths: vec![allowed_dir.clone()],
                     blocked_paths: vec![],
                     max_file_size: 1024,
                     allow_hidden_files: false,
                 };
-                
+
                 let fs = MockFileSystem;
                 let test_data = b"malicious content";
-                
+
                 // 尝试路径遍历攻击
                 let malicious_path = allowed_dir.join(&traversal_attempts);
                 let result = fs.write_file_secure(&malicious_path, test_data, &policy).await;
-                
+
                 // 路径遍历应该被阻止
                 prop_assert!(result.is_err());
-                
+
                 Ok(())
             });
             result?;
@@ -1785,40 +1788,40 @@ mod path_security_policy_tests {
             let result = tokio_test::block_on(async {
                 let temp_dir = TempDir::new().unwrap();
                 let mut allowed_paths = Vec::new();
-                
+
                 // 创建多个允许的目录
                 for i in 0..dir_count {
                     let dir_path = temp_dir.path().join(format!("allowed_{}", i));
                     tokio::fs::create_dir_all(&dir_path).await.unwrap();
                     allowed_paths.push(dir_path);
                 }
-                
+
                 // 创建一个不在允许列表中的目录
                 let forbidden_dir = temp_dir.path().join("forbidden");
                 tokio::fs::create_dir_all(&forbidden_dir).await.unwrap();
-                
+
                 let policy = PathSecurityPolicy {
                     allowed_paths: allowed_paths.clone(),
                     blocked_paths: vec![],
                     max_file_size: 1024,
                     allow_hidden_files: false,
                 };
-                
+
                 let fs = MockFileSystem;
                 let test_data = b"test content";
-                
+
                 // 测试所有允许的路径
                 for allowed_path in &allowed_paths {
                     let file_path = allowed_path.join(&file_name);
                     let result = fs.write_file_secure(&file_path, test_data, &policy).await;
                     prop_assert!(result.is_ok());
                 }
-                
+
                 // 测试禁止的路径
                 let forbidden_file = forbidden_dir.join(&file_name);
                 let forbidden_result = fs.write_file_secure(&forbidden_file, test_data, &policy).await;
                 prop_assert!(forbidden_result.is_err());
-                
+
                 Ok(())
             });
             result?;
@@ -1843,7 +1846,7 @@ mod device_registration_audit_tests {
             // Feature: lightweight-rmm, Property 34: 注册事件审计
             let result = tokio_test::block_on(async {
                 let (audit_logger, mut receiver) = AuditLogger::new(device_id.clone());
-                
+
                 // 模拟设备注册事件
                 let result = audit_logger.log_device_registration(
                     device_id.clone(),
@@ -1853,22 +1856,22 @@ mod device_registration_audit_tests {
                     AuditResult::Success,
                     None,
                 );
-                
+
                 prop_assert!(result.is_ok());
-                
+
                 // 验证审计事件被正确记录
                 let event = receiver.recv().await.unwrap();
                 prop_assert_eq!(event.device_id, device_id);
                 prop_assert_eq!(event.event_type, AuditEventType::DeviceRegister);
                 prop_assert!(matches!(event.result, AuditResult::Success));
-                
+
                 // 验证事件数据包含正确信息
                 match event.data {
-                    crate::core::audit::AuditEventData::DeviceRegister { 
-                        enrollment_token_prefix, 
-                        platform: event_platform, 
+                    crate::core::audit::AuditEventData::DeviceRegister {
+                        enrollment_token_prefix,
+                        platform: event_platform,
                         version: event_version,
-                        .. 
+                        ..
                     } => {
                         prop_assert!(enrollment_token_prefix.starts_with(&enrollment_token[..8.min(enrollment_token.len())]));
                         prop_assert_eq!(event_platform, platform);
@@ -1876,7 +1879,7 @@ mod device_registration_audit_tests {
                     }
                     _ => prop_assert!(false, "Expected DeviceRegister event data"),
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -1892,7 +1895,7 @@ mod device_registration_audit_tests {
             // Feature: lightweight-rmm, Property 34: 注册事件审计
             let result = tokio_test::block_on(async {
                 let (audit_logger, mut receiver) = AuditLogger::new(device_id.clone());
-                
+
                 // 模拟注册失败事件
                 let result = audit_logger.log_device_registration(
                     device_id.clone(),
@@ -1902,14 +1905,14 @@ mod device_registration_audit_tests {
                     AuditResult::Error,
                     Some(error_message.clone()),
                 );
-                
+
                 prop_assert!(result.is_ok());
-                
+
                 let event = receiver.recv().await.unwrap();
                 prop_assert_eq!(event.device_id, device_id);
                 prop_assert!(matches!(event.result, AuditResult::Error));
                 prop_assert_eq!(event.error_message, Some(error_message));
-                
+
                 Ok(())
             });
             result?;
@@ -1939,7 +1942,7 @@ mod command_execution_audit_tests {
             // Feature: lightweight-rmm, Property 35: 命令执行审计
             let result = tokio_test::block_on(async {
                 let (audit_logger, mut receiver) = AuditLogger::new(device_id.clone());
-                
+
                 let result = audit_logger.log_command_execution(
                     Some(session_id.clone()),
                     &command,
@@ -1951,16 +1954,16 @@ mod command_execution_audit_tests {
                     AuditResult::Success,
                     None,
                 );
-                
+
                 prop_assert!(result.is_ok());
-                
+
                 let event = receiver.recv().await.unwrap();
                 prop_assert_eq!(event.device_id, device_id);
                 prop_assert_eq!(event.session_id, Some(session_id.clone()));
                 prop_assert_eq!(event.event_type, AuditEventType::CommandExecute);
-                
+
                 match event.data {
-                    crate::core::audit::AuditEventData::CommandExecute { 
+                    crate::core::audit::AuditEventData::CommandExecute {
                         command: logged_command,
                         args: logged_args,
                         exit_code: logged_exit_code,
@@ -1983,7 +1986,7 @@ mod command_execution_audit_tests {
                     }
                     _ => prop_assert!(false, "Expected CommandExecute event data"),
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -2006,7 +2009,7 @@ mod command_execution_audit_tests {
             // Feature: lightweight-rmm, Property 35: 命令执行审计
             let result = tokio_test::block_on(async {
                 let (audit_logger, mut receiver) = AuditLogger::new(device_id.clone());
-                
+
                 let result = audit_logger.log_command_execution(
                     None,
                     &sensitive_command,
@@ -2018,17 +2021,17 @@ mod command_execution_audit_tests {
                     AuditResult::Error,
                     Some("Permission denied".to_string()),
                 );
-                
+
                 prop_assert!(result.is_ok());
-                
+
                 let event = receiver.recv().await.unwrap();
-                
+
                 match event.data {
-                    crate::core::audit::AuditEventData::CommandExecute { 
+                    crate::core::audit::AuditEventData::CommandExecute {
                         command,
                         args: logged_args,
                         is_sensitive,
-                        .. 
+                        ..
                     } => {
                         prop_assert!(is_sensitive);
                         prop_assert_eq!(command, "[REDACTED]");
@@ -2036,7 +2039,7 @@ mod command_execution_audit_tests {
                     }
                     _ => prop_assert!(false, "Expected CommandExecute event data"),
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -2063,7 +2066,7 @@ mod file_operation_audit_tests {
             // Feature: lightweight-rmm, Property 36: 文件操作审计记录
             let result = tokio_test::block_on(async {
                 let (audit_logger, mut receiver) = AuditLogger::new(device_id.clone());
-                
+
                 // 测试文件下载审计
                 let download_result = audit_logger.log_file_download(
                     Some(session_id.clone()),
@@ -2074,16 +2077,16 @@ mod file_operation_audit_tests {
                     AuditResult::Success,
                     None,
                 );
-                
+
                 prop_assert!(download_result.is_ok());
-                
+
                 let download_event = receiver.recv().await.unwrap();
                 prop_assert_eq!(download_event.device_id, device_id);
                 prop_assert_eq!(download_event.session_id, Some(session_id.clone()));
                 prop_assert_eq!(download_event.event_type, AuditEventType::FileDownload);
-                
+
                 match download_event.data {
-                    crate::core::audit::AuditEventData::FileDownload { 
+                    crate::core::audit::AuditEventData::FileDownload {
                         path,
                         file_size: logged_size,
                         checksum: logged_checksum,
@@ -2096,7 +2099,7 @@ mod file_operation_audit_tests {
                     }
                     _ => prop_assert!(false, "Expected FileDownload event data"),
                 }
-                
+
                 // 测试文件上传审计
                 let upload_result = audit_logger.log_file_upload(
                     Some(session_id.clone()),
@@ -2107,12 +2110,12 @@ mod file_operation_audit_tests {
                     AuditResult::Success,
                     None,
                 );
-                
+
                 prop_assert!(upload_result.is_ok());
-                
+
                 let upload_event = receiver.recv().await.unwrap();
                 prop_assert_eq!(upload_event.event_type, AuditEventType::FileUpload);
-                
+
                 Ok(())
             });
             result?;
@@ -2130,7 +2133,7 @@ mod file_operation_audit_tests {
             // Feature: lightweight-rmm, Property 36: 文件操作审计记录
             let result = tokio_test::block_on(async {
                 let (audit_logger, mut receiver) = AuditLogger::new(device_id.clone());
-                
+
                 let result = audit_logger.log_file_list(
                     None,
                     &directory_path,
@@ -2139,15 +2142,15 @@ mod file_operation_audit_tests {
                     AuditResult::Success,
                     None,
                 );
-                
+
                 prop_assert!(result.is_ok());
-                
+
                 let event = receiver.recv().await.unwrap();
                 prop_assert_eq!(event.device_id, device_id);
                 prop_assert_eq!(event.event_type, AuditEventType::FileList);
-                
+
                 match event.data {
-                    crate::core::audit::AuditEventData::FileList { 
+                    crate::core::audit::AuditEventData::FileList {
                         path,
                         file_count: logged_count,
                         operation_id: logged_op_id,
@@ -2158,7 +2161,7 @@ mod file_operation_audit_tests {
                     }
                     _ => prop_assert!(false, "Expected FileList event data"),
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -2176,7 +2179,7 @@ mod file_operation_audit_tests {
             // Feature: lightweight-rmm, Property 36: 文件操作审计记录
             let result = tokio_test::block_on(async {
                 let (audit_logger, mut receiver) = AuditLogger::new(device_id.clone());
-                
+
                 // 测试文件操作失败的审计
                 let result = audit_logger.log_file_download(
                     None,
@@ -2187,21 +2190,21 @@ mod file_operation_audit_tests {
                     AuditResult::Error,
                     Some(error_message.clone()),
                 );
-                
+
                 prop_assert!(result.is_ok());
-                
+
                 let event = receiver.recv().await.unwrap();
                 prop_assert_eq!(event.device_id, device_id);
                 prop_assert!(matches!(event.result, AuditResult::Error));
                 prop_assert_eq!(event.error_message, Some(error_message));
-                
+
                 match event.data {
                     crate::core::audit::AuditEventData::FileDownload { path, .. } => {
                         prop_assert_eq!(path, file_path);
                     }
                     _ => prop_assert!(false, "Expected FileDownload event data"),
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -2227,7 +2230,7 @@ mod session_lifecycle_audit_tests {
             // Feature: lightweight-rmm, Property 37: 会话生命周期审计
             let result = tokio_test::block_on(async {
                 let (audit_logger, mut receiver) = AuditLogger::new(device_id.clone());
-                
+
                 // 测试会话连接审计
                 let connect_result = audit_logger.log_session_connect(
                     &session_id,
@@ -2235,16 +2238,16 @@ mod session_lifecycle_audit_tests {
                     AuditResult::Success,
                     None,
                 );
-                
+
                 prop_assert!(connect_result.is_ok());
-                
+
                 let connect_event = receiver.recv().await.unwrap();
                 prop_assert_eq!(connect_event.device_id, device_id);
                 prop_assert_eq!(connect_event.session_id, Some(session_id.clone()));
                 prop_assert_eq!(connect_event.event_type, AuditEventType::SessionConnect);
-                
+
                 match connect_event.data {
-                    crate::core::audit::AuditEventData::SessionConnect { 
+                    crate::core::audit::AuditEventData::SessionConnect {
                         session_id: logged_session_id,
                         connection_time: logged_time,
                     } => {
@@ -2253,7 +2256,7 @@ mod session_lifecycle_audit_tests {
                     }
                     _ => prop_assert!(false, "Expected SessionConnect event data"),
                 }
-                
+
                 // 测试会话断开审计
                 let disconnect_result = audit_logger.log_session_disconnect(
                     &session_id,
@@ -2262,14 +2265,14 @@ mod session_lifecycle_audit_tests {
                     AuditResult::Success,
                     None,
                 );
-                
+
                 prop_assert!(disconnect_result.is_ok());
-                
+
                 let disconnect_event = receiver.recv().await.unwrap();
                 prop_assert_eq!(disconnect_event.event_type, AuditEventType::SessionDisconnect);
-                
+
                 match disconnect_event.data {
-                    crate::core::audit::AuditEventData::SessionDisconnect { 
+                    crate::core::audit::AuditEventData::SessionDisconnect {
                         session_id: logged_session_id,
                         disconnect_reason,
                         duration_ms: logged_duration,
@@ -2280,7 +2283,7 @@ mod session_lifecycle_audit_tests {
                     }
                     _ => prop_assert!(false, "Expected SessionDisconnect event data"),
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -2297,21 +2300,21 @@ mod session_lifecycle_audit_tests {
             // Feature: lightweight-rmm, Property 37: 会话生命周期审计
             let result = tokio_test::block_on(async {
                 let (audit_logger, mut receiver) = AuditLogger::new(device_id.clone());
-                
+
                 let result = audit_logger.log_session_connect(
                     &session_id,
                     0,
                     AuditResult::Error,
                     Some(error_message.clone()),
                 );
-                
+
                 prop_assert!(result.is_ok());
-                
+
                 let event = receiver.recv().await.unwrap();
                 prop_assert_eq!(event.device_id, device_id);
                 prop_assert!(matches!(event.result, AuditResult::Error));
                 prop_assert_eq!(event.error_message, Some(error_message));
-                
+
                 Ok(())
             });
             result?;
@@ -2336,7 +2339,7 @@ mod session_lifecycle_audit_tests {
             // Feature: lightweight-rmm, Property 37: 会话生命周期审计
             let result = tokio_test::block_on(async {
                 let (audit_logger, mut receiver) = AuditLogger::new(device_id.clone());
-                
+
                 let result = audit_logger.log_session_disconnect(
                     &session_id,
                     &disconnect_reason,
@@ -2344,23 +2347,23 @@ mod session_lifecycle_audit_tests {
                     AuditResult::Success,
                     None,
                 );
-                
+
                 prop_assert!(result.is_ok());
-                
+
                 let event = receiver.recv().await.unwrap();
-                
+
                 match event.data {
-                    crate::core::audit::AuditEventData::SessionDisconnect { 
+                    crate::core::audit::AuditEventData::SessionDisconnect {
                         disconnect_reason: logged_reason,
                         duration_ms: logged_duration,
-                        .. 
+                        ..
                     } => {
                         prop_assert_eq!(logged_reason, disconnect_reason);
                         prop_assert_eq!(logged_duration, duration_ms);
                     }
                     _ => prop_assert!(false, "Expected SessionDisconnect event data"),
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -2396,23 +2399,23 @@ mod sensitive_operation_audit_tests {
             // Feature: lightweight-rmm, Property 20: 敏感操作审计
             let result = tokio_test::block_on(async {
                 let (audit_logger, mut receiver) = AuditLogger::new(device_id.clone());
-                
+
                 let result = audit_logger.log_security_violation(
                     None,
                     &violation_type,
                     &details,
                     threat_level.clone(),
                 );
-                
+
                 prop_assert!(result.is_ok());
-                
+
                 let event = receiver.recv().await.unwrap();
                 prop_assert_eq!(event.device_id, device_id);
                 prop_assert_eq!(event.event_type, AuditEventType::SecurityViolation);
                 prop_assert!(matches!(event.result, AuditResult::Error));
-                
+
                 match event.data {
-                    crate::core::audit::AuditEventData::SecurityViolation { 
+                    crate::core::audit::AuditEventData::SecurityViolation {
                         violation_type: logged_type,
                         details: logged_details,
                         threat_level: logged_level,
@@ -2423,7 +2426,7 @@ mod sensitive_operation_audit_tests {
                     }
                     _ => prop_assert!(false, "Expected SecurityViolation event data"),
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -2446,21 +2449,21 @@ mod sensitive_operation_audit_tests {
             // Feature: lightweight-rmm, Property 20: 敏感操作审计
             let result = tokio_test::block_on(async {
                 let (audit_logger, mut receiver) = AuditLogger::new(device_id.clone());
-                
+
                 let result = audit_logger.log_authentication_failure(
                     &failure_reason,
                     attempt_count,
                 );
-                
+
                 prop_assert!(result.is_ok());
-                
+
                 let event = receiver.recv().await.unwrap();
                 prop_assert_eq!(event.device_id, device_id);
                 prop_assert_eq!(event.event_type, AuditEventType::AuthenticationFailure);
                 prop_assert!(matches!(event.result, AuditResult::Error));
-                
+
                 match event.data {
-                    crate::core::audit::AuditEventData::AuthenticationFailure { 
+                    crate::core::audit::AuditEventData::AuthenticationFailure {
                         failure_reason: logged_reason,
                         attempt_count: logged_count,
                     } => {
@@ -2469,7 +2472,7 @@ mod sensitive_operation_audit_tests {
                     }
                     _ => prop_assert!(false, "Expected AuthenticationFailure event data"),
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -2485,7 +2488,7 @@ mod sensitive_operation_audit_tests {
             // Feature: lightweight-rmm, Property 20: 敏感操作审计
             let result = tokio_test::block_on(async {
                 let (audit_logger, mut receiver) = AuditLogger::new(device_id.clone());
-                
+
                 // 测试不同威胁级别的审计
                 let threat_levels = vec![
                     ThreatLevel::Low,
@@ -2493,34 +2496,34 @@ mod sensitive_operation_audit_tests {
                     ThreatLevel::High,
                     ThreatLevel::Critical,
                 ];
-                
+
                 for (i, threat_level) in threat_levels.iter().enumerate() {
                     let violation_type = format!("{}_{}", base_violation, i);
                     let details = format!("Threat level {} violation", i);
-                    
+
                     let result = audit_logger.log_security_violation(
                         None,
                         &violation_type,
                         &details,
                         threat_level.clone(),
                     );
-                    
+
                     prop_assert!(result.is_ok());
-                    
+
                     let event = receiver.recv().await.unwrap();
                     prop_assert_eq!(event.event_type, AuditEventType::SecurityViolation);
-                    
+
                     match event.data {
-                        crate::core::audit::AuditEventData::SecurityViolation { 
+                        crate::core::audit::AuditEventData::SecurityViolation {
                             threat_level: logged_level,
-                            .. 
+                            ..
                         } => {
                             prop_assert!(matches!(logged_level, threat_level));
                         }
                         _ => prop_assert!(false, "Expected SecurityViolation event data"),
                     }
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -2553,7 +2556,7 @@ mod file_operation_audit_comprehensive_tests {
             // Feature: lightweight-rmm, Property 25: 文件操作审计
             let result = tokio_test::block_on(async {
                 let (audit_logger, mut receiver) = AuditLogger::new(device_id.clone());
-                
+
                 // 测试多个文件操作的审计
                 for (file_path, file_size, checksum, operation_id) in &file_operations {
                     // 测试文件上传审计
@@ -2566,18 +2569,18 @@ mod file_operation_audit_comprehensive_tests {
                         AuditResult::Success,
                         None,
                     );
-                    
+
                     prop_assert!(upload_result.is_ok());
-                    
+
                     let upload_event = receiver.recv().await.unwrap();
                     prop_assert_eq!(upload_event.device_id, device_id.clone());
                     prop_assert_eq!(upload_event.session_id, Some(session_id.clone()));
                     prop_assert_eq!(upload_event.event_type, AuditEventType::FileUpload);
                     prop_assert!(matches!(upload_event.result, AuditResult::Success));
-                    
+
                     // 验证审计事件包含正确的文件信息
                     match upload_event.data {
-                        crate::core::audit::AuditEventData::FileUpload { 
+                        crate::core::audit::AuditEventData::FileUpload {
                             path,
                             file_size: logged_size,
                             checksum: logged_checksum,
@@ -2591,7 +2594,7 @@ mod file_operation_audit_comprehensive_tests {
                         _ => prop_assert!(false, "Expected FileUpload event data"),
                     }
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -2608,12 +2611,12 @@ mod file_operation_audit_comprehensive_tests {
             // Feature: lightweight-rmm, Property 25: 文件操作审计
             let result = tokio_test::block_on(async {
                 let (audit_logger, mut receiver) = AuditLogger::new(device_id.clone());
-                
+
                 let before_timestamp = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .unwrap()
                     .as_millis() as u64;
-                
+
                 let result = audit_logger.log_file_list(
                     None,
                     &file_path,
@@ -2622,23 +2625,23 @@ mod file_operation_audit_comprehensive_tests {
                     AuditResult::Success,
                     None,
                 );
-                
+
                 prop_assert!(result.is_ok());
-                
+
                 let after_timestamp = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .unwrap()
                     .as_millis() as u64;
-                
+
                 let event = receiver.recv().await.unwrap();
-                
+
                 // 验证时间戳在合理范围内
                 prop_assert!(event.timestamp >= before_timestamp);
                 prop_assert!(event.timestamp <= after_timestamp);
-                
+
                 // 验证时间戳精度（毫秒级）
                 prop_assert!(event.timestamp > 0);
-                
+
                 Ok(())
             });
             result?;
@@ -2654,14 +2657,14 @@ mod file_operation_audit_comprehensive_tests {
             // Feature: lightweight-rmm, Property 25: 文件操作审计
             let result = tokio_test::block_on(async {
                 let (audit_logger, mut receiver) = AuditLogger::new(device_id.clone());
-                
+
                 // 模拟并发文件操作
                 let mut handles = Vec::new();
                 for i in 0..operation_count {
                     let logger = audit_logger.clone();
                     let file_path = format!("/tmp/file_{}.txt", i);
                     let operation_id = format!("op_{}", i);
-                    
+
                     let handle = tokio::spawn(async move {
                         logger.log_file_download(
                             None,
@@ -2675,13 +2678,13 @@ mod file_operation_audit_comprehensive_tests {
                     });
                     handles.push(handle);
                 }
-                
+
                 // 等待所有操作完成
                 for handle in handles {
                     let result = handle.await.unwrap();
                     prop_assert!(result.is_ok());
                 }
-                
+
                 // 验证所有事件都被记录
                 let mut received_events = 0;
                 while let Ok(event) = receiver.try_recv() {
@@ -2689,9 +2692,9 @@ mod file_operation_audit_comprehensive_tests {
                     prop_assert_eq!(event.event_type, AuditEventType::FileDownload);
                     received_events += 1;
                 }
-                
+
                 prop_assert_eq!(received_events, operation_count);
-                
+
                 Ok(())
             });
             result?;
@@ -2717,26 +2720,26 @@ mod tls_strict_verification_tests {
                 // 创建严格的 TLS 配置
                 let tls_config = TlsConfig::strict()
                     .with_min_tls_version(min_tls_version.clone());
-                
+
                 // 验证 TLS 配置是严格模式
                 prop_assert!(matches!(tls_config.verify_mode, TlsVerifyMode::Strict));
-                
+
                 // 创建 HTTP 客户端
                 let http_client = HttpClient::new(tls_config);
                 prop_assert!(http_client.is_ok());
-                
+
                 let client = http_client.unwrap();
-                
+
                 // 验证 TLS 配置正确应用
                 prop_assert!(matches!(client.tls_config().verify_mode, TlsVerifyMode::Strict));
-                
+
                 // 执行安全检查
                 let security_result = client.perform_security_checks(&hostname).await;
                 prop_assert!(security_result.is_ok());
-                
+
                 let security_check = security_result.unwrap();
                 prop_assert!(matches!(security_check.tls_verification, crate::transport::TlsVerificationStatus::Strict));
-                
+
                 Ok(())
             });
             result?;
@@ -2754,24 +2757,24 @@ mod tls_strict_verification_tests {
             let result = tokio_test::block_on(async {
                 // 创建带证书固定的 TLS 配置
                 let tls_config = TlsConfig::strict_with_pinning(certificate_hashes.clone());
-                
+
                 // 验证证书固定配置
                 prop_assert!(matches!(tls_config.verify_mode, TlsVerifyMode::StrictWithPinning));
                 prop_assert_eq!(tls_config.certificate_pinning.as_ref().unwrap(), &certificate_hashes);
-                
+
                 // 创建 HTTP 客户端
                 let http_client = HttpClient::new(tls_config);
                 prop_assert!(http_client.is_ok());
-                
+
                 let client = http_client.unwrap();
-                
+
                 // 执行安全检查
                 let security_result = client.perform_security_checks(&hostname).await;
                 prop_assert!(security_result.is_ok());
-                
+
                 let security_check = security_result.unwrap();
                 prop_assert!(matches!(security_check.tls_verification, crate::transport::TlsVerificationStatus::StrictWithPinning));
-                
+
                 Ok(())
             });
             result?;
@@ -2788,18 +2791,18 @@ mod tls_strict_verification_tests {
                 // 创建带密码套件配置的 TLS 配置
                 let tls_config = TlsConfig::strict()
                     .with_cipher_suites(cipher_suites.clone());
-                
+
                 // 验证密码套件配置
                 prop_assert_eq!(tls_config.cipher_suites.as_ref().unwrap(), &cipher_suites);
-                
+
                 // 创建 HTTP 客户端
                 let http_client = HttpClient::new(tls_config);
                 prop_assert!(http_client.is_ok());
-                
+
                 // 验证客户端创建成功，说明配置有效
                 let client = http_client.unwrap();
                 prop_assert!(matches!(client.tls_config().verify_mode, TlsVerifyMode::Strict));
-                
+
                 Ok(())
             });
             result?;
@@ -2816,26 +2819,26 @@ mod tls_strict_verification_tests {
             // Feature: lightweight-rmm, Property 29: TLS 严格验证
             let result = tokio_test::block_on(async {
                 let tls_config = TlsConfig::strict_with_pinning(vec![expected_hash.clone()]);
-                
+
                 // 测试证书指纹验证
                 let verification_result = tls_config.verify_certificate_pinning(&test_certificate_data);
                 prop_assert!(verification_result.is_ok());
-                
+
                 // 由于我们使用的是随机测试数据，验证应该失败（除非极其巧合）
                 let is_valid = verification_result.unwrap();
-                
+
                 // 计算实际的证书哈希
                 use sha2::{Sha256, Digest};
                 let mut hasher = Sha256::new();
                 hasher.update(&test_certificate_data);
                 let actual_hash = hex::encode(hasher.finalize());
-                
+
                 if actual_hash.to_lowercase() == expected_hash.to_lowercase() {
                     prop_assert!(is_valid);
                 } else {
                     prop_assert!(!is_valid);
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -2871,19 +2874,19 @@ mod doh_fallback_strategy_tests {
                         ],
                     });
                 }
-                
+
                 // 创建启用回退的 DoH 解析器
                 let doh_resolver = DohResolver::new(providers.clone(), true);
-                
+
                 // 验证提供商配置
                 prop_assert_eq!(&doh_resolver.get_current_provider().unwrap().name, "Provider_0");
-                
+
                 // 验证提供商数量正确
                 prop_assert_eq!(doh_resolver.provider_count(), provider_count);
-                
+
                 // 验证回退功能启用
                 prop_assert!(doh_resolver.is_fallback_enabled());
-                
+
                 Ok(())
             });
             result?;
@@ -2908,23 +2911,23 @@ mod doh_fallback_strategy_tests {
                         ],
                     });
                 }
-                
+
                 let mut doh_resolver = DohResolver::new(providers.clone(), true);
-                
+
                 // 验证初始提供商
                 let initial_provider = doh_resolver.get_current_provider().unwrap().name.clone();
                 prop_assert_eq!(&initial_provider, &provider_names[0]);
-                
+
                 // 测试提供商轮换逻辑（不实际进行网络请求）
                 doh_resolver.set_current_provider_index((doh_resolver.current_provider_index() + 1) % doh_resolver.provider_count());
                 let rotated_provider = doh_resolver.get_current_provider().unwrap().name.clone();
-                
+
                 if provider_names.len() > 1 {
                     prop_assert_eq!(&rotated_provider, &provider_names[1]);
                 } else {
                     prop_assert_eq!(&rotated_provider, &provider_names[0]);
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -2946,17 +2949,17 @@ mod doh_fallback_strategy_tests {
                         bootstrap_ips: vec!["192.0.2.1".parse().unwrap()], // TEST-NET-1
                     }
                 ];
-                
+
                 let doh_resolver = DohResolver::new(providers, true);
-                
+
                 // 验证配置正确
                 prop_assert!(doh_resolver.is_fallback_enabled());
                 prop_assert_eq!(doh_resolver.provider_count(), 1);
                 prop_assert_eq!(&doh_resolver.get_current_provider().unwrap().name, "Invalid_Provider");
-                
+
                 // 验证域名格式
                 prop_assert!(invalid_domain.ends_with(".invalid"));
-                
+
                 Ok(())
             });
             result?;
@@ -2972,17 +2975,17 @@ mod doh_fallback_strategy_tests {
             let result = tokio_test::block_on(async {
                 // 测试默认 DoH 配置
                 let default_resolver = DohResolver::default();
-                
+
                 // 验证默认配置包含知名提供商
                 let current_provider = default_resolver.get_current_provider().unwrap();
                 prop_assert!(
-                    current_provider.name == "Cloudflare" || 
+                    current_provider.name == "Cloudflare" ||
                     current_provider.name == "Google"
                 );
-                
+
                 // 验证默认配置启用回退
                 prop_assert!(default_resolver.is_fallback_enabled());
-                
+
                 // 测试自定义回退配置
                 let custom_providers = vec![
                     DohProvider {
@@ -2991,12 +2994,12 @@ mod doh_fallback_strategy_tests {
                         bootstrap_ips: vec!["203.0.113.1".parse().unwrap()], // TEST-NET-3
                     }
                 ];
-                
+
                 let custom_resolver = DohResolver::new(custom_providers, fallback_enabled);
                 let test_provider = custom_resolver.get_current_provider().unwrap();
                 prop_assert_eq!(&test_provider.name, "Test_Provider");
                 prop_assert_eq!(custom_resolver.is_fallback_enabled(), fallback_enabled);
-                
+
                 Ok(())
             });
             result?;
@@ -3022,17 +3025,17 @@ mod ech_graceful_degradation_tests {
             let result = tokio_test::block_on(async {
                 // 创建 ECH 配置
                 let ech_config = EchConfig::new(true, fallback_enabled);
-                
+
                 // 验证 ECH 配置
                 prop_assert!(ech_config.enabled);
                 prop_assert_eq!(ech_config.fallback_enabled, fallback_enabled);
-                
+
                 // 验证配置列表初始为空
                 prop_assert!(ech_config.config_list.is_empty());
-                
+
                 // 验证主机名格式合理
                 prop_assert!(hostname.len() >= 5 && hostname.len() <= 20);
-                
+
                 Ok(())
             });
             result?;
@@ -3050,30 +3053,30 @@ mod ech_graceful_degradation_tests {
             // Feature: lightweight-rmm, Property 33: ECH 优雅降级
             let result = tokio_test::block_on(async {
                 let mut ech_config = EchConfig::new(true, true);
-                
+
                 // 添加 ECH 配置条目
                 for (public_name, config_size) in &config_entries {
                     let config_data: Vec<u8> = (0..*config_size).map(|i| (i % 256) as u8).collect();
                     ech_config.add_config(public_name.clone(), config_data.clone());
                 }
-                
+
                 // 验证配置条目数量
                 prop_assert_eq!(ech_config.config_list.len(), config_entries.len());
-                
+
                 // 验证每个配置条目
                 for (public_name, config_size) in &config_entries {
                     let config_entry = ech_config.get_config_for_host(public_name);
                     prop_assert!(config_entry.is_some());
-                    
+
                     let entry = config_entry.unwrap();
                     prop_assert_eq!(&entry.public_name, public_name);
                     prop_assert_eq!(entry.config_data.len(), *config_size);
                 }
-                
+
                 // 测试不存在的主机名
                 let nonexistent_config = ech_config.get_config_for_host("nonexistent.example.com");
                 prop_assert!(nonexistent_config.is_none());
-                
+
                 Ok(())
             });
             result?;
@@ -3097,21 +3100,21 @@ mod ech_graceful_degradation_tests {
             // Feature: lightweight-rmm, Property 33: ECH 优雅降级
             let result = tokio_test::block_on(async {
                 let ech_config = EchConfig::new(true, fallback_enabled);
-                
+
                 // 验证配置正确
                 prop_assert!(ech_config.enabled);
                 prop_assert_eq!(ech_config.fallback_enabled, fallback_enabled);
-                
+
                 // 验证无效主机名格式
                 for invalid_hostname in &invalid_hostnames {
                     prop_assert!(
-                        invalid_hostname.contains("..") || 
-                        invalid_hostname.contains("999") || 
+                        invalid_hostname.contains("..") ||
+                        invalid_hostname.contains("999") ||
                         invalid_hostname.contains("99999") ||
                         invalid_hostname.len() > 0
                     );
                 }
-                
+
                 Ok(())
             });
             result?;
@@ -3129,26 +3132,26 @@ mod ech_graceful_degradation_tests {
                 // 创建 HTTP 客户端
                 let tls_config = TlsConfig::default();
                 let mut http_client = HttpClient::new(tls_config).unwrap();
-                
+
                 // 设置 ECH 配置
                 let ech_config = EchConfig::new(ech_enabled, true);
                 http_client.set_ech_config(ech_config);
-                
+
                 // 验证 ECH 状态
                 prop_assert_eq!(http_client.is_ech_enabled(), ech_enabled);
-                
+
                 if ech_enabled {
                     // 验证 ECH 配置存在
                     prop_assert!(http_client.ech_config().is_some());
-                    
+
                     let ech_config = http_client.ech_config().unwrap();
                     prop_assert!(ech_config.enabled);
                     prop_assert!(ech_config.fallback_enabled);
                 }
-                
+
                 // 验证主机名格式
                 prop_assert!(hostname.len() >= 5 && hostname.len() <= 15);
-                
+
                 Ok(())
             });
             result?;
@@ -3161,12 +3164,12 @@ mod ech_graceful_degradation_tests {
         let result: Result<(), anyhow::Error> = tokio_test::block_on(async {
             // 测试默认 ECH 配置
             let default_ech_config = EchConfig::default();
-            
+
             // 验证默认配置是安全的（禁用 ECH，启用回退）
             assert!(!default_ech_config.enabled);
             assert!(default_ech_config.fallback_enabled);
             assert!(default_ech_config.config_list.is_empty());
-            
+
             Ok(())
         });
         result.unwrap();

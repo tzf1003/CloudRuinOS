@@ -3,11 +3,11 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::time::Duration;
-use tracing::{info, error, debug};
+use tracing::{debug, error, info};
 
 use super::crypto::CryptoManager;
 use super::protocol::{EnrollmentRequest, EnrollmentResponse, EnrollmentStatus};
-use super::state::{StateManager, EnrollmentStatus as StateEnrollmentStatus};
+use super::state::{EnrollmentStatus as StateEnrollmentStatus, StateManager};
 
 /// 设备注册客户端
 #[derive(Debug)]
@@ -28,9 +28,7 @@ pub struct EnrollmentConfig {
 impl EnrollmentClient {
     /// 创建新的注册客户端
     pub fn new(config: EnrollmentConfig) -> Result<Self> {
-        let http_client = Client::builder()
-            .timeout(config.timeout)
-            .build()?;
+        let http_client = Client::builder().timeout(config.timeout).build()?;
 
         Ok(Self {
             http_client,
@@ -48,7 +46,9 @@ impl EnrollmentClient {
         info!("Starting device enrollment process");
 
         // 设置注册状态为进行中
-        state_manager.set_enrollment_status(StateEnrollmentStatus::Enrolling).await?;
+        state_manager
+            .set_enrollment_status(StateEnrollmentStatus::Enrolling)
+            .await?;
 
         // 生成新的密钥对
         let mut crypto_manager = CryptoManager::generate()?;
@@ -67,7 +67,10 @@ impl EnrollmentClient {
 
         match response.status {
             EnrollmentStatus::Success => {
-                info!("Device enrollment successful, device_id: {}", response.device_id);
+                info!(
+                    "Device enrollment successful, device_id: {}",
+                    response.device_id
+                );
 
                 // 设置设备 ID
                 crypto_manager.set_device_id(response.device_id.clone());
@@ -77,19 +80,27 @@ impl EnrollmentClient {
                 info!("Device credentials saved to: {:?}", credentials_path);
 
                 // 更新状态管理器
-                state_manager.set_device_id(response.device_id.clone()).await?;
-                state_manager.set_enrollment_status(StateEnrollmentStatus::Enrolled).await?;
+                state_manager
+                    .set_device_id(response.device_id.clone())
+                    .await?;
+                state_manager
+                    .set_enrollment_status(StateEnrollmentStatus::Enrolled)
+                    .await?;
 
                 Ok(response.device_id)
             }
             EnrollmentStatus::Error => {
-                let error_msg = response.message.unwrap_or_else(|| "Unknown enrollment error".to_string());
+                let error_msg = response
+                    .message
+                    .unwrap_or_else(|| "Unknown enrollment error".to_string());
                 error!("Device enrollment failed: {}", error_msg);
 
                 // 设置注册失败状态
-                state_manager.set_enrollment_status(
-                    StateEnrollmentStatus::EnrollmentFailed(error_msg.clone())
-                ).await?;
+                state_manager
+                    .set_enrollment_status(StateEnrollmentStatus::EnrollmentFailed(
+                        error_msg.clone(),
+                    ))
+                    .await?;
 
                 Err(anyhow!("Enrollment failed: {}", error_msg))
             }
@@ -97,15 +108,14 @@ impl EnrollmentClient {
     }
 
     /// 发送注册请求
-    async fn send_enrollment_request(&self, request: &EnrollmentRequest) -> Result<EnrollmentResponse> {
+    async fn send_enrollment_request(
+        &self,
+        request: &EnrollmentRequest,
+    ) -> Result<EnrollmentResponse> {
         let url = format!("{}/agent/enroll", self.server_url);
         debug!("Sending enrollment request to: {}", url);
 
-        let response = self.http_client
-            .post(&url)
-            .json(request)
-            .send()
-            .await?;
+        let response = self.http_client.post(&url).json(request).send().await?;
 
         if !response.status().is_success() {
             return Err(anyhow!(
@@ -134,11 +144,10 @@ impl EnrollmentClient {
         for attempt in 1..=max_attempts {
             info!("Enrollment attempt {} of {}", attempt, max_attempts);
 
-            match self.enroll_device(
-                enrollment_token.clone(),
-                state_manager,
-                credentials_path,
-            ).await {
+            match self
+                .enroll_device(enrollment_token.clone(), state_manager, credentials_path)
+                .await
+            {
                 Ok(device_id) => {
                     info!("Enrollment successful on attempt {}", attempt);
                     return Ok(device_id);
@@ -173,11 +182,13 @@ impl EnrollmentClient {
             Ok(crypto_manager) => {
                 if let Some(device_id) = crypto_manager.device_id() {
                     info!("Found existing credentials for device: {}", device_id);
-                    
+
                     // 更新状态管理器
                     state_manager.set_device_id(device_id.to_string()).await?;
-                    state_manager.set_enrollment_status(StateEnrollmentStatus::Enrolled).await?;
-                    
+                    state_manager
+                        .set_enrollment_status(StateEnrollmentStatus::Enrolled)
+                        .await?;
+
                     Ok(true)
                 } else {
                     error!("Credentials file exists but contains no device ID");
@@ -196,10 +207,7 @@ impl EnrollmentClient {
         let url = format!("{}/agent/status/{}", self.server_url, device_id);
         debug!("Checking enrollment status at: {}", url);
 
-        let response = self.http_client
-            .get(&url)
-            .send()
-            .await?;
+        let response = self.http_client.get(&url).send().await?;
 
         Ok(response.status().is_success())
     }
@@ -242,16 +250,18 @@ mod tests {
     async fn test_verify_existing_credentials_no_file() {
         let config = EnrollmentConfig::default();
         let client = EnrollmentClient::new(config).unwrap();
-        
+
         let temp_file = NamedTempFile::new().unwrap();
         let non_existent_path = temp_file.path().with_extension("nonexistent");
-        
+
         let temp_state_file = NamedTempFile::new().unwrap();
         let state_manager = StateManager::new(temp_state_file.path()).unwrap();
         // 初始化状态文件
         state_manager.save_state().await.unwrap();
-        
-        let result = client.verify_existing_credentials(&non_existent_path, &state_manager).await;
+
+        let result = client
+            .verify_existing_credentials(&non_existent_path, &state_manager)
+            .await;
         assert!(result.is_ok());
         assert!(!result.unwrap());
     }
@@ -260,26 +270,33 @@ mod tests {
     async fn test_verify_existing_credentials_with_valid_file() {
         let config = EnrollmentConfig::default();
         let client = EnrollmentClient::new(config).unwrap();
-        
+
         // 创建有效的凭证文件
         let crypto_manager = CryptoManager::generate().unwrap();
         let device_id = "test-device-123".to_string();
-        
+
         let temp_creds_file = NamedTempFile::new().unwrap();
-        crypto_manager.save_credentials(temp_creds_file.path(), device_id.clone()).unwrap();
-        
+        crypto_manager
+            .save_credentials(temp_creds_file.path(), device_id.clone())
+            .unwrap();
+
         let temp_state_file = NamedTempFile::new().unwrap();
         let state_manager = StateManager::new(temp_state_file.path()).unwrap();
         // 初始化状态文件
         state_manager.save_state().await.unwrap();
-        
-        let result = client.verify_existing_credentials(temp_creds_file.path(), &state_manager).await;
+
+        let result = client
+            .verify_existing_credentials(temp_creds_file.path(), &state_manager)
+            .await;
         assert!(result.is_ok());
         assert!(result.unwrap());
-        
+
         // 验证状态管理器已更新
         assert_eq!(state_manager.get_device_id().await, Some(device_id));
-        assert_eq!(state_manager.get_enrollment_status().await, StateEnrollmentStatus::Enrolled);
+        assert_eq!(
+            state_manager.get_enrollment_status().await,
+            StateEnrollmentStatus::Enrolled
+        );
     }
 }
 
@@ -348,18 +365,18 @@ mod credential_storage_tests {
 
             // 验证凭证文件可以被正确加载
             let loaded_manager = CryptoManager::from_credentials_file(credentials_path).unwrap();
-            
+
             // 验证设备 ID 正确存储
             prop_assert_eq!(loaded_manager.device_id(), Some(device_id.as_str()));
-            
+
             // 验证公钥一致性
             prop_assert_eq!(loaded_manager.public_key_base64(), crypto_manager.public_key_base64());
-            
+
             // 验证私钥一致性（通过签名验证）
             let test_data = b"test signature data";
             let original_signature = crypto_manager.sign(test_data);
             let loaded_signature = loaded_manager.sign(test_data);
-            
+
             // 两个管理器应该能够验证对方的签名（因为使用相同的密钥对）
             prop_assert!(crypto_manager.verify(test_data, &loaded_signature).unwrap());
             prop_assert!(loaded_manager.verify(test_data, &original_signature).unwrap());
@@ -381,20 +398,20 @@ mod credential_storage_tests {
 
             // 读取凭证文件内容
             let file_content = std::fs::read_to_string(credentials_path).unwrap();
-            
+
             // 验证文件内容是有效的 JSON
             let json_value: serde_json::Value = serde_json::from_str(&file_content).unwrap();
-            
+
             // 验证 JSON 包含必需的字段
             prop_assert!(json_value.get("device_id").is_some(), "JSON should contain device_id field");
             prop_assert!(json_value.get("private_key").is_some(), "JSON should contain private_key field");
             prop_assert!(json_value.get("public_key").is_some(), "JSON should contain public_key field");
-            
+
             // 验证字段值的类型
             prop_assert!(json_value["device_id"].is_string(), "device_id should be a string");
             prop_assert!(json_value["private_key"].is_string(), "private_key should be a string");
             prop_assert!(json_value["public_key"].is_string(), "public_key should be a string");
-            
+
             // 验证设备 ID 值正确
             prop_assert_eq!(json_value["device_id"].as_str().unwrap(), device_id);
         }
@@ -415,22 +432,22 @@ mod credential_storage_tests {
 
             // 加载凭证文件
             let loaded_manager = CryptoManager::from_credentials_file(credentials_path).unwrap();
-            
+
             // 获取 Base64 编码的密钥
             let public_key_b64 = loaded_manager.public_key_base64();
             let private_key_b64 = loaded_manager.private_key_base64();
-            
+
             // 验证 Base64 编码格式正确（可以解码）
             use base64::Engine;
             let public_key_bytes = base64::engine::general_purpose::STANDARD
                 .decode(&public_key_b64).unwrap();
             let private_key_bytes = base64::engine::general_purpose::STANDARD
                 .decode(&private_key_b64).unwrap();
-            
+
             // 验证密钥长度正确
             prop_assert_eq!(public_key_bytes.len(), 32, "Public key should be 32 bytes");
             prop_assert_eq!(private_key_bytes.len(), 32, "Private key should be 32 bytes");
-            
+
             // 验证 Base64 字符串不为空
             prop_assert!(!public_key_b64.is_empty(), "Public key Base64 should not be empty");
             prop_assert!(!private_key_b64.is_empty(), "Private key Base64 should not be empty");
@@ -458,7 +475,7 @@ mod credential_storage_tests {
                     retry_delay: std::time::Duration::from_secs(1),
                 };
                 let client = EnrollmentClient::new(config).unwrap();
-                
+
                 // 创建状态管理器
                 let state_manager = StateManager::new(&state_file_path).unwrap();
 
@@ -476,7 +493,7 @@ mod credential_storage_tests {
 
                 // 验证状态管理器已更新
                 prop_assert_eq!(state_manager.get_device_id().await, Some(device_id));
-                
+
                 Ok(())
             }).unwrap()
         }
@@ -495,7 +512,9 @@ mod credential_storage_tests {
         let original_private_key = original_manager.private_key_base64();
 
         // 保存凭证
-        original_manager.save_credentials(credentials_path, device_id.clone()).unwrap();
+        original_manager
+            .save_credentials(credentials_path, device_id.clone())
+            .unwrap();
 
         // 加载凭证
         let loaded_manager = CryptoManager::from_credentials_file(credentials_path).unwrap();
@@ -511,10 +530,16 @@ mod credential_storage_tests {
         let loaded_signature = loaded_manager.sign(test_data);
 
         // 验证签名
-        assert!(original_manager.verify(test_data, &original_signature).unwrap());
+        assert!(original_manager
+            .verify(test_data, &original_signature)
+            .unwrap());
         assert!(loaded_manager.verify(test_data, &loaded_signature).unwrap());
-        assert!(original_manager.verify(test_data, &loaded_signature).unwrap());
-        assert!(loaded_manager.verify(test_data, &original_signature).unwrap());
+        assert!(original_manager
+            .verify(test_data, &loaded_signature)
+            .unwrap());
+        assert!(loaded_manager
+            .verify(test_data, &original_signature)
+            .unwrap());
     }
 
     #[tokio::test]
@@ -525,7 +550,9 @@ mod credential_storage_tests {
         let device_id = "test-device-permissions".to_string();
 
         let crypto_manager = CryptoManager::generate().unwrap();
-        crypto_manager.save_credentials(credentials_path, device_id).unwrap();
+        crypto_manager
+            .save_credentials(credentials_path, device_id)
+            .unwrap();
 
         // 验证文件存在且可读
         assert!(credentials_path.exists());
@@ -537,17 +564,21 @@ mod credential_storage_tests {
             use std::os::unix::fs::PermissionsExt;
             let metadata = std::fs::metadata(credentials_path).unwrap();
             let permissions = metadata.permissions();
-            
+
             // 验证文件权限不是完全开放的
             let mode = permissions.mode();
-            assert_ne!(mode & 0o777, 0o777, "Credentials file should not have world-readable permissions");
+            assert_ne!(
+                mode & 0o777,
+                0o777,
+                "Credentials file should not have world-readable permissions"
+            );
         }
     }
 
     #[test]
     fn test_credential_storage_error_handling() {
         // 测试凭证存储的错误处理
-        
+
         // 测试无效路径
         let invalid_path = PathBuf::from("/invalid/path/that/does/not/exist/credentials.json");
         let crypto_manager = CryptoManager::generate().unwrap();
@@ -557,6 +588,9 @@ mod credential_storage_tests {
         // 测试加载不存在的文件
         let non_existent_path = PathBuf::from("non_existent_credentials.json");
         let result = CryptoManager::from_credentials_file(&non_existent_path);
-        assert!(result.is_err(), "Should fail when loading non-existent file");
+        assert!(
+            result.is_err(),
+            "Should fail when loading non-existent file"
+        );
     }
 }

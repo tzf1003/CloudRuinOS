@@ -157,14 +157,16 @@ impl ReconnectManager {
             factor if factor > 1.0 => {
                 // 指数退避
                 let new_delay_ms = (self.current_delay.as_millis() as f64 * factor) as u64;
-                self.current_delay = Duration::from_millis(new_delay_ms).min(self.strategy.max_delay);
+                self.current_delay =
+                    Duration::from_millis(new_delay_ms).min(self.strategy.max_delay);
             }
             1.0 => {
                 // 线性退避或固定间隔
                 if self.strategy.initial_delay != self.strategy.max_delay {
                     // 线性退避
                     let increment = self.strategy.initial_delay;
-                    self.current_delay = (self.current_delay + increment).min(self.strategy.max_delay);
+                    self.current_delay =
+                        (self.current_delay + increment).min(self.strategy.max_delay);
                 }
                 // 固定间隔不需要更新
             }
@@ -234,7 +236,7 @@ impl ReconnectManager {
                 Err(_e) => {
                     let error_msg = _e.to_string();
                     self.record_failure(&error_msg);
-                    
+
                     // 如果达到最大尝试次数，返回失败
                     if !self.should_reconnect() {
                         return ReconnectResult::MaxAttemptsReached;
@@ -279,7 +281,7 @@ mod tests {
         // 模拟失败并更新延迟
         manager.wait_for_reconnect().await.unwrap();
         let second_delay = manager.next_delay();
-        
+
         // 第二次延迟应该更长（指数增长）
         assert!(second_delay > first_delay || second_delay >= Duration::from_secs(1));
     }
@@ -294,7 +296,7 @@ mod tests {
         let first_delay = manager.next_delay();
         manager.wait_for_reconnect().await.unwrap();
         let second_delay = manager.next_delay();
-        
+
         assert_eq!(first_delay, interval);
         assert_eq!(second_delay, interval);
     }
@@ -313,13 +315,13 @@ mod tests {
         // 前 3 次应该允许重连
         assert!(manager.should_reconnect());
         manager.wait_for_reconnect().await.unwrap();
-        
+
         assert!(manager.should_reconnect());
         manager.wait_for_reconnect().await.unwrap();
-        
+
         assert!(manager.should_reconnect());
         manager.wait_for_reconnect().await.unwrap();
-        
+
         // 第 4 次应该被拒绝
         assert!(!manager.should_reconnect());
     }
@@ -334,7 +336,7 @@ mod tests {
             false,
         );
         let mut manager = ReconnectManager::new(strategy);
-        
+
         let attempt_count = Arc::new(AtomicUsize::new(0));
         let attempt_count_clone = attempt_count.clone();
 
@@ -352,7 +354,7 @@ mod tests {
         };
 
         let result = manager.reconnect_with_retry(connect_fn).await;
-        
+
         match result {
             ReconnectResult::Success => {
                 assert_eq!(attempt_count.load(Ordering::SeqCst), 3);
@@ -372,14 +374,14 @@ mod tests {
             false,
         );
         let mut manager = ReconnectManager::new(strategy);
-        
+
         let connect_fn = || async {
             // 总是失败
             Err(anyhow!("Connection always fails"))
         };
 
         let result = manager.reconnect_with_retry(connect_fn).await;
-        
+
         match result {
             ReconnectResult::MaxAttemptsReached => {
                 assert_eq!(manager.current_attempt(), 2);
@@ -396,13 +398,13 @@ mod tests {
         // 进行一些尝试
         manager.wait_for_reconnect().await.unwrap();
         manager.wait_for_reconnect().await.unwrap();
-        
+
         assert_eq!(manager.current_attempt(), 2);
         assert!(manager.current_delay() > Duration::from_secs(1));
 
         // 重置
         manager.reset();
-        
+
         assert_eq!(manager.current_attempt(), 0);
         assert_eq!(manager.current_delay(), Duration::from_secs(1));
     }

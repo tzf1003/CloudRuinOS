@@ -1,9 +1,9 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use std::sync::Arc;
-use tokio::sync::{mpsc, Mutex};
 use std::collections::VecDeque;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tokio::sync::{mpsc, Mutex};
 
 /// 审计事件类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -119,14 +119,8 @@ pub struct AuditLogger {
 impl AuditLogger {
     pub fn new(device_id: String) -> (Self, mpsc::UnboundedReceiver<AuditEvent>) {
         let (sender, receiver) = mpsc::unbounded_channel();
-        
-        (
-            Self {
-                device_id,
-                sender,
-            },
-            receiver,
-        )
+
+        (Self { device_id, sender }, receiver)
     }
 
     /// 记录命令执行事件
@@ -143,15 +137,23 @@ impl AuditLogger {
         error_message: Option<String>,
     ) -> Result<()> {
         let is_sensitive = self.is_sensitive_command(command);
-        
+
         let event = AuditEvent {
             event_type: AuditEventType::CommandExecute,
             timestamp: self.current_timestamp(),
             device_id: self.device_id.clone(),
             session_id,
             data: AuditEventData::CommandExecute {
-                command: if is_sensitive { "[REDACTED]".to_string() } else { command.to_string() },
-                args: if is_sensitive { vec!["[REDACTED]".to_string()] } else { args.to_vec() },
+                command: if is_sensitive {
+                    "[REDACTED]".to_string()
+                } else {
+                    command.to_string()
+                },
+                args: if is_sensitive {
+                    vec!["[REDACTED]".to_string()]
+                } else {
+                    args.to_vec()
+                },
                 exit_code,
                 execution_time_ms: execution_time.as_millis() as u64,
                 stdout_length,
@@ -349,7 +351,8 @@ impl AuditLogger {
 
     /// 发送审计事件
     fn send_event(&self, event: AuditEvent) -> Result<()> {
-        self.sender.send(event)
+        self.sender
+            .send(event)
             .map_err(|e| anyhow::anyhow!("Failed to send audit event: {}", e))?;
         Ok(())
     }
@@ -365,16 +368,14 @@ impl AuditLogger {
     /// 检查是否为敏感命令
     fn is_sensitive_command(&self, command: &str) -> bool {
         let sensitive_commands = [
-            "passwd", "password", "sudo", "su", "ssh", "scp",
-            "wget", "curl", "nc", "netcat", "telnet",
-            "rm", "del", "format", "fdisk", "mkfs",
-            "shutdown", "reboot", "halt", "poweroff",
-            "chmod", "chown", "chgrp",
+            "passwd", "password", "sudo", "su", "ssh", "scp", "wget", "curl", "nc", "netcat",
+            "telnet", "rm", "del", "format", "fdisk", "mkfs", "shutdown", "reboot", "halt",
+            "poweroff", "chmod", "chown", "chgrp",
         ];
 
         let command_name = command.to_lowercase();
         let command_parts: Vec<&str> = command_name.split_whitespace().collect();
-        
+
         if let Some(first_part) = command_parts.first() {
             return sensitive_commands.iter().any(|&sensitive| {
                 first_part.contains(sensitive) || sensitive.contains(first_part)
@@ -401,7 +402,8 @@ impl AuditLogger {
             session_id: None,
             data: AuditEventData::DeviceRegister {
                 device_id,
-                enrollment_token_prefix: enrollment_token[..8.min(enrollment_token.len())].to_string(),
+                enrollment_token_prefix: enrollment_token[..8.min(enrollment_token.len())]
+                    .to_string(),
                 platform,
                 version,
             },
@@ -566,7 +568,10 @@ impl AuditEventHandler {
         // 如果超过最大缓存数，移除最旧的事件
         while buffer.len() > self.config.max_cached_events {
             if let Some(dropped) = buffer.pop_front() {
-                tracing::warn!("Audit buffer full, dropping oldest event: {:?}", dropped.event_type);
+                tracing::warn!(
+                    "Audit buffer full, dropping oldest event: {:?}",
+                    dropped.event_type
+                );
             }
         }
 
@@ -589,7 +594,7 @@ impl AuditEventHandler {
         // 尝试上传到服务端
         if let Err(e) = self.upload_events(&events).await {
             tracing::error!("Failed to upload audit events: {}", e);
-            
+
             // 上传失败，尝试本地持久化
             if self.config.enable_local_persistence {
                 if let Err(e) = self.persist_events_locally(&events).await {
@@ -607,7 +612,9 @@ impl AuditEventHandler {
 
     /// 上传事件到服务端
     async fn upload_events(&self, events: &[AuditEvent]) -> Result<()> {
-        let client = self.http_client.as_ref()
+        let client = self
+            .http_client
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("HTTP client not initialized"))?;
 
         if self.config.server_url.is_empty() {
@@ -620,12 +627,13 @@ impl AuditEventHandler {
             .unwrap_or_default()
             .as_millis() as u64;
         let nonce = format!("{:016x}", rand::random::<u64>());
-        
+
         let signature = if let Some(crypto) = &self.crypto_manager {
             // 构建签名数据
-            let sign_data = format!("{}:{}:{}:{}", 
-                self.device_id, 
-                timestamp, 
+            let sign_data = format!(
+                "{}:{}:{}:{}",
+                self.device_id,
+                timestamp,
                 nonce,
                 events.len()
             );
@@ -648,11 +656,7 @@ impl AuditEventHandler {
         let mut attempts = 0;
 
         while attempts < self.config.max_retries {
-            match client.post(&url)
-                .json(&request)
-                .send()
-                .await
-            {
+            match client.post(&url).json(&request).send().await {
                 Ok(response) => {
                     if response.status().is_success() {
                         let result: AuditBatchResponse = response.json().await?;
@@ -690,12 +694,18 @@ impl AuditEventHandler {
             }
         }
 
-        Err(anyhow::anyhow!("Failed to upload audit events after {} attempts", self.config.max_retries))
+        Err(anyhow::anyhow!(
+            "Failed to upload audit events after {} attempts",
+            self.config.max_retries
+        ))
     }
 
     /// 本地持久化事件
     async fn persist_events_locally(&self, events: &[AuditEvent]) -> Result<()> {
-        let path = self.config.local_persistence_path.as_ref()
+        let path = self
+            .config
+            .local_persistence_path
+            .as_ref()
             .map(|p| std::path::PathBuf::from(p))
             .unwrap_or_else(|| {
                 dirs::data_local_dir()
@@ -726,7 +736,10 @@ impl AuditEventHandler {
 
     /// 加载本地持久化的事件并重新上传
     pub async fn load_and_upload_persisted_events(&self) -> Result<usize> {
-        let path = self.config.local_persistence_path.as_ref()
+        let path = self
+            .config
+            .local_persistence_path
+            .as_ref()
             .map(|p| std::path::PathBuf::from(p))
             .unwrap_or_else(|| {
                 dirs::data_local_dir()
@@ -750,7 +763,11 @@ impl AuditEventHandler {
                         total_uploaded += count;
                         // 上传成功后删除文件
                         if let Err(e) = tokio::fs::remove_file(&file_path).await {
-                            tracing::warn!("Failed to remove persisted file {:?}: {}", file_path, e);
+                            tracing::warn!(
+                                "Failed to remove persisted file {:?}: {}",
+                                file_path,
+                                e
+                            );
                         }
                     }
                     Err(e) => {
@@ -782,25 +799,29 @@ mod tests {
     #[tokio::test]
     async fn test_audit_logger_command_execution() {
         let (logger, mut receiver) = AuditLogger::new("test-device".to_string());
-        
-        logger.log_command_execution(
-            Some("test-session".to_string()),
-            "echo",
-            &["hello".to_string()],
-            0,
-            Duration::from_millis(100),
-            5,
-            0,
-            AuditResult::Success,
-            None,
-        ).unwrap();
+
+        logger
+            .log_command_execution(
+                Some("test-session".to_string()),
+                "echo",
+                &["hello".to_string()],
+                0,
+                Duration::from_millis(100),
+                5,
+                0,
+                AuditResult::Success,
+                None,
+            )
+            .unwrap();
 
         let event = receiver.recv().await.unwrap();
         assert_eq!(event.device_id, "test-device");
         assert_eq!(event.session_id, Some("test-session".to_string()));
-        
+
         match event.data {
-            AuditEventData::CommandExecute { command, exit_code, .. } => {
+            AuditEventData::CommandExecute {
+                command, exit_code, ..
+            } => {
                 assert_eq!(command, "echo");
                 assert_eq!(exit_code, 0);
             }
@@ -811,23 +832,30 @@ mod tests {
     #[tokio::test]
     async fn test_sensitive_command_redaction() {
         let (logger, mut receiver) = AuditLogger::new("test-device".to_string());
-        
-        logger.log_command_execution(
-            None,
-            "sudo rm -rf /",
-            &["-rf".to_string(), "/".to_string()],
-            1,
-            Duration::from_millis(50),
-            0,
-            10,
-            AuditResult::Error,
-            Some("Permission denied".to_string()),
-        ).unwrap();
+
+        logger
+            .log_command_execution(
+                None,
+                "sudo rm -rf /",
+                &["-rf".to_string(), "/".to_string()],
+                1,
+                Duration::from_millis(50),
+                0,
+                10,
+                AuditResult::Error,
+                Some("Permission denied".to_string()),
+            )
+            .unwrap();
 
         let event = receiver.recv().await.unwrap();
-        
+
         match event.data {
-            AuditEventData::CommandExecute { command, args, is_sensitive, .. } => {
+            AuditEventData::CommandExecute {
+                command,
+                args,
+                is_sensitive,
+                ..
+            } => {
                 assert_eq!(command, "[REDACTED]");
                 assert_eq!(args, vec!["[REDACTED]"]);
                 assert!(is_sensitive);
@@ -839,7 +867,7 @@ mod tests {
     #[test]
     fn test_is_sensitive_command() {
         let (logger, _) = AuditLogger::new("test-device".to_string());
-        
+
         assert!(logger.is_sensitive_command("sudo ls"));
         assert!(logger.is_sensitive_command("rm -rf /"));
         assert!(logger.is_sensitive_command("passwd user"));

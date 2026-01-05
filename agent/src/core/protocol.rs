@@ -79,20 +79,11 @@ pub enum WSMessage {
         stderr: String,
     },
     #[serde(rename = "fs_list")]
-    FsList {
-        id: String,
-        path: String,
-    },
+    FsList { id: String, path: String },
     #[serde(rename = "fs_list_result")]
-    FsListResult {
-        id: String,
-        files: Vec<FileInfo>,
-    },
+    FsListResult { id: String, files: Vec<FileInfo> },
     #[serde(rename = "fs_get")]
-    FsGet {
-        id: String,
-        path: String,
-    },
+    FsGet { id: String, path: String },
     #[serde(rename = "fs_get_result")]
     FsGetResult {
         id: String,
@@ -113,18 +104,11 @@ pub enum WSMessage {
         error: Option<String>,
     },
     #[serde(rename = "presence")]
-    Presence {
-        status: PresenceStatus,
-    },
+    Presence { status: PresenceStatus },
     #[serde(rename = "error")]
-    Error {
-        code: String,
-        message: String,
-    },
+    Error { code: String, message: String },
     #[serde(rename = "audit_ref")]
-    AuditRef {
-        log_id: u64,
-    },
+    AuditRef { log_id: u64 },
 }
 
 /// 文件信息

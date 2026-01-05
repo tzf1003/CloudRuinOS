@@ -1,8 +1,8 @@
 use super::*;
+use async_trait::async_trait;
 use proptest::prelude::*;
 use std::path::PathBuf;
 use std::process::Output;
-use async_trait::async_trait;
 
 #[cfg(windows)]
 use std::os::windows::process::ExitStatusExt;
@@ -38,13 +38,13 @@ impl MockCommandExecutor {
 impl CommandExecutor for MockCommandExecutor {
     async fn execute(&self, cmd: &str, args: &[String]) -> Result<Output> {
         // 模拟真实的命令执行行为
-        
+
         // 定义一些已知的"存在"的命令
         let valid_commands = [
-            "echo", "ls", "dir", "cat", "type", "pwd", "whoami", 
-            "ps", "tasklist", "netstat", "ipconfig", "ifconfig"
+            "echo", "ls", "dir", "cat", "type", "pwd", "whoami", "ps", "tasklist", "netstat",
+            "ipconfig", "ifconfig",
         ];
-        
+
         // 检查命令是否存在
         if valid_commands.contains(&cmd) {
             // 模拟成功执行
@@ -57,10 +57,10 @@ impl CommandExecutor for MockCommandExecutor {
             // 对于不存在的命令，返回错误而不是成功的 Output
             #[cfg(windows)]
             let error_message = format!("'{}' is not recognized as an internal or external command, operable program or batch file.", cmd);
-            
+
             #[cfg(not(windows))]
             let error_message = format!("{}: command not found", cmd);
-            
+
             Err(anyhow::anyhow!(error_message))
         }
     }
@@ -117,11 +117,11 @@ mod platform_isolation_tests {
         ) {
             // 创建平台特定的命令执行器
             let executor = create_command_executor().expect("应该能创建命令执行器");
-            
+
             // 验证执行器实现了 CommandExecutor trait
             // 这确保了平台差异被正确隔离在 trait 接口后面
             let _: &dyn CommandExecutor = executor.as_ref();
-            
+
             // 验证不同平台的执行器都有相同的接口
             // 这是编译时检查，确保接口一致性
             prop_assert!(true); // 如果编译通过，说明接口隔离正确
@@ -136,11 +136,11 @@ mod platform_isolation_tests {
         ) {
             // 创建平台特定的文件系统
             let fs = create_file_system().expect("应该能创建文件系统");
-            
+
             // 验证文件系统实现了 FileSystem trait
             // 这确保了平台差异被正确隔离在 trait 接口后面
             let _: &dyn FileSystem = fs.as_ref();
-            
+
             // 验证不同平台的文件系统都有相同的接口
             // 这是编译时检查，确保接口一致性
             prop_assert!(true); // 如果编译通过，说明接口隔离正确
@@ -153,20 +153,20 @@ mod platform_isolation_tests {
             // 测试命令执行器工厂
             let executor1 = create_command_executor().expect("应该能创建命令执行器");
             let executor2 = create_command_executor().expect("应该能创建命令执行器");
-            
+
             // 验证工厂函数总是返回实现了相同 trait 的对象
             // 这确保了平台选择逻辑的一致性
             let _: &dyn CommandExecutor = executor1.as_ref();
             let _: &dyn CommandExecutor = executor2.as_ref();
-            
+
             // 测试文件系统工厂
             let fs1 = create_file_system().expect("应该能创建文件系统");
             let fs2 = create_file_system().expect("应该能创建文件系统");
-            
+
             // 验证工厂函数总是返回实现了相同 trait 的对象
             let _: &dyn FileSystem = fs1.as_ref();
             let _: &dyn FileSystem = fs2.as_ref();
-            
+
             prop_assert!(true); // 如果编译通过，说明接口隔离正确
         }
     }
@@ -191,16 +191,19 @@ mod platform_isolation_tests {
         // 验证条件编译正确工作
         let executor = create_command_executor().expect("应该能创建命令执行器");
         let fs = create_file_system().expect("应该能创建文件系统");
-        
+
         // 验证工厂函数在不同平台上返回正确的实现
         // 这是编译时和运行时的双重检查
-        
+
         // 验证对象创建成功（非空检查的简化版本）
         let executor_trait: &dyn CommandExecutor = executor.as_ref();
         let fs_trait: &dyn FileSystem = fs.as_ref();
-        
+
         // 如果能成功转换为 trait 对象，说明平台实现正确
-        assert!(true, "Platform-specific implementations created successfully");
+        assert!(
+            true,
+            "Platform-specific implementations created successfully"
+        );
     }
 
     #[test]
@@ -211,7 +214,7 @@ mod platform_isolation_tests {
 
         // 验证所有必需的 trait 方法都可用
         // 这是编译时检查，确保平台实现完整
-        
+
         // 验证 trait 方法存在且可调用
         assert!(true, "All platform abstraction methods are available");
     }
@@ -219,17 +222,20 @@ mod platform_isolation_tests {
     #[test]
     fn test_platform_interface_isolation_property() {
         // 这是核心的平台接口隔离属性测试
-        
+
         // 创建平台特定的实现
         let executor = create_command_executor().expect("应该能创建命令执行器");
         let fs = create_file_system().expect("应该能创建文件系统");
-        
+
         // 验证可以通过统一接口使用不同平台的实现
         let _executor_trait: &dyn CommandExecutor = executor.as_ref();
         let _fs_trait: &dyn FileSystem = fs.as_ref();
-        
+
         // 验证平台差异被正确隔离
         // 不同平台的实现都通过相同的 trait 接口暴露功能
-        assert!(true, "Platform differences are properly isolated behind trait interfaces");
+        assert!(
+            true,
+            "Platform differences are properly isolated behind trait interfaces"
+        );
     }
 }

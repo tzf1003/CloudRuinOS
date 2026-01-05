@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use base64::Engine;
-use ed25519_dalek::{SigningKey, VerifyingKey, Signature, Signer, Verifier};
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -28,7 +28,7 @@ impl CryptoManager {
         let mut csprng = OsRng {};
         let signing_key = SigningKey::generate(&mut csprng);
         let verifying_key = signing_key.verifying_key();
-        
+
         Ok(Self {
             signing_key,
             verifying_key,
@@ -44,7 +44,7 @@ impl CryptoManager {
 
         let mut key_bytes = [0u8; 32];
         key_bytes.copy_from_slice(private_key_bytes);
-        
+
         let signing_key = SigningKey::from_bytes(&key_bytes);
         let verifying_key = signing_key.verifying_key();
 
@@ -59,12 +59,12 @@ impl CryptoManager {
     pub fn from_credentials_file<P: AsRef<Path>>(path: P) -> Result<Self> {
         let content = fs::read_to_string(path)?;
         let credentials: DeviceCredentials = serde_json::from_str(&content)?;
-        
-        let private_key_bytes = base64::engine::general_purpose::STANDARD
-            .decode(&credentials.private_key)?;
+
+        let private_key_bytes =
+            base64::engine::general_purpose::STANDARD.decode(&credentials.private_key)?;
         let mut manager = Self::from_private_key(&private_key_bytes)?;
         manager.device_id = Some(credentials.device_id);
-        
+
         Ok(manager)
     }
 
@@ -80,42 +80,38 @@ impl CryptoManager {
 
         let content = serde_json::to_string_pretty(&credentials)?;
         fs::write(path, content)?;
-        
+
         Ok(())
     }
 
     /// 获取公钥（Base64 编码）
     pub fn public_key_base64(&self) -> String {
-        base64::engine::general_purpose::STANDARD
-            .encode(self.verifying_key.to_bytes())
+        base64::engine::general_purpose::STANDARD.encode(self.verifying_key.to_bytes())
     }
 
     /// 获取私钥（Base64 编码）
     pub fn private_key_base64(&self) -> String {
-        base64::engine::general_purpose::STANDARD
-            .encode(self.signing_key.to_bytes())
+        base64::engine::general_purpose::STANDARD.encode(self.signing_key.to_bytes())
     }
 
     /// 签名数据
     pub fn sign(&self, data: &[u8]) -> String {
         let signature = self.signing_key.sign(data);
-        base64::engine::general_purpose::STANDARD
-            .encode(signature.to_bytes())
+        base64::engine::general_purpose::STANDARD.encode(signature.to_bytes())
     }
 
     /// 验证签名
     pub fn verify(&self, data: &[u8], signature_base64: &str) -> Result<bool> {
-        let signature_bytes = base64::engine::general_purpose::STANDARD
-            .decode(signature_base64)?;
-        
+        let signature_bytes = base64::engine::general_purpose::STANDARD.decode(signature_base64)?;
+
         if signature_bytes.len() != 64 {
             return Ok(false);
         }
-        
+
         let mut sig_array = [0u8; 64];
         sig_array.copy_from_slice(&signature_bytes);
         let signature = Signature::from_bytes(&sig_array);
-        
+
         match self.verifying_key.verify(data, &signature) {
             Ok(_) => Ok(true),
             Err(_) => Ok(false),
@@ -173,10 +169,10 @@ mod tests {
     fn test_sign_and_verify() {
         let manager = CryptoManager::generate().unwrap();
         let data = b"test message";
-        
+
         let signature = manager.sign(data);
         assert!(manager.verify(data, &signature).unwrap());
-        
+
         // 验证错误的签名
         assert!(!manager.verify(b"wrong data", &signature).unwrap());
     }
@@ -185,20 +181,25 @@ mod tests {
     fn test_save_and_load_credentials() {
         let manager = CryptoManager::generate().unwrap();
         let device_id = "test-device-123".to_string();
-        
+
         let temp_file = NamedTempFile::new().unwrap();
-        manager.save_credentials(temp_file.path(), device_id.clone()).unwrap();
-        
+        manager
+            .save_credentials(temp_file.path(), device_id.clone())
+            .unwrap();
+
         let loaded_manager = CryptoManager::from_credentials_file(temp_file.path()).unwrap();
         assert_eq!(loaded_manager.device_id(), Some(device_id.as_str()));
-        assert_eq!(loaded_manager.public_key_base64(), manager.public_key_base64());
+        assert_eq!(
+            loaded_manager.public_key_base64(),
+            manager.public_key_base64()
+        );
     }
 
     #[test]
     fn test_generate_nonce() {
         let nonce1 = CryptoManager::generate_nonce();
         let nonce2 = CryptoManager::generate_nonce();
-        
+
         assert_ne!(nonce1, nonce2);
         assert!(!nonce1.is_empty());
         assert!(!nonce2.is_empty());

@@ -1,14 +1,14 @@
 use anyhow::Result;
-use tracing::{info, error};
 use std::env;
+use tracing::{error, info};
 
+mod config;
 mod core;
 mod platform;
 mod transport;
-mod config;
 
-use crate::core::Agent;
 use crate::config::ConfigManager;
+use crate::core::Agent;
 
 // 构建时信息
 const BUILD_TARGET: &str = env!("BUILD_TARGET");
@@ -22,7 +22,7 @@ async fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     let mut config_path = None;
     let mut service_mode = false;
-    
+
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
@@ -54,7 +54,7 @@ async fn main() -> Result<()> {
             }
         }
     }
-    
+
     // 加载配置
     let config_manager = if let Some(path) = config_path {
         ConfigManager::load_from_file(path)?
@@ -65,10 +65,10 @@ async fn main() -> Result<()> {
             "/etc/rmm-agent/config.toml",
             "C:\\ProgramData\\RMM Agent\\config.toml",
         ];
-        
+
         let mut loaded = false;
         let mut config_manager = ConfigManager::default();
-        
+
         for path in &default_paths {
             if std::path::Path::new(path).exists() {
                 match ConfigManager::load_from_file(path) {
@@ -83,62 +83,70 @@ async fn main() -> Result<()> {
                 }
             }
         }
-        
+
         if !loaded {
             eprintln!("警告: 未找到配置文件，使用默认配置");
         }
-        
+
         config_manager
     };
-    
+
     // 初始化日志
     let log_level = &config_manager.config().logging.level;
-    let env_filter = format!("rmm_agent={},{}={}", log_level, env!("CARGO_PKG_NAME").replace('-', "_"), log_level);
-    
+    let env_filter = format!(
+        "rmm_agent={},{}={}",
+        log_level,
+        env!("CARGO_PKG_NAME").replace('-', "_"),
+        log_level
+    );
+
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::new(env_filter))
         .init();
 
     // 显示版本和构建信息
     info!("Starting RMM Agent v{}", env!("CARGO_PKG_VERSION"));
-    info!("Build target: {} (OS: {}, Arch: {})", BUILD_TARGET, BUILD_OS, BUILD_ARCH);
+    info!(
+        "Build target: {} (OS: {}, Arch: {})",
+        BUILD_TARGET, BUILD_OS, BUILD_ARCH
+    );
     info!("Git commit: {}", GIT_HASH);
-    
+
     // 显示平台特定信息
     #[cfg(platform_windows)]
     info!("Platform: Windows");
-    
+
     #[cfg(platform_linux)]
     info!("Platform: Linux");
-    
+
     #[cfg(platform_macos)]
     info!("Platform: macOS");
-    
+
     #[cfg(static_link)]
     info!("Linking: Static");
-    
+
     #[cfg(not(static_link))]
     info!("Linking: Dynamic");
-    
+
     // 显示启用的功能
     let mut features = Vec::new();
-    
+
     #[cfg(feature = "doh")]
     features.push("DoH");
-    
+
     #[cfg(feature = "ech")]
     features.push("ECH");
-    
+
     #[cfg(feature = "tls-pinning")]
     features.push("TLS-Pinning");
-    
+
     #[cfg(feature = "tls-strict")]
     features.push("TLS-Strict");
-    
+
     if !features.is_empty() {
         info!("Enabled features: {}", features.join(", "));
     }
-    
+
     // 显示配置信息
     let config = config_manager.config();
     info!("Server URL: {}", config.server.base_url);
@@ -147,7 +155,7 @@ async fn main() -> Result<()> {
 
     // 创建并启动 Agent
     let agent = Agent::new_with_config(config_manager).await?;
-    
+
     if let Err(e) = agent.run().await {
         error!("Agent failed: {}", e);
         std::process::exit(1);
@@ -176,6 +184,9 @@ fn print_help() {
 
 fn print_version() {
     println!("RMM Agent v{}", env!("CARGO_PKG_VERSION"));
-    println!("Build target: {} (OS: {}, Arch: {})", BUILD_TARGET, BUILD_OS, BUILD_ARCH);
+    println!(
+        "Build target: {} (OS: {}, Arch: {})",
+        BUILD_TARGET, BUILD_OS, BUILD_ARCH
+    );
     println!("Git commit: {}", GIT_HASH);
 }

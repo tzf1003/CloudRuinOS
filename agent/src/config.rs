@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
 /// Agent 主配置结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -102,13 +102,13 @@ pub struct ServiceSection {
     pub auto_start: bool,
     pub restart_on_failure: bool,
     pub restart_delay: u64,
-    
+
     #[cfg(target_os = "windows")]
     pub windows: Option<WindowsServiceSection>,
-    
+
     #[cfg(target_os = "linux")]
     pub linux: Option<LinuxServiceSection>,
-    
+
     #[cfg(target_os = "macos")]
     pub macos: Option<MacOSServiceSection>,
 }
@@ -153,58 +153,59 @@ impl ConfigManager {
     /// 从文件加载配置
     pub fn load_from_file<P: AsRef<Path>>(config_path: P) -> Result<Self> {
         let config_path = config_path.as_ref().to_path_buf();
-        
+
         info!("加载配置文件: {:?}", config_path);
-        
+
         let config_content = std::fs::read_to_string(&config_path)
             .map_err(|e| anyhow!("读取配置文件失败: {}", e))?;
-        
-        let mut config: AgentConfig = toml::from_str(&config_content)
-            .map_err(|e| anyhow!("解析配置文件失败: {}", e))?;
-        
+
+        let mut config: AgentConfig =
+            toml::from_str(&config_content).map_err(|e| anyhow!("解析配置文件失败: {}", e))?;
+
         // 验证配置
         Self::validate_config(&mut config)?;
-        
+
         // 获取文件修改时间
         let last_modified = std::fs::metadata(&config_path)
             .ok()
             .and_then(|m| m.modified().ok());
-        
+
         Ok(Self {
             config,
             config_path,
             last_modified,
         })
     }
-    
+
     /// 创建默认配置
     pub fn default() -> Self {
         let config = Self::create_default_config();
-        
+
         Self {
             config,
             config_path: PathBuf::new(),
             last_modified: None,
         }
     }
-    
+
     /// 获取配置
     pub fn config(&self) -> &AgentConfig {
         &self.config
     }
-    
+
     /// 检查配置文件是否已更新
     pub fn check_for_updates(&mut self) -> Result<bool> {
         if self.config_path.as_os_str().is_empty() {
             return Ok(false);
         }
-        
+
         let metadata = std::fs::metadata(&self.config_path)
             .map_err(|e| anyhow!("获取配置文件元数据失败: {}", e))?;
-        
-        let current_modified = metadata.modified()
+
+        let current_modified = metadata
+            .modified()
             .map_err(|e| anyhow!("获取文件修改时间失败: {}", e))?;
-        
+
         if let Some(last_modified) = self.last_modified {
             if current_modified > last_modified {
                 info!("检测到配置文件更新，重新加载...");
@@ -212,142 +213,143 @@ impl ConfigManager {
                 return Ok(true);
             }
         }
-        
+
         Ok(false)
     }
-    
+
     /// 重新加载配置
     pub fn reload(&mut self) -> Result<()> {
         let new_manager = Self::load_from_file(&self.config_path)?;
         self.config = new_manager.config;
         self.last_modified = new_manager.last_modified;
-        
+
         info!("配置文件重新加载完成");
         Ok(())
     }
-    
+
     /// 保存配置到文件
     pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let config_content = toml::to_string_pretty(&self.config)
-            .map_err(|e| anyhow!("序列化配置失败: {}", e))?;
-        
-        std::fs::write(path, config_content)
-            .map_err(|e| anyhow!("写入配置文件失败: {}", e))?;
-        
+        let config_content =
+            toml::to_string_pretty(&self.config).map_err(|e| anyhow!("序列化配置失败: {}", e))?;
+
+        std::fs::write(path, config_content).map_err(|e| anyhow!("写入配置文件失败: {}", e))?;
+
         Ok(())
     }
-    
+
     /// 更新设备 ID
     pub fn update_device_id(&mut self, device_id: String) -> Result<()> {
         self.config.agent.device_id = Some(device_id);
-        
+
         if !self.config_path.as_os_str().is_empty() {
             self.save_to_file(&self.config_path)?;
         }
-        
+
         Ok(())
     }
-    
+
     /// 验证配置
     fn validate_config(config: &mut AgentConfig) -> Result<()> {
         // 验证服务器 URL
         if config.server.base_url.is_empty() {
             return Err(anyhow!("服务器 URL 不能为空"));
         }
-        
-        if !config.server.base_url.starts_with("http://") && !config.server.base_url.starts_with("https://") {
+
+        if !config.server.base_url.starts_with("http://")
+            && !config.server.base_url.starts_with("https://")
+        {
             return Err(anyhow!("服务器 URL 必须以 http:// 或 https:// 开头"));
         }
-        
+
         // 验证心跳间隔
         if config.heartbeat.interval == 0 {
             warn!("心跳间隔为 0，设置为默认值 30 秒");
             config.heartbeat.interval = 30;
         }
-        
+
         // 验证超时设置
         if config.server.connect_timeout == 0 {
             warn!("连接超时为 0，设置为默认值 30 秒");
             config.server.connect_timeout = 30;
         }
-        
+
         if config.server.request_timeout == 0 {
             warn!("请求超时为 0，设置为默认值 60 秒");
             config.server.request_timeout = 60;
         }
-        
+
         // 验证日志级别
         let valid_levels = ["trace", "debug", "info", "warn", "error"];
         if !valid_levels.contains(&config.logging.level.as_str()) {
             warn!("无效的日志级别 '{}'，设置为 'info'", config.logging.level);
             config.logging.level = "info".to_string();
         }
-        
+
         // 验证重连配置
         if config.reconnect.backoff_factor <= 1.0 {
             warn!("退避因子必须大于 1.0，设置为默认值 2.0");
             config.reconnect.backoff_factor = 2.0;
         }
-        
+
         // 设置默认路径（如果为空）
         Self::set_default_paths(config)?;
-        
+
         Ok(())
     }
-    
+
     /// 设置默认路径
     fn set_default_paths(config: &mut AgentConfig) -> Result<()> {
         if config.paths.config_dir.is_empty() {
             config.paths.config_dir = Self::get_default_config_dir()?;
         }
-        
+
         if config.paths.data_dir.is_empty() {
             config.paths.data_dir = Self::get_default_data_dir()?;
         }
-        
+
         if config.paths.log_dir.is_empty() {
             config.paths.log_dir = Self::get_default_log_dir()?;
         }
-        
+
         Ok(())
     }
-    
+
     /// 获取默认配置目录
     fn get_default_config_dir() -> Result<String> {
         #[cfg(target_os = "windows")]
         return Ok("C:\\ProgramData\\RMM Agent".to_string());
-        
+
         #[cfg(target_os = "linux")]
         return Ok("/etc/rmm-agent".to_string());
-        
+
         #[cfg(target_os = "macos")]
         return Ok("/etc/rmm-agent".to_string());
     }
-    
+
     /// 获取默认数据目录
     fn get_default_data_dir() -> Result<String> {
         #[cfg(target_os = "windows")]
         return Ok("C:\\ProgramData\\RMM Agent\\Data".to_string());
-        
+
         #[cfg(target_os = "linux")]
         return Ok("/var/lib/rmm-agent".to_string());
-        
+
         #[cfg(target_os = "macos")]
         return Ok("/var/lib/rmm-agent".to_string());
     }
-    
+
     /// 获取默认日志目录
     fn get_default_log_dir() -> Result<String> {
         #[cfg(target_os = "windows")]
         return Ok("C:\\ProgramData\\RMM Agent\\Logs".to_string());
-        
+
         #[cfg(target_os = "linux")]
         return Ok("/var/log/rmm-agent".to_string());
-        
+
         #[cfg(target_os = "macos")]
         return Ok("/var/log/rmm-agent".to_string());
     }
-    
+
     /// 创建默认配置
     fn create_default_config() -> AgentConfig {
         AgentConfig {
@@ -432,47 +434,47 @@ impl AgentConfig {
     pub fn heartbeat_interval(&self) -> Duration {
         Duration::from_secs(self.heartbeat.interval)
     }
-    
+
     /// 获取连接超时 Duration
     pub fn connect_timeout(&self) -> Duration {
         Duration::from_secs(self.server.connect_timeout)
     }
-    
+
     /// 获取请求超时 Duration
     pub fn request_timeout(&self) -> Duration {
         Duration::from_secs(self.server.request_timeout)
     }
-    
+
     /// 获取重连初始延迟 Duration
     pub fn initial_reconnect_delay(&self) -> Duration {
         Duration::from_secs(self.reconnect.initial_delay)
     }
-    
+
     /// 获取最大重连延迟 Duration
     pub fn max_reconnect_delay(&self) -> Duration {
         Duration::from_secs(self.reconnect.max_delay)
     }
-    
+
     /// 获取命令默认超时 Duration
     pub fn command_timeout(&self) -> Duration {
         Duration::from_secs(self.commands.default_timeout)
     }
-    
+
     /// 获取完整的服务器端点 URL
     pub fn get_endpoint_url(&self, endpoint: &str) -> String {
         format!("{}{}", self.server.base_url.trim_end_matches('/'), endpoint)
     }
-    
+
     /// 获取注册端点 URL
     pub fn enrollment_url(&self) -> String {
         self.get_endpoint_url(&self.server.enrollment_endpoint)
     }
-    
+
     /// 获取心跳端点 URL
     pub fn heartbeat_url(&self) -> String {
         self.get_endpoint_url(&self.server.heartbeat_endpoint)
     }
-    
+
     /// 获取 WebSocket 端点 URL
     pub fn websocket_url(&self) -> String {
         let base_url = self.server.base_url.trim_end_matches('/');
@@ -483,19 +485,19 @@ impl AgentConfig {
         } else {
             format!("wss://{}", base_url)
         };
-        
+
         format!("{}{}", ws_url, self.server.websocket_endpoint)
     }
-    
+
     /// 获取凭证文件路径
     pub fn credentials_path(&self) -> PathBuf {
         PathBuf::from(&self.paths.data_dir).join(&self.paths.credentials_file)
     }
-    
+
     /// 解析文件大小字符串为字节数
     pub fn parse_file_size(size_str: &str) -> Result<u64> {
         let size_str = size_str.trim().to_uppercase();
-        
+
         if let Some(num_str) = size_str.strip_suffix("KB") {
             Ok(num_str.parse::<u64>()? * 1024)
         } else if let Some(num_str) = size_str.strip_suffix("MB") {
@@ -509,7 +511,7 @@ impl AgentConfig {
             Ok(size_str.parse::<u64>()?)
         }
     }
-    
+
     /// 获取最大文件大小（字节）
     pub fn max_file_size_bytes(&self) -> Result<u64> {
         Self::parse_file_size(&self.file_operations.max_file_size)

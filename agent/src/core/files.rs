@@ -68,14 +68,15 @@ impl FileManager {
     /// 验证路径是否安全
     pub fn validate_path(&self, path: &str) -> Result<PathBuf> {
         let path_buf = PathBuf::from(path);
-        
+
         // 规范化路径，防止路径遍历攻击
         let canonical_path = match path_buf.canonicalize() {
             Ok(p) => p,
             Err(_) => {
                 // 如果路径不存在，尝试规范化父目录
                 if let Some(parent) = path_buf.parent() {
-                    let canonical_parent = parent.canonicalize()
+                    let canonical_parent = parent
+                        .canonicalize()
                         .map_err(|_| anyhow!("Invalid path: parent directory does not exist"))?;
                     canonical_parent.join(path_buf.file_name().unwrap_or_default())
                 } else {
@@ -113,7 +114,7 @@ impl FileManager {
     /// 列出目录内容
     pub async fn list_files(&self, path: &str) -> Result<Vec<FileInfo>> {
         let validated_path = self.validate_path(path)?;
-        
+
         debug!("Listing files in: {:?}", validated_path);
 
         if !validated_path.exists() {
@@ -131,15 +132,17 @@ impl FileManager {
         for entry in entries {
             let entry = entry.map_err(|e| anyhow!("Failed to read directory entry: {}", e))?;
             let entry_path = entry.path();
-            
-            let metadata = entry.metadata()
+
+            let metadata = entry
+                .metadata()
                 .map_err(|e| anyhow!("Failed to read file metadata: {}", e))?;
 
             let file_info = FileInfo {
                 path: entry_path.to_string_lossy().to_string(),
                 size: metadata.len(),
                 is_dir: metadata.is_dir(),
-                modified: metadata.modified()
+                modified: metadata
+                    .modified()
                     .ok()
                     .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                     .map(|d| d.as_secs()),
@@ -158,7 +161,7 @@ impl FileManager {
     /// 读取文件内容
     pub async fn read_file(&self, path: &str) -> Result<(Vec<u8>, String)> {
         let validated_path = self.validate_path(path)?;
-        
+
         debug!("Reading file: {:?}", validated_path);
 
         if !validated_path.exists() {
@@ -180,8 +183,8 @@ impl FileManager {
             ));
         }
 
-        let content = fs::read(&validated_path)
-            .map_err(|e| anyhow!("Failed to read file: {}", e))?;
+        let content =
+            fs::read(&validated_path).map_err(|e| anyhow!("Failed to read file: {}", e))?;
 
         // 计算 SHA-256 校验和
         let checksum = self.calculate_checksum(&content);
@@ -191,10 +194,19 @@ impl FileManager {
     }
 
     /// 写入文件内容
-    pub async fn write_file(&self, path: &str, content: &[u8], expected_checksum: &str) -> Result<()> {
+    pub async fn write_file(
+        &self,
+        path: &str,
+        content: &[u8],
+        expected_checksum: &str,
+    ) -> Result<()> {
         let validated_path = self.validate_path(path)?;
-        
-        debug!("Writing file: {:?} ({} bytes)", validated_path, content.len());
+
+        debug!(
+            "Writing file: {:?} ({} bytes)",
+            validated_path,
+            content.len()
+        );
 
         // 检查文件大小限制
         if content.len() as u64 > self.max_file_size {
@@ -222,8 +234,7 @@ impl FileManager {
         }
 
         // 写入文件
-        fs::write(&validated_path, content)
-            .map_err(|e| anyhow!("Failed to write file: {}", e))?;
+        fs::write(&validated_path, content).map_err(|e| anyhow!("Failed to write file: {}", e))?;
 
         info!("Wrote file {} ({} bytes)", path, content.len());
         Ok(())
@@ -232,7 +243,7 @@ impl FileManager {
     /// 删除文件
     pub async fn delete_file(&self, path: &str) -> Result<()> {
         let validated_path = self.validate_path(path)?;
-        
+
         debug!("Deleting file: {:?}", validated_path);
 
         if !validated_path.exists() {
@@ -262,7 +273,7 @@ impl FileManager {
     /// 获取文件信息
     pub async fn get_file_info(&self, path: &str) -> Result<FileInfo> {
         let validated_path = self.validate_path(path)?;
-        
+
         if !validated_path.exists() {
             return Err(anyhow!("File does not exist: {}", path));
         }
@@ -274,7 +285,8 @@ impl FileManager {
             path: validated_path.to_string_lossy().to_string(),
             size: metadata.len(),
             is_dir: metadata.is_dir(),
-            modified: metadata.modified()
+            modified: metadata
+                .modified()
                 .ok()
                 .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                 .map(|d| d.as_secs()),
@@ -285,8 +297,8 @@ impl FileManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::{tempdir, NamedTempFile};
     use std::fs;
+    use tempfile::{tempdir, NamedTempFile};
 
     #[tokio::test]
     async fn test_file_manager_creation() {
@@ -344,7 +356,7 @@ mod tests {
         let new_file = temp_dir.path().join("new.txt");
         let new_content = b"New content";
         let new_checksum = file_manager.calculate_checksum(new_content);
-        
+
         file_manager
             .write_file(&new_file.to_string_lossy(), new_content, &new_checksum)
             .await

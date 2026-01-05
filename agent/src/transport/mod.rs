@@ -1,11 +1,11 @@
+use crate::core::crypto::CryptoManager;
+use crate::core::protocol::WSMessage;
 use anyhow::Result;
+use futures::{SinkExt, StreamExt};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio_tungstenite::{connect_async, tungstenite::Message};
-use futures::{SinkExt, StreamExt};
 use tokio::time::{sleep, Instant};
-use crate::core::protocol::WSMessage;
-use crate::core::crypto::CryptoManager;
+use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 #[derive(Clone)]
 pub struct HttpClient {
@@ -137,25 +137,28 @@ impl TlsConfig {
     #[cfg(feature = "tls-pinning")]
     pub fn verify_certificate_pinning(&self, cert_der: &[u8]) -> Result<bool> {
         if let Some(ref pinned_hashes) = self.certificate_pinning {
-            use sha2::{Sha256, Digest};
-            
+            use sha2::{Digest, Sha256};
+
             // 计算证书的 SHA-256 指纹
             let mut hasher = Sha256::new();
             hasher.update(cert_der);
             let cert_hash = hasher.finalize();
             let cert_hash_hex = hex::encode(cert_hash);
-            
+
             // 检查是否匹配任何固定的证书
-            let matches = pinned_hashes.iter().any(|pinned| {
-                pinned.to_lowercase() == cert_hash_hex.to_lowercase()
-            });
-            
+            let matches = pinned_hashes
+                .iter()
+                .any(|pinned| pinned.to_lowercase() == cert_hash_hex.to_lowercase());
+
             if matches {
                 tracing::debug!("Certificate pinning verification passed");
                 Ok(true)
             } else {
-                tracing::error!("Certificate pinning verification failed. Expected one of: {:?}, got: {}", 
-                    pinned_hashes, cert_hash_hex);
+                tracing::error!(
+                    "Certificate pinning verification failed. Expected one of: {:?}, got: {}",
+                    pinned_hashes,
+                    cert_hash_hex
+                );
                 Ok(false)
             }
         } else {
@@ -185,25 +188,28 @@ impl PinningCertVerifier {
     /// 验证证书指纹
     fn verify_pinning(&self, cert_der: &[u8]) -> bool {
         if let Some(ref pinned_hashes) = self.pinned_hashes {
-            use sha2::{Sha256, Digest};
-            
+            use sha2::{Digest, Sha256};
+
             // 计算证书的 SHA-256 指纹
             let mut hasher = Sha256::new();
             hasher.update(cert_der);
             let cert_hash = hasher.finalize();
             let cert_hash_hex = hex::encode(cert_hash);
-            
+
             // 检查是否匹配任何固定的证书
-            let matches = pinned_hashes.iter().any(|pinned| {
-                pinned.to_lowercase() == cert_hash_hex.to_lowercase()
-            });
-            
+            let matches = pinned_hashes
+                .iter()
+                .any(|pinned| pinned.to_lowercase() == cert_hash_hex.to_lowercase());
+
             if matches {
                 tracing::debug!("Certificate pinning verification passed: {}", cert_hash_hex);
                 true
             } else {
-                tracing::error!("Certificate pinning verification failed. Expected one of: {:?}, got: {}", 
-                    pinned_hashes, cert_hash_hex);
+                tracing::error!(
+                    "Certificate pinning verification failed. Expected one of: {:?}, got: {}",
+                    pinned_hashes,
+                    cert_hash_hex
+                );
                 false
             }
         } else {
@@ -225,9 +231,11 @@ impl rustls::client::danger::ServerCertVerifier for PinningCertVerifier {
     ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
         // 首先验证证书固定
         if !self.verify_pinning(end_entity.as_ref()) {
-            return Err(rustls::Error::General("Certificate pinning verification failed".into()));
+            return Err(rustls::Error::General(
+                "Certificate pinning verification failed".into(),
+            ));
         }
-        
+
         // 验证证书链中的任意中间证书
         for intermediate in intermediates {
             if self.pinned_hashes.is_some() && !self.verify_pinning(intermediate.as_ref()) {
@@ -235,12 +243,14 @@ impl rustls::client::danger::ServerCertVerifier for PinningCertVerifier {
                 tracing::debug!("Intermediate certificate not in pinned list, continuing...");
             }
         }
-        
+
         // 使用 webpki 验证证书链
-        let webpki_verifier = rustls::client::WebPkiServerVerifier::builder(
-            std::sync::Arc::new(self.root_store.clone())
-        ).build().map_err(|e| rustls::Error::General(format!("Failed to build verifier: {:?}", e)))?;
-        
+        let webpki_verifier = rustls::client::WebPkiServerVerifier::builder(std::sync::Arc::new(
+            self.root_store.clone(),
+        ))
+        .build()
+        .map_err(|e| rustls::Error::General(format!("Failed to build verifier: {:?}", e)))?;
+
         webpki_verifier.verify_server_cert(
             end_entity,
             intermediates,
@@ -359,8 +369,12 @@ impl DohResolver {
         }
 
         let provider = &self.providers[self.current_provider];
-        tracing::debug!("Attempting DoH resolution for {} using provider: {}", domain, provider.name);
-        
+        tracing::debug!(
+            "Attempting DoH resolution for {} using provider: {}",
+            domain,
+            provider.name
+        );
+
         // 实现基本的 DoH 查询
         // 注意：这是一个简化的实现，生产环境应该使用专门的 DNS 库
         let client = reqwest::Client::builder()
@@ -369,7 +383,7 @@ impl DohResolver {
 
         // 构建 DoH 查询 URL
         let query_url = format!("{}?name={}&type=A", provider.url, domain);
-        
+
         let response = client
             .get(&query_url)
             .header("Accept", "application/dns-json")
@@ -377,11 +391,14 @@ impl DohResolver {
             .await?;
 
         if !response.status().is_success() {
-            return Err(anyhow::anyhow!("DoH query failed with status: {}", response.status()));
+            return Err(anyhow::anyhow!(
+                "DoH query failed with status: {}",
+                response.status()
+            ));
         }
 
         let json: serde_json::Value = response.json().await?;
-        
+
         // 解析 DNS 响应
         let mut ips = Vec::new();
         if let Some(answers) = json.get("Answer").and_then(|a| a.as_array()) {
@@ -405,7 +422,7 @@ impl DohResolver {
     async fn try_fallback(&mut self, domain: &str) -> Result<Vec<std::net::IpAddr>> {
         // 尝试下一个提供商
         self.current_provider = (self.current_provider + 1) % self.providers.len();
-        
+
         if let Ok(ips) = self.try_current_provider(domain).await {
             return Ok(ips);
         }
@@ -429,21 +446,15 @@ impl Default for DohResolver {
             DohProvider {
                 name: "Cloudflare".to_string(),
                 url: "https://1.1.1.1/dns-query".to_string(),
-                bootstrap_ips: vec![
-                    "1.1.1.1".parse().unwrap(),
-                    "1.0.0.1".parse().unwrap(),
-                ],
+                bootstrap_ips: vec!["1.1.1.1".parse().unwrap(), "1.0.0.1".parse().unwrap()],
             },
             DohProvider {
                 name: "Google".to_string(),
                 url: "https://8.8.8.8/dns-query".to_string(),
-                bootstrap_ips: vec![
-                    "8.8.8.8".parse().unwrap(),
-                    "8.8.4.4".parse().unwrap(),
-                ],
+                bootstrap_ips: vec!["8.8.8.8".parse().unwrap(), "8.8.4.4".parse().unwrap()],
             },
         ];
-        
+
         Self::new(providers, true)
     }
 }
@@ -480,11 +491,11 @@ impl EchConfig {
         }
 
         tracing::debug!("Probing ECH support for hostname: {}", hostname);
-        
+
         // 简化的 ECH 探测实现
         // 实际实现需要检查 TLS 扩展和服务器支持
         // 这里我们模拟探测过程
-        
+
         // 尝试连接并检查 ECH 支持
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(5))
@@ -494,10 +505,11 @@ impl EchConfig {
             Ok(response) => {
                 // 检查响应头中的 ECH 相关信息
                 // 这是一个简化的检查，实际需要检查 TLS 握手
-                let ech_supported = response.headers()
+                let ech_supported = response
+                    .headers()
                     .get("strict-transport-security")
                     .is_some(); // 简化的检查逻辑
-                
+
                 tracing::debug!("ECH probe result for {}: {}", hostname, ech_supported);
                 Ok(ech_supported)
             }
@@ -507,7 +519,10 @@ impl EchConfig {
                     tracing::info!("ECH probe failed, falling back to standard TLS");
                     Ok(false) // 优雅降级
                 } else {
-                    Err(anyhow::anyhow!("ECH probe failed and fallback disabled: {}", e))
+                    Err(anyhow::anyhow!(
+                        "ECH probe failed and fallback disabled: {}",
+                        e
+                    ))
                 }
             }
         }
@@ -523,7 +538,8 @@ impl EchConfig {
 
     /// 获取指定主机名的 ECH 配置
     pub fn get_config_for_host(&self, hostname: &str) -> Option<&EchConfigEntry> {
-        self.config_list.iter()
+        self.config_list
+            .iter()
             .find(|config| config.public_name == hostname)
     }
 }
@@ -537,8 +553,7 @@ impl Default for EchConfig {
 
 impl HttpClient {
     pub fn new(tls_config: TlsConfig) -> Result<Self> {
-        let mut client_builder = reqwest::Client::builder()
-            .timeout(Duration::from_secs(30));
+        let mut client_builder = reqwest::Client::builder().timeout(Duration::from_secs(30));
 
         // 配置 TLS 验证
         match tls_config.verify_mode {
@@ -554,13 +569,13 @@ impl HttpClient {
                 // 使用自定义 TLS 连接器实现证书固定验证
                 use rustls::ClientConfig;
                 use std::sync::Arc;
-                
+
                 // 创建带证书固定验证的 TLS 配置
                 let tls_config_clone = tls_config.clone();
-                
+
                 // 构建自定义的 rustls 配置
                 let mut root_store = rustls::RootCertStore::empty();
-                
+
                 // 加载系统根证书
                 #[cfg(feature = "tls-pinning")]
                 {
@@ -577,23 +592,28 @@ impl HttpClient {
                         }
                     }
                 }
-                
+
                 // 创建自定义证书验证器
                 let cert_verifier = Arc::new(PinningCertVerifier::new(
                     root_store,
                     tls_config_clone.certificate_pinning.clone(),
                 ));
-                
+
                 let config = ClientConfig::builder()
                     .dangerous()
                     .with_custom_certificate_verifier(cert_verifier)
                     .with_no_client_auth();
-                
-                client_builder = client_builder
-                    .use_preconfigured_tls(config);
-                
-                tracing::info!("Certificate pinning enabled with {} pinned certificates", 
-                    tls_config.certificate_pinning.as_ref().map(|v| v.len()).unwrap_or(0));
+
+                client_builder = client_builder.use_preconfigured_tls(config);
+
+                tracing::info!(
+                    "Certificate pinning enabled with {} pinned certificates",
+                    tls_config
+                        .certificate_pinning
+                        .as_ref()
+                        .map(|v| v.len())
+                        .unwrap_or(0)
+                );
             }
         }
 
@@ -705,8 +725,7 @@ impl HttpClient {
         #[cfg(feature = "doh")]
         if let Some(ref resolver) = self.doh_resolver {
             result.doh_available = true;
-            result.doh_provider = resolver.get_current_provider()
-                .map(|p| p.name.clone());
+            result.doh_provider = resolver.get_current_provider().map(|p| p.name.clone());
         }
 
         // ECH 支持检查
@@ -733,7 +752,7 @@ impl HttpClient {
 
 impl WebSocketClient {
     pub fn new(
-        reconnect_strategy: ReconnectStrategy, 
+        reconnect_strategy: ReconnectStrategy,
         heartbeat_interval: Duration,
         url: String,
         device_id: String,
@@ -800,10 +819,10 @@ impl WebSocketClient {
                     // 指数退避延迟
                     tracing::info!("Retrying connection in {:?}", delay);
                     sleep(delay).await;
-                    
+
                     delay = Duration::from_secs_f64(
                         (delay.as_secs_f64() * self.reconnect_strategy.backoff_factor)
-                            .min(self.reconnect_strategy.max_delay.as_secs_f64())
+                            .min(self.reconnect_strategy.max_delay.as_secs_f64()),
                     );
                 }
             }
@@ -834,12 +853,14 @@ impl WebSocketClient {
         let auth_json = serde_json::to_string(&auth_message)
             .map_err(|e| WebSocketError::InvalidMessage(e.to_string()))?;
 
-        write.send(Message::Text(auth_json)).await
+        write
+            .send(Message::Text(auth_json))
+            .await
             .map_err(|e| WebSocketError::MessageSendFailed(e.to_string()))?;
 
         // 创建通道用于心跳消息
         let (heartbeat_tx, mut heartbeat_rx) = tokio::sync::mpsc::unbounded_channel::<WSMessage>();
-        
+
         // 启动心跳任务
         let heartbeat_tx_clone = heartbeat_tx.clone();
         let heartbeat_interval = self.heartbeat_interval;
@@ -850,7 +871,7 @@ impl WebSocketClient {
                 let presence_msg = WSMessage::Presence {
                     status: crate::core::protocol::PresenceStatus::Online,
                 };
-                
+
                 if let Err(_) = heartbeat_tx_clone.send(presence_msg) {
                     tracing::error!("Failed to send heartbeat message to channel");
                     break;
@@ -873,7 +894,7 @@ impl WebSocketClient {
                                             // 发送响应消息
                                             let response_json = serde_json::to_string(&response)
                                                 .map_err(|e| WebSocketError::InvalidMessage(e.to_string()))?;
-                                            
+
                                             write.send(Message::Text(response_json)).await
                                                 .map_err(|e| WebSocketError::MessageSendFailed(e.to_string()))?;
                                         }
@@ -924,7 +945,9 @@ impl WebSocketClient {
         heartbeat_task.abort();
 
         // 连接断开，返回错误以触发重连
-        Err(WebSocketError::ConnectionFailed("Connection closed".to_string()))
+        Err(WebSocketError::ConnectionFailed(
+            "Connection closed".to_string(),
+        ))
     }
 
     /// 生成认证签名
@@ -934,15 +957,15 @@ impl WebSocketClient {
             .duration_since(std::time::UNIX_EPOCH)
             .map_err(|e| WebSocketError::InvalidMessage(e.to_string()))?
             .as_millis() as u64;
-        
+
         // 构造签名数据: device_id:timestamp
         let signature_data = format!("{}:{}", self.device_id, timestamp);
-        
+
         match &self.crypto_manager {
             Some(crypto) => {
                 // 使用 CryptoManager 进行 Ed25519 签名
                 let signature = crypto.sign(signature_data.as_bytes());
-                
+
                 // 返回格式: timestamp:signature (服务端需要时间戳来验证)
                 Ok(format!("{}:{}", timestamp, signature))
             }
@@ -956,14 +979,17 @@ impl WebSocketClient {
 
     /// 生成请求签名（用于 HTTP API 请求）
     /// 返回 (timestamp, nonce, signature)
-    pub fn sign_request(&self, payload: &serde_json::Value) -> Result<(u64, String, String), WebSocketError> {
+    pub fn sign_request(
+        &self,
+        payload: &serde_json::Value,
+    ) -> Result<(u64, String, String), WebSocketError> {
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_err(|e| WebSocketError::InvalidMessage(e.to_string()))?
             .as_millis() as u64;
-        
+
         let nonce = CryptoManager::generate_nonce();
-        
+
         match &self.crypto_manager {
             Some(crypto) => {
                 // 构造签名数据：按字段排序的 JSON
@@ -972,7 +998,7 @@ impl WebSocketClient {
                     "timestamp": timestamp,
                     "nonce": nonce,
                 });
-                
+
                 // 合并 payload
                 if let serde_json::Value::Object(map) = payload {
                     if let serde_json::Value::Object(ref mut sign_map) = sign_data {
@@ -981,16 +1007,14 @@ impl WebSocketClient {
                         }
                     }
                 }
-                
+
                 // 排序 JSON 键并序列化
                 let sorted_json = sort_json_keys(&sign_data);
                 let signature = crypto.sign(sorted_json.as_bytes());
-                
+
                 Ok((timestamp, nonce, signature))
             }
-            None => {
-                Err(WebSocketError::AuthenticationFailed)
-            }
+            None => Err(WebSocketError::AuthenticationFailed),
         }
     }
 
@@ -999,7 +1023,7 @@ impl WebSocketClient {
         // 注意: 实际的消息发送应该通过 connect_and_run 中的通道进行
         // 这里提供一个占位实现
         Err(WebSocketError::MessageSendFailed(
-            "Use connect_and_run for message handling".to_string()
+            "Use connect_and_run for message handling".to_string(),
         ))
     }
 }
@@ -1010,12 +1034,12 @@ fn sort_json_keys(value: &serde_json::Value) -> String {
         serde_json::Value::Object(map) => {
             let mut sorted: Vec<(&String, &serde_json::Value)> = map.iter().collect();
             sorted.sort_by(|a, b| a.0.cmp(b.0));
-            
+
             let pairs: Vec<String> = sorted
                 .iter()
                 .map(|(k, v)| format!("\"{}\":{}", k, sort_json_keys(v)))
                 .collect();
-            
+
             format!("{{{}}}", pairs.join(","))
         }
         serde_json::Value::Array(arr) => {

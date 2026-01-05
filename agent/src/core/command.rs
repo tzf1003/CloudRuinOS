@@ -1,12 +1,12 @@
+use crate::core::audit::{AuditLogger, AuditResult};
+use crate::core::files::{FileManager, FileManagerConfig};
+use crate::core::protocol::{FileInfo, WSMessage};
+use crate::platform::CommandExecutor;
 use anyhow::{anyhow, Result};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 use tokio::process::Command as TokioCommand;
 use tokio::time::timeout;
-use crate::core::protocol::{WSMessage, FileInfo};
-use crate::core::audit::{AuditLogger, AuditResult};
-use crate::core::files::{FileManager, FileManagerConfig};
-use crate::platform::CommandExecutor;
 
 #[cfg(windows)]
 use std::os::windows::process::ExitStatusExt;
@@ -113,7 +113,7 @@ impl CommandHandler {
                                 CommandError::Timeout { .. } => AuditResult::Timeout,
                                 _ => AuditResult::Error,
                             };
-                            
+
                             let _ = audit_logger.log_command_execution(
                                 self.current_session_id.clone(),
                                 &command,
@@ -191,7 +191,11 @@ impl CommandHandler {
                             );
                         }
 
-                        Ok(Some(WSMessage::FsGetResult { id, content, checksum }))
+                        Ok(Some(WSMessage::FsGetResult {
+                            id,
+                            content,
+                            checksum,
+                        }))
                     }
                     Err(e) => {
                         // 记录失败的文件下载操作
@@ -214,7 +218,12 @@ impl CommandHandler {
                     }
                 }
             }
-            WSMessage::FsPut { id, path, content, checksum } => {
+            WSMessage::FsPut {
+                id,
+                path,
+                content,
+                checksum,
+            } => {
                 let result = self.write_file(&path, &content, &checksum).await;
                 match result {
                     Ok(_) => {
@@ -231,7 +240,11 @@ impl CommandHandler {
                             );
                         }
 
-                        Ok(Some(WSMessage::FsPutResult { id, success: true, error: None }))
+                        Ok(Some(WSMessage::FsPutResult {
+                            id,
+                            success: true,
+                            error: None,
+                        }))
                     }
                     Err(e) => {
                         // 记录失败的文件上传操作
@@ -247,10 +260,10 @@ impl CommandHandler {
                             );
                         }
 
-                        Ok(Some(WSMessage::FsPutResult { 
-                            id, 
-                            success: false, 
-                            error: Some(e.to_string()) 
+                        Ok(Some(WSMessage::FsPutResult {
+                            id,
+                            success: false,
+                            error: Some(e.to_string()),
                         }))
                     }
                 }
@@ -276,30 +289,21 @@ impl CommandHandler {
         self.validate_command(command)?;
 
         // 使用平台特定的执行器
-        let result = timeout(
-            timeout_duration,
-            self.executor.execute(command, args)
-        ).await;
+        let result = timeout(timeout_duration, self.executor.execute(command, args)).await;
 
         match result {
-            Ok(Ok(output)) => {
-                Ok(CommandResult {
-                    exit_code: output.status.code().unwrap_or(-1),
-                    stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-                    stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-                    execution_time: start_time.elapsed(),
-                })
-            }
-            Ok(Err(e)) => {
-                Err(CommandError::ExecutionFailed {
-                    message: e.to_string(),
-                })
-            }
-            Err(_) => {
-                Err(CommandError::Timeout {
-                    timeout: timeout_duration,
-                })
-            }
+            Ok(Ok(output)) => Ok(CommandResult {
+                exit_code: output.status.code().unwrap_or(-1),
+                stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+                stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+                execution_time: start_time.elapsed(),
+            }),
+            Ok(Err(e)) => Err(CommandError::ExecutionFailed {
+                message: e.to_string(),
+            }),
+            Err(_) => Err(CommandError::Timeout {
+                timeout: timeout_duration,
+            }),
         }
     }
 
@@ -307,13 +311,12 @@ impl CommandHandler {
     fn validate_command(&self, command: &str) -> Result<(), CommandError> {
         // 基本的命令安全检查
         let dangerous_commands = [
-            "rm", "del", "format", "fdisk", "mkfs",
-            "shutdown", "reboot", "halt", "poweroff",
+            "rm", "del", "format", "fdisk", "mkfs", "shutdown", "reboot", "halt", "poweroff",
             "passwd", "sudo", "su", "chmod", "chown",
         ];
 
         let command_name = command.split_whitespace().next().unwrap_or("");
-        
+
         if dangerous_commands.contains(&command_name) {
             return Err(CommandError::PermissionDenied {
                 command: command.to_string(),
@@ -334,12 +337,15 @@ impl CommandHandler {
     async fn list_files(&self, path: &str) -> Result<Vec<FileInfo>> {
         let files = self.file_manager.list_files(path).await?;
         // 转换 files::FileInfo 到 protocol::FileInfo
-        let protocol_files = files.into_iter().map(|f| FileInfo {
-            path: f.path,
-            size: f.size,
-            is_dir: f.is_dir,
-            modified: f.modified,
-        }).collect();
+        let protocol_files = files
+            .into_iter()
+            .map(|f| FileInfo {
+                path: f.path,
+                size: f.size,
+                is_dir: f.is_dir,
+                modified: f.modified,
+            })
+            .collect();
         Ok(protocol_files)
     }
 
@@ -353,7 +359,9 @@ impl CommandHandler {
     /// 写入文件
     async fn write_file(&self, path: &str, content: &str, expected_checksum: &str) -> Result<()> {
         let content_bytes = content.as_bytes();
-        self.file_manager.write_file(path, content_bytes, expected_checksum).await
+        self.file_manager
+            .write_file(path, content_bytes, expected_checksum)
+            .await
     }
 
     /// 设置默认超时时间
@@ -376,17 +384,18 @@ mod tests {
     #[tokio::test]
     async fn test_command_execution() {
         let mut mock_executor = MockCommandExecutor::new();
-        mock_executor.expect_execute()
-            .returning(|_, _| {
-                Ok(Output {
-                    status: std::process::ExitStatus::from_raw(0),
-                    stdout: b"Hello World".to_vec(),
-                    stderr: Vec::new(),
-                })
-            });
+        mock_executor.expect_execute().returning(|_, _| {
+            Ok(Output {
+                status: std::process::ExitStatus::from_raw(0),
+                stdout: b"Hello World".to_vec(),
+                stderr: Vec::new(),
+            })
+        });
 
         let handler = CommandHandler::new(Box::new(mock_executor));
-        let result = handler.execute_command("echo", &["Hello World".to_string()], None).await;
+        let result = handler
+            .execute_command("echo", &["Hello World".to_string()], None)
+            .await;
 
         assert!(result.is_ok());
         let cmd_result = result.unwrap();
@@ -398,12 +407,14 @@ mod tests {
     async fn test_dangerous_command_rejection() {
         let mock_executor = MockCommandExecutor::new();
         let handler = CommandHandler::new(Box::new(mock_executor));
-        
-        let result = handler.execute_command("rm", &["-rf".to_string(), "/".to_string()], None).await;
+
+        let result = handler
+            .execute_command("rm", &["-rf".to_string(), "/".to_string()], None)
+            .await;
         assert!(result.is_err());
-        
+
         match result.unwrap_err() {
-            CommandError::PermissionDenied { .. } => {},
+            CommandError::PermissionDenied { .. } => {}
             _ => panic!("Expected PermissionDenied error"),
         }
     }
@@ -411,27 +422,28 @@ mod tests {
     #[tokio::test]
     async fn test_command_timeout() {
         let mut mock_executor = MockCommandExecutor::new();
-        mock_executor.expect_execute()
-            .returning(|_, _| {
-                // 模拟长时间运行的命令
-                std::thread::sleep(Duration::from_secs(2));
-                Ok(Output {
-                    status: std::process::ExitStatus::from_raw(0),
-                    stdout: Vec::new(),
-                    stderr: Vec::new(),
-                })
-            });
+        mock_executor.expect_execute().returning(|_, _| {
+            // 模拟长时间运行的命令
+            std::thread::sleep(Duration::from_secs(2));
+            Ok(Output {
+                status: std::process::ExitStatus::from_raw(0),
+                stdout: Vec::new(),
+                stderr: Vec::new(),
+            })
+        });
 
         let handler = CommandHandler::new(Box::new(mock_executor));
-        let result = handler.execute_command(
-            "sleep", 
-            &["10".to_string()], 
-            Some(Duration::from_millis(100))
-        ).await;
+        let result = handler
+            .execute_command(
+                "sleep",
+                &["10".to_string()],
+                Some(Duration::from_millis(100)),
+            )
+            .await;
 
         assert!(result.is_err());
         match result.unwrap_err() {
-            CommandError::Timeout { .. } => {},
+            CommandError::Timeout { .. } => {}
             _ => panic!("Expected Timeout error"),
         }
     }

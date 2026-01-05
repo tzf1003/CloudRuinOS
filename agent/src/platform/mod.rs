@@ -1,8 +1,8 @@
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use anyhow::{Result, anyhow};
+use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use std::process::Output;
-use sha2::{Sha256, Digest};
 
 #[cfg(test)]
 pub mod tests;
@@ -18,21 +18,30 @@ pub trait FileSystem {
     async fn list_files(&self, path: &Path) -> Result<Vec<FileInfo>>;
     async fn read_file(&self, path: &Path) -> Result<Vec<u8>>;
     async fn write_file(&self, path: &Path, data: &[u8]) -> Result<()>;
-    
+
     // 带安全策略的文件操作
-    async fn list_files_secure(&self, path: &Path, policy: &PathSecurityPolicy) -> Result<Vec<FileInfo>> {
+    async fn list_files_secure(
+        &self,
+        path: &Path,
+        policy: &PathSecurityPolicy,
+    ) -> Result<Vec<FileInfo>> {
         policy.is_path_allowed(path)?;
         self.list_files(path).await
     }
-    
+
     async fn read_file_secure(&self, path: &Path, policy: &PathSecurityPolicy) -> Result<Vec<u8>> {
         policy.is_path_allowed(path)?;
         let data = self.read_file(path).await?;
         policy.validate_file_size(data.len() as u64)?;
         Ok(data)
     }
-    
-    async fn write_file_secure(&self, path: &Path, data: &[u8], policy: &PathSecurityPolicy) -> Result<()> {
+
+    async fn write_file_secure(
+        &self,
+        path: &Path,
+        data: &[u8],
+        policy: &PathSecurityPolicy,
+    ) -> Result<()> {
         policy.is_path_allowed(path)?;
         policy.validate_file_size(data.len() as u64)?;
         self.write_file(path, data).await
@@ -96,7 +105,8 @@ impl PathSecurityPolicy {
         } else {
             // If file doesn't exist, canonicalize parent and append filename
             if let Some(parent) = path.parent() {
-                let canonical_parent = parent.canonicalize()
+                let canonical_parent = parent
+                    .canonicalize()
                     .map_err(|e| anyhow!("Failed to canonicalize parent path: {}", e))?;
                 if let Some(filename) = path.file_name() {
                     canonical_parent.join(filename)
@@ -107,21 +117,26 @@ impl PathSecurityPolicy {
                 return Err(anyhow!("Invalid path: no parent directory"));
             }
         };
-        
+
         // Check if path is blocked
         for blocked in &self.blocked_paths {
             if canonical_path.starts_with(blocked) {
                 return Err(anyhow!("Path is blocked by security policy: {:?}", path));
             }
         }
-        
+
         // Check if path is in allowed list (if not empty)
         if !self.allowed_paths.is_empty() {
             let mut allowed = false;
             for allowed_path in &self.allowed_paths {
                 // Canonicalize allowed path for comparison
-                let canonical_allowed = allowed_path.canonicalize()
-                    .map_err(|e| anyhow!("Failed to canonicalize allowed path {:?}: {}", allowed_path, e))?;
+                let canonical_allowed = allowed_path.canonicalize().map_err(|e| {
+                    anyhow!(
+                        "Failed to canonicalize allowed path {:?}: {}",
+                        allowed_path,
+                        e
+                    )
+                })?;
                 if canonical_path.starts_with(&canonical_allowed) {
                     allowed = true;
                     break;
@@ -131,7 +146,7 @@ impl PathSecurityPolicy {
                 return Err(anyhow!("Path not in allowed list: {:?}", path));
             }
         }
-        
+
         // Check for invalid filenames
         if let Some(filename) = canonical_path.file_name() {
             let filename_str = filename.to_string_lossy();
@@ -139,7 +154,7 @@ impl PathSecurityPolicy {
                 return Err(anyhow!("Invalid filename: {:?}", filename_str));
             }
         }
-        
+
         // Check hidden files
         if !self.allow_hidden_files {
             if let Some(filename) = canonical_path.file_name() {
@@ -148,13 +163,17 @@ impl PathSecurityPolicy {
                 }
             }
         }
-        
+
         Ok(())
     }
-    
+
     pub fn validate_file_size(&self, size: u64) -> Result<()> {
         if size > self.max_file_size {
-            return Err(anyhow!("File size {} exceeds maximum allowed size {}", size, self.max_file_size));
+            return Err(anyhow!(
+                "File size {} exceeds maximum allowed size {}",
+                size,
+                self.max_file_size
+            ));
         }
         Ok(())
     }
@@ -180,49 +199,53 @@ pub mod macos;
 // 平台工厂函数
 
 /// 创建平台特定的命令执行器
-/// 
+///
 /// # Errors
 /// 如果当前平台不受支持或缺少对应的 feature flag，返回错误
 pub fn create_command_executor() -> Result<Box<dyn CommandExecutor + Send + Sync>> {
     #[cfg(all(target_os = "windows", feature = "windows"))]
     return Ok(Box::new(windows::WindowsCommandExecutor::new()));
-    
+
     #[cfg(all(target_os = "linux", feature = "linux"))]
     return Ok(Box::new(linux::LinuxCommandExecutor::new()));
-    
+
     #[cfg(all(target_os = "macos", feature = "macos"))]
     return Ok(Box::new(macos::MacOSCommandExecutor::new()));
-    
+
     #[cfg(not(any(
         all(target_os = "windows", feature = "windows"),
         all(target_os = "linux", feature = "linux"),
         all(target_os = "macos", feature = "macos")
     )))]
-    Err(anyhow!("Unsupported platform or missing platform feature flag. \
-        Current OS: {}. Please enable the appropriate feature: windows, linux, or macos", 
-        std::env::consts::OS))
+    Err(anyhow!(
+        "Unsupported platform or missing platform feature flag. \
+        Current OS: {}. Please enable the appropriate feature: windows, linux, or macos",
+        std::env::consts::OS
+    ))
 }
 
 /// 创建平台特定的文件系统操作器
-/// 
+///
 /// # Errors
 /// 如果当前平台不受支持或缺少对应的 feature flag，返回错误
 pub fn create_file_system() -> Result<Box<dyn FileSystem + Send + Sync>> {
     #[cfg(all(target_os = "windows", feature = "windows"))]
     return Ok(Box::new(windows::WindowsFileSystem::new()));
-    
+
     #[cfg(all(target_os = "linux", feature = "linux"))]
     return Ok(Box::new(linux::LinuxFileSystem::new()));
-    
+
     #[cfg(all(target_os = "macos", feature = "macos"))]
     return Ok(Box::new(macos::MacOSFileSystem::new()));
-    
+
     #[cfg(not(any(
         all(target_os = "windows", feature = "windows"),
         all(target_os = "linux", feature = "linux"),
         all(target_os = "macos", feature = "macos")
     )))]
-    Err(anyhow!("Unsupported platform or missing platform feature flag. \
-        Current OS: {}. Please enable the appropriate feature: windows, linux, or macos", 
-        std::env::consts::OS))
+    Err(anyhow!(
+        "Unsupported platform or missing platform feature flag. \
+        Current OS: {}. Please enable the appropriate feature: windows, linux, or macos",
+        std::env::consts::OS
+    ))
 }

@@ -80,7 +80,7 @@ impl StateManager {
     /// 创建新的状态管理器
     pub fn new<P: AsRef<Path>>(state_file_path: P) -> Result<Self> {
         let state_file_path = state_file_path.as_ref().to_path_buf();
-        
+
         // 确保状态文件目录存在
         if let Some(parent) = state_file_path.parent() {
             fs::create_dir_all(parent)?;
@@ -101,13 +101,13 @@ impl StateManager {
     /// 加载状态文件
     fn load_state<P: AsRef<Path>>(path: P) -> Result<AgentState> {
         let content = fs::read_to_string(path)?;
-        
+
         // 处理空文件的情况
         if content.trim().is_empty() {
             info!("State file is empty, using default state");
             return Ok(AgentState::default());
         }
-        
+
         let state: AgentState = serde_json::from_str(&content)?;
         info!("Loaded agent state from file");
         Ok(state)
@@ -353,10 +353,10 @@ mod tests {
     async fn test_state_manager_creation() {
         let temp_file = NamedTempFile::new().unwrap();
         let state_manager = StateManager::new(temp_file.path()).unwrap();
-        
+
         // 初始化状态文件
         state_manager.save_state().await.unwrap();
-        
+
         let state = state_manager.get_state().await;
         assert_eq!(state.enrollment_status, EnrollmentStatus::NotEnrolled);
         assert_eq!(state.connection_status, ConnectionStatus::Disconnected);
@@ -366,17 +366,20 @@ mod tests {
     async fn test_device_id_operations() {
         let temp_file = NamedTempFile::new().unwrap();
         let state_manager = StateManager::new(temp_file.path()).unwrap();
-        
+
         // 初始化状态文件
         state_manager.save_state().await.unwrap();
-        
+
         // 初始状态应该没有设备 ID
         assert!(state_manager.get_device_id().await.is_none());
-        
+
         // 设置设备 ID
         let device_id = "test-device-123".to_string();
-        state_manager.set_device_id(device_id.clone()).await.unwrap();
-        
+        state_manager
+            .set_device_id(device_id.clone())
+            .await
+            .unwrap();
+
         // 验证设备 ID 已设置
         assert_eq!(state_manager.get_device_id().await, Some(device_id));
     }
@@ -385,22 +388,31 @@ mod tests {
     async fn test_state_persistence() {
         let temp_file = NamedTempFile::new().unwrap();
         let device_id = "persistent-device-456".to_string();
-        
+
         // 创建状态管理器并设置设备 ID
         {
             let state_manager = StateManager::new(temp_file.path()).unwrap();
             // 初始化状态文件
             state_manager.save_state().await.unwrap();
-            
-            state_manager.set_device_id(device_id.clone()).await.unwrap();
-            state_manager.set_enrollment_status(EnrollmentStatus::Enrolled).await.unwrap();
+
+            state_manager
+                .set_device_id(device_id.clone())
+                .await
+                .unwrap();
+            state_manager
+                .set_enrollment_status(EnrollmentStatus::Enrolled)
+                .await
+                .unwrap();
         }
-        
+
         // 重新加载状态管理器
         {
             let state_manager = StateManager::new(temp_file.path()).unwrap();
             assert_eq!(state_manager.get_device_id().await, Some(device_id));
-            assert_eq!(state_manager.get_enrollment_status().await, EnrollmentStatus::Enrolled);
+            assert_eq!(
+                state_manager.get_enrollment_status().await,
+                EnrollmentStatus::Enrolled
+            );
         }
     }
 
@@ -408,20 +420,20 @@ mod tests {
     async fn test_runtime_stats() {
         let temp_file = NamedTempFile::new().unwrap();
         let state_manager = StateManager::new(temp_file.path()).unwrap();
-        
+
         // 初始化状态文件
         state_manager.save_state().await.unwrap();
-        
+
         // 初始统计应该为 0
         let stats = state_manager.get_runtime_stats().await;
         assert_eq!(stats.heartbeats_sent, 0);
         assert_eq!(stats.commands_received, 0);
-        
+
         // 更新统计
         state_manager.update_heartbeat().await.unwrap();
         state_manager.record_command_received().await.unwrap();
         state_manager.record_command_executed().await.unwrap();
-        
+
         // 验证统计更新
         let stats = state_manager.get_runtime_stats().await;
         assert_eq!(stats.heartbeats_sent, 1);
@@ -433,19 +445,22 @@ mod tests {
     async fn test_metadata_operations() {
         let temp_file = NamedTempFile::new().unwrap();
         let state_manager = StateManager::new(temp_file.path()).unwrap();
-        
+
         // 初始化状态文件
         state_manager.save_state().await.unwrap();
-        
+
         // 设置元数据
         let key = "test_key".to_string();
         let value = serde_json::json!({"test": "value"});
-        state_manager.set_metadata(key.clone(), value.clone()).await.unwrap();
-        
+        state_manager
+            .set_metadata(key.clone(), value.clone())
+            .await
+            .unwrap();
+
         // 获取元数据
         let retrieved_value = state_manager.get_metadata(&key).await;
         assert_eq!(retrieved_value, Some(value));
-        
+
         // 获取不存在的元数据
         let missing_value = state_manager.get_metadata("missing_key").await;
         assert!(missing_value.is_none());

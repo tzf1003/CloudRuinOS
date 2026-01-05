@@ -70,7 +70,7 @@ impl Scheduler {
     /// 创建新的调度器
     pub fn new() -> Self {
         let (command_tx, command_rx) = mpsc::unbounded_channel();
-        
+
         Self {
             tasks: Arc::new(RwLock::new(HashMap::new())),
             command_tx,
@@ -84,7 +84,12 @@ impl Scheduler {
     }
 
     /// 添加任务
-    pub async fn add_task(&self, id: String, task_type: TaskType, interval: Duration) -> Result<()> {
+    pub async fn add_task(
+        &self,
+        id: String,
+        task_type: TaskType,
+        interval: Duration,
+    ) -> Result<()> {
         let task = ScheduledTask {
             id: id.clone(),
             task_type,
@@ -95,7 +100,7 @@ impl Scheduler {
 
         let mut tasks = self.tasks.write().await;
         tasks.insert(id.clone(), task);
-        
+
         info!("Added scheduled task: {}", id);
         Ok(())
     }
@@ -140,7 +145,9 @@ impl Scheduler {
     where
         F: FnMut(TaskType) -> Result<()> + Send + 'static,
     {
-        let mut command_rx = self.command_rx.take()
+        let mut command_rx = self
+            .command_rx
+            .take()
             .ok_or_else(|| anyhow::anyhow!("Scheduler already running"))?;
 
         let mut tick_interval = interval(Duration::from_millis(100));
@@ -186,7 +193,7 @@ impl Scheduler {
                         }
                     }
                 }
-                
+
                 // 检查定时任务
                 _ = tick_interval.tick() => {
                     self.check_and_execute_tasks(&mut task_executor).await;
@@ -224,7 +231,10 @@ impl Scheduler {
 
             match result {
                 Ok(_) => {
-                    debug!("Task {} executed successfully in {:?}", task_id, execution_time);
+                    debug!(
+                        "Task {} executed successfully in {:?}",
+                        task_id, execution_time
+                    );
                 }
                 Err(e) => {
                     error!("Task {} failed: {} (took {:?})", task_id, e, execution_time);
@@ -250,10 +260,16 @@ impl Scheduler {
 
             match result {
                 Ok(_) => {
-                    info!("Triggered task {} executed successfully in {:?}", task_id, execution_time);
+                    info!(
+                        "Triggered task {} executed successfully in {:?}",
+                        task_id, execution_time
+                    );
                 }
                 Err(e) => {
-                    error!("Triggered task {} failed: {} (took {:?})", task_id, e, execution_time);
+                    error!(
+                        "Triggered task {} failed: {} (took {:?})",
+                        task_id, e, execution_time
+                    );
                 }
             }
         } else {
@@ -302,13 +318,16 @@ mod tests {
     #[tokio::test]
     async fn test_scheduler_basic_operations() {
         let scheduler = Scheduler::new();
-        
+
         // 添加任务
-        scheduler.add_task(
-            "test_task".to_string(),
-            TaskType::Heartbeat,
-            Duration::from_millis(100)
-        ).await.unwrap();
+        scheduler
+            .add_task(
+                "test_task".to_string(),
+                TaskType::Heartbeat,
+                Duration::from_millis(100),
+            )
+            .await
+            .unwrap();
 
         // 检查任务存在
         let task = scheduler.get_task_status("test_task").await;
@@ -338,11 +357,14 @@ mod tests {
         let execution_count_clone = execution_count.clone();
 
         // 添加快速执行的任务
-        scheduler.add_task(
-            "fast_task".to_string(),
-            TaskType::Heartbeat,
-            Duration::from_millis(50)
-        ).await.unwrap();
+        scheduler
+            .add_task(
+                "fast_task".to_string(),
+                TaskType::Heartbeat,
+                Duration::from_millis(50),
+            )
+            .await
+            .unwrap();
 
         let task_executor = move |_task_type: TaskType| -> Result<()> {
             execution_count_clone.fetch_add(1, Ordering::SeqCst);
@@ -350,16 +372,14 @@ mod tests {
         };
 
         // 运行调度器一段时间
-        let scheduler_handle = tokio::spawn(async move {
-            scheduler.run(task_executor).await
-        });
+        let scheduler_handle = tokio::spawn(async move { scheduler.run(task_executor).await });
 
         // 等待一段时间让任务执行
         sleep(Duration::from_millis(200)).await;
 
         // 发送关闭命令
         let sender = scheduler_handle.abort();
-        
+
         // 检查任务是否被执行了多次
         let count = execution_count.load(Ordering::SeqCst);
         assert!(count > 0, "Task should have been executed at least once");
