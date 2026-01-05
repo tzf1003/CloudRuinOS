@@ -1,6 +1,7 @@
 name: Deploy Console to Cloudflare Pages
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main

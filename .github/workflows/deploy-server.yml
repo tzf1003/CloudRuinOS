@@ -1,6 +1,7 @@
 name: Deploy Server to Cloudflare Workers
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
