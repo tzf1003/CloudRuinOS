@@ -1,4 +1,4 @@
-// API Types for RMM Console
+// API Types for Ruinos Console
 export interface Device {
   id: string;
   deviceId: string;

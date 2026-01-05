@@ -36,7 +36,7 @@ jobs:
       - name: Build application
         run: npm run -w console build
         env:
-          VITE_API_BASE_URL: https://rmm-server.your-subdomain.workers.dev
+          VITE_API_BASE_URL: https://ruinos-server.your-subdomain.workers.dev
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -70,11 +70,11 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages project create cloudruinos-console --production-branch main
+          command: pages project create ruinos-console --production-branch main
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy console/dist --project-name=cloudruinos-console --commit-dirty=true
+          command: pages deploy console/dist --project-name=ruinos-console --commit-dirty=true

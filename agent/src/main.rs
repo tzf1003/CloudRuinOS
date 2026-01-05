@@ -62,8 +62,8 @@ async fn main() -> Result<()> {
         // 尝试从默认位置加载配置
         let default_paths = [
             "config.toml",
-            "/etc/rmm-agent/config.toml",
-            "C:\\ProgramData\\RMM Agent\\config.toml",
+            "/etc/ruinos-agent/config.toml",
+            "C:\\ProgramData\\Ruinos Agent\\config.toml",
         ];
 
         let mut loaded = false;
@@ -94,7 +94,7 @@ async fn main() -> Result<()> {
     // 初始化日志
     let log_level = &config_manager.config().logging.level;
     let env_filter = format!(
-        "rmm_agent={},{}={}",
+        "ruinos_agent={},{}={}",
         log_level,
         env!("CARGO_PKG_NAME").replace('-', "_"),
         log_level
@@ -105,7 +105,7 @@ async fn main() -> Result<()> {
         .init();
 
     // 显示版本和构建信息
-    info!("Starting RMM Agent v{}", env!("CARGO_PKG_VERSION"));
+    info!("Starting Ruinos Agent v{}", env!("CARGO_PKG_VERSION"));
     info!(
         "Build target: {} (OS: {}, Arch: {})",
         BUILD_TARGET, BUILD_OS, BUILD_ARCH
@@ -165,11 +165,11 @@ async fn main() -> Result<()> {
 }
 
 fn print_help() {
-    println!("RMM Agent v{}", env!("CARGO_PKG_VERSION"));
+    println!("Ruinos Agent v{}", env!("CARGO_PKG_VERSION"));
     println!("Remote Monitoring and Management Agent");
     println!();
     println!("USAGE:");
-    println!("    rmm-agent [OPTIONS]");
+    println!("    ruinos-agent [OPTIONS]");
     println!();
     println!("OPTIONS:");
     println!("    --config <FILE>    指定配置文件路径");
@@ -178,12 +178,12 @@ fn print_help() {
     println!("    --version, -v      显示版本信息");
     println!();
     println!("EXAMPLES:");
-    println!("    rmm-agent --config /etc/rmm-agent/config.toml");
-    println!("    rmm-agent --service");
+    println!("    ruinos-agent --config /etc/ruinos-agent/config.toml");
+    println!("    ruinos-agent --service");
 }
 
 fn print_version() {
-    println!("RMM Agent v{}", env!("CARGO_PKG_VERSION"));
+    println!("Ruinos Agent v{}", env!("CARGO_PKG_VERSION"));
     println!(
         "Build target: {} (OS: {}, Arch: {})",
         BUILD_TARGET, BUILD_OS, BUILD_ARCH

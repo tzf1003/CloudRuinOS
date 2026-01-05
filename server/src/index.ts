@@ -1,5 +1,5 @@
 /**
- * RMM Server - Cloudflare Workers API
+ * Ruinos Server - Cloudflare Workers API
  * 轻量化远程监控和管理系统服务端
  */
 

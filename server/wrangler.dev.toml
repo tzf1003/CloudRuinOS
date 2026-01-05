@@ -1,9 +1,9 @@
-name = "rmm-server-dev"
+name = "ruinos-server-dev"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
 
-# 本地开发环境变量
+# 本地开发环境变�?
 [vars]
 ENVIRONMENT = "development"
 API_VERSION = "v1"
@@ -13,4 +13,4 @@ HEARTBEAT_INTERVAL = "60"   # 60 seconds
 NONCE_WINDOW = "300"        # 5 minutes
 
 # 本地开发不需要真实的云服务，使用内存存储
-# 注释掉所有云服务配置以避免认证问题
+# 注释掉所有云服务配置以避免认证问�

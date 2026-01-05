@@ -1,11 +1,11 @@
-# 轻量化 RMM 系统
+# Ruinos
 
-Remote Monitoring and Management System - 基于 Cloudflare Workers 的轻量化远程设备管理解决方案
+远程监控与管理系统 - 基于 Cloudflare Workers 的轻量化远程设备管理解决方案
 
 ## 项目结构
 
 ```
-lightweight-rmm/
+ruinos/
 ├── server/          # Cloudflare Workers 服务端
 ├── agent/           # Rust 跨平台 Agent 客户端
 ├── console/         # React 前端管理控制台
@@ -28,7 +28,7 @@ lightweight-rmm/
 1. **克隆项目并安装依赖**
    ```bash
    git clone <repository-url>
-   cd lightweight-rmm
+   cd ruinos
    npm install
    ```
 

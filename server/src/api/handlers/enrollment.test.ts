@@ -85,7 +85,7 @@ function createTestRequest(body: EnrollDeviceRequest): Request {
     headers: {
       'Content-Type': 'application/json',
       'CF-Connecting-IP': '192.168.1.100',
-      'User-Agent': 'RMM-Agent/1.0.0',
+      'User-Agent': 'Ruinos-Agent/1.0.0',
     },
     body: JSON.stringify(body),
   });

@@ -1,7 +1,7 @@
 {
-  "name": "rmm-console",
+  "name": "ruinos-console",
   "version": "0.1.0",
-  "description": "RMM Console - Frontend Management Application",
+  "description": "Ruinos Console - 前端管理控制台",
   "type": "module",
   "scripts": {
     "dev": "vite",

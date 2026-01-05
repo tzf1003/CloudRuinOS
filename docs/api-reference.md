@@ -1,21 +1,21 @@
-# API 参考文档
+# API 参考文�?
 
 ## 概述
 
-轻量化 RMM 系统提供 RESTful HTTP API 和 WebSocket 实时通信接口。所有 API 都基于 JSON 格式进行数据交换，并采用 Ed25519 签名验证确保请求安全性。
+轻量�?Ruinos 系统提供 RESTful HTTP API �?WebSocket 实时通信接口。所�?API 都基�?JSON 格式进行数据交换，并采用 Ed25519 签名验证确保请求安全性�?
 
 ## 基础信息
 
-- **Base URL**: `https://your-rmm-server.example.com`
+- **Base URL**: `https://your-Ruinos-server.example.com`
 - **API Version**: v1
 - **Content-Type**: `application/json`
-- **认证方式**: Ed25519 签名 + Nonce 防重放
+- **认证方式**: Ed25519 签名 + Nonce 防重�?
 
 ## 认证机制
 
 ### 签名验证
 
-所有需要认证的请求都必须包含以下 HTTP 头：
+所有需要认证的请求都必须包含以�?HTTP 头：
 
 ```http
 X-Device-ID: {device_id}
@@ -26,7 +26,7 @@ X-Nonce: {random_nonce}
 ### 签名生成算法
 
 ```typescript
-// 签名内容构造
+// 签名内容构�?
 const signaturePayload = `${method}|${path}|${body}|${nonce}|${timestamp}`
 
 // Ed25519 签名
@@ -37,16 +37,16 @@ const signature = ed25519.sign(signaturePayload, privateKey)
 
 ### 设备注册
 
-注册新设备到 RMM 系统。
+注册新设备到 Ruinos 系统�?
 
 **端点**: `POST /agent/enroll`
 
-**请求头**:
+**请求�?*:
 ```http
 Content-Type: application/json
 ```
 
-**请求体**:
+**请求�?*:
 ```json
 {
   "enrollment_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
@@ -88,11 +88,11 @@ Content-Type: application/json
 
 ### 心跳上报
 
-定期上报设备状态和系统信息。
+定期上报设备状态和系统信息�?
 
 **端点**: `POST /agent/heartbeat`
 
-**请求头**:
+**请求�?*:
 ```http
 Content-Type: application/json
 X-Device-ID: dev_1234567890abcdef
@@ -100,7 +100,7 @@ X-Signature: {ed25519_signature}
 X-Nonce: {random_nonce}
 ```
 
-**请求体**:
+**请求�?*:
 ```json
 {
   "timestamp": "2024-01-01T00:00:00Z",
@@ -131,7 +131,7 @@ X-Nonce: {random_nonce}
       {
         "type": "upgrade_websocket",
         "session_id": "sess_abc123",
-        "websocket_url": "wss://your-rmm-server.example.com/sessions/sess_abc123"
+        "websocket_url": "wss://your-Ruinos-server.example.com/sessions/sess_abc123"
       }
     ]
   }
@@ -148,8 +148,8 @@ X-Nonce: {random_nonce}
 
 **查询参数**:
 - `page`: 页码 (默认: 1)
-- `limit`: 每页数量 (默认: 20, 最大: 100)
-- `status`: 设备状态过滤 (`online`, `offline`, `all`)
+- `limit`: 每页数量 (默认: 20, 最�? 100)
+- `status`: 设备状态过�?(`online`, `offline`, `all`)
 - `platform`: 平台过滤 (`windows`, `linux`, `macos`)
 
 **响应**:
@@ -223,7 +223,7 @@ X-Nonce: {random_nonce}
 
 **端点**: `POST /sessions`
 
-**请求体**:
+**请求�?*:
 ```json
 {
   "device_id": "dev_1234567890abcdef",
@@ -240,13 +240,13 @@ X-Nonce: {random_nonce}
     "device_id": "dev_1234567890abcdef",
     "type": "interactive",
     "status": "pending",
-    "websocket_url": "wss://your-rmm-server.example.com/sessions/sess_abc123",
+    "websocket_url": "wss://your-Ruinos-server.example.com/sessions/sess_abc123",
     "created_at": "2024-01-01T00:00:00Z"
   }
 }
 ```
 
-#### 获取会话状态
+#### 获取会话状�?
 
 **端点**: `GET /sessions/{session_id}`
 
@@ -284,7 +284,7 @@ X-Nonce: {random_nonce}
 
 **端点**: `POST /files/list`
 
-**请求体**:
+**请求�?*:
 ```json
 {
   "device_id": "dev_1234567890abcdef",
@@ -330,7 +330,7 @@ X-Nonce: {random_nonce}
 - `device_id`: 设备 ID
 - `path`: 文件路径
 
-**响应头**:
+**响应�?*:
 ```http
 Content-Type: application/octet-stream
 Content-Disposition: attachment; filename="document.txt"
@@ -342,7 +342,7 @@ X-File-Checksum: sha256:abc123...
 
 **端点**: `POST /files/upload`
 
-**请求体** (multipart/form-data):
+**请求�?* (multipart/form-data):
 ```
 device_id: dev_1234567890abcdef
 path: /home/user/uploaded.txt
@@ -370,10 +370,10 @@ file: [binary data]
 
 **查询参数**:
 - `page`: 页码 (默认: 1)
-- `limit`: 每页数量 (默认: 50, 最大: 200)
+- `limit`: 每页数量 (默认: 50, 最�? 200)
 - `device_id`: 设备 ID 过滤
 - `action`: 操作类型过滤
-- `start_date`: 开始日期 (ISO 8601)
+- `start_date`: 开始日�?(ISO 8601)
 - `end_date`: 结束日期 (ISO 8601)
 
 **响应**:
@@ -412,7 +412,7 @@ file: [binary data]
 
 **端点**: `POST /admin/enrollment-tokens`
 
-**请求体**:
+**请求�?*:
 ```json
 {
   "expires_in": 3600,
@@ -432,7 +432,7 @@ file: [binary data]
 }
 ```
 
-#### 健康检查
+#### 健康检�?
 
 **端点**: `GET /health`
 
@@ -463,23 +463,23 @@ file: [binary data]
 
 ### 连接建立
 
-**URL**: `wss://your-rmm-server.example.com/sessions/{session_id}`
+**URL**: `wss://your-Ruinos-server.example.com/sessions/{session_id}`
 
-**认证**: 通过查询参数传递设备 ID 和签名
+**认证**: 通过查询参数传递设�?ID 和签�?
 ```
 ?device_id={device_id}&signature={signature}&nonce={nonce}
 ```
 
 ### 消息格式
 
-所有 WebSocket 消息都采用 JSON 格式：
+所�?WebSocket 消息都采�?JSON 格式�?
 
 ```typescript
 interface WSMessage {
   id: string          // 消息唯一标识
   type: string        // 消息类型
   payload: any        // 消息内容
-  timestamp: string   // 时间戳 (ISO 8601)
+  timestamp: string   // 时间�?(ISO 8601)
 }
 ```
 
@@ -487,7 +487,7 @@ interface WSMessage {
 
 #### 命令执行
 
-**发送** (Console → Agent):
+**发�?* (Console �?Agent):
 ```json
 {
   "id": "cmd_123",
@@ -502,7 +502,7 @@ interface WSMessage {
 }
 ```
 
-**响应** (Agent → Console):
+**响应** (Agent �?Console):
 ```json
 {
   "id": "cmd_123",
@@ -580,60 +580,60 @@ interface WSMessage {
 - `400 Bad Request`: 请求参数错误
 - `401 Unauthorized`: 认证失败
 - `403 Forbidden`: 权限不足
-- `404 Not Found`: 资源不存在
+- `404 Not Found`: 资源不存�?
 - `429 Too Many Requests`: 请求频率限制
-- `500 Internal Server Error`: 服务器内部错误
+- `500 Internal Server Error`: 服务器内部错�?
 
 ### 业务错误代码
 
 #### 认证相关
-- `INVALID_TOKEN`: 无效的注册令牌
-- `TOKEN_EXPIRED`: 令牌已过期
+- `INVALID_TOKEN`: 无效的注册令�?
+- `TOKEN_EXPIRED`: 令牌已过�?
 - `INVALID_SIGNATURE`: 签名验证失败
 - `NONCE_REUSED`: Nonce 重复使用
-- `DEVICE_NOT_FOUND`: 设备不存在
+- `DEVICE_NOT_FOUND`: 设备不存�?
 
 #### 会话相关
-- `SESSION_NOT_FOUND`: 会话不存在
-- `SESSION_EXPIRED`: 会话已过期
+- `SESSION_NOT_FOUND`: 会话不存�?
+- `SESSION_EXPIRED`: 会话已过�?
 - `SESSION_LIMIT_EXCEEDED`: 会话数量超限
 - `WEBSOCKET_CONNECTION_FAILED`: WebSocket 连接失败
 
 #### 文件操作相关
-- `FILE_NOT_FOUND`: 文件不存在
-- `ACCESS_DENIED`: 访问被拒绝
+- `FILE_NOT_FOUND`: 文件不存�?
+- `ACCESS_DENIED`: 访问被拒�?
 - `FILE_TOO_LARGE`: 文件过大
 - `DISK_SPACE_INSUFFICIENT`: 磁盘空间不足
 - `CHECKSUM_MISMATCH`: 校验和不匹配
 
 #### 命令执行相关
 - `COMMAND_TIMEOUT`: 命令执行超时
-- `COMMAND_BLOCKED`: 命令被阻止
+- `COMMAND_BLOCKED`: 命令被阻�?
 - `EXECUTION_FAILED`: 执行失败
 - `PERMISSION_DENIED`: 权限不足
 
 ## 速率限制
 
 ### API 限制
-- **注册 API**: 每 IP 每小时 10 次
-- **心跳 API**: 每设备每分钟 2 次
-- **文件上传**: 每设备每分钟 5 次
-- **其他 API**: 每 IP 每分钟 100 次
+- **注册 API**: �?IP 每小�?10 �?
+- **心跳 API**: 每设备每分钟 2 �?
+- **文件上传**: 每设备每分钟 5 �?
+- **其他 API**: �?IP 每分�?100 �?
 
 ### WebSocket 限制
-- **消息频率**: 每秒最多 10 条消息
-- **连接数**: 每设备最多 3 个并发连接
-- **会话时长**: 最长 24 小时
+- **消息频率**: 每秒最�?10 条消�?
+- **连接�?*: 每设备最�?3 个并发连�?
+- **会话时长**: 最�?24 小时
 
-## SDK 和示例
+## SDK 和示�?
 
-### JavaScript/TypeScript 客户端
+### JavaScript/TypeScript 客户�?
 
 ```typescript
-import { RMMClient } from '@rmm/client'
+import { RuinosClient } from '@Ruinos/client'
 
-const client = new RMMClient({
-  baseUrl: 'https://your-rmm-server.example.com',
+const client = new RuinosClient({
+  baseUrl: 'https://your-Ruinos-server.example.com',
   apiKey: 'your-api-key'
 })
 
@@ -656,10 +656,10 @@ ws.on('message', (message) => {
 })
 ```
 
-### Rust Agent 客户端
+### Rust Agent 客户�?
 
 ```rust
-use rmm_agent::{Agent, Config};
+use Ruinos_agent::{Agent, Config};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -673,4 +673,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-这个 API 参考文档提供了完整的接口规范，包括请求格式、响应格式、错误处理和使用示例，为客户端开发和集成提供了详细的技术指导。
+这个 API 参考文档提供了完整的接口规范，包括请求格式、响应格式、错误处理和使用示例，为客户端开发和集成提供了详细的技术指导�

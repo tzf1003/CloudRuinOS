@@ -1,7 +1,7 @@
 {
-  "name": "rmm-server",
+  "name": "ruinos-server",
   "version": "0.1.0",
-  "description": "RMM Server - Cloudflare Workers API",
+  "description": "Ruinos Server - Cloudflare Workers API",
   "main": "src/index.ts",
   "scripts": {
     "dev": "wrangler dev --local",

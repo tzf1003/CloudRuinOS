@@ -1,40 +1,40 @@
 # Wrangler 配置文件模板
-# 复制此文件为 wrangler.toml 并填入实际值
-# 获取配置值请参考: .github/DEPLOYMENT_CONFIG.md
+# 复制此文件为 wrangler.toml 并填入实际�?
+# 获取配置值请参�? .github/DEPLOYMENT_CONFIG.md
 
-name = "rmm-server"
+name = "ruinos-server"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
 
 # 生产环境配置
 [env.production]
-name = "rmm-server-prod"
+name = "ruinos-server-prod"
 vars = { ENVIRONMENT = "production" }
 
 # 测试环境配置
 [env.test]
-name = "rmm-server-test"
+name = "ruinos-server-test"
 vars = { ENVIRONMENT = "test" }
 
-# D1 数据库配置
+# D1 数据库配�?
 [[d1_databases]]
 binding = "DB"
-database_name = "rmm-db-local"
+database_name = "ruinos-db-local"
 database_id = "your-d1-database-id"           # 运行 wrangler d1 list 获取
-preview_database_id = "your-preview-db-id"    # 预览环境数据库 ID
+preview_database_id = "your-preview-db-id"    # 预览环境数据�?ID
 
 [[env.production.d1_databases]]
 binding = "DB"
-database_name = "rmm-db-prod"
-database_id = "your-prod-d1-database-id"      # 生产环境 D1 数据库 ID
+database_name = "ruinos-db-prod"
+database_id = "your-prod-d1-database-id"      # 生产环境 D1 数据�?ID
 
 [[env.test.d1_databases]]
 binding = "DB"
-database_name = "rmm-db-test"
-database_id = "your-test-d1-database-id"      # 测试环境 D1 数据库 ID
+database_name = "ruinos-db-test"
+database_id = "your-test-d1-database-id"      # 测试环境 D1 数据�?ID
 
-# KV 存储配置 (本地开发)
+# KV 存储配置 (本地开�?
 [[kv_namespaces]]
 binding = "KV"
 id = "your-kv-namespace-id"                   # 运行 wrangler kv namespace list 获取
@@ -51,16 +51,16 @@ id = "your-test-kv-namespace-id"              # 测试环境 KV namespace ID
 # R2 对象存储配置
 [[r2_buckets]]
 binding = "R2"
-bucket_name = "rmm-files-dev"                 # 运行 wrangler r2 bucket list 获取
-preview_bucket_name = "rmm-files-dev"
+bucket_name = "ruinos-files-dev"                 # 运行 wrangler r2 bucket list 获取
+preview_bucket_name = "ruinos-files-dev"
 
 [env.production.r2_buckets]
 binding = "R2"
-bucket_name = "rmm-files-prod"
+bucket_name = "ruinos-files-prod"
 
 [env.test.r2_buckets]
 binding = "R2"
-bucket_name = "rmm-files-test"
+bucket_name = "ruinos-files-test"
 
 # Durable Objects 配置
 [[durable_objects.bindings]]

@@ -238,7 +238,7 @@ describe('User Experience Properties', () => {
         );
 
         // 验证布局组件正确渲染
-        expect(screen.getByText('RMM Console')).toBeInTheDocument();
+        expect(screen.getByText('Ruinos Console')).toBeInTheDocument();
         expect(screen.getByText('测试内容')).toBeInTheDocument();
 
         // 验证移动端菜单按钮在小屏幕下存在

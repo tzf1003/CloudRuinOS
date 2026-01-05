@@ -1,20 +1,20 @@
 @echo off
-REM RMM Agent 安装脚本 - Windows 版本
+REM Ruinos Agent 安装脚本 - Windows 版本
 REM 支持 Windows 服务安装和配置
 
 setlocal enabledelayedexpansion
 
 REM 配置变量
-set "AGENT_NAME=RMMAgent"
-set "DISPLAY_NAME=RMM Agent Service"
+set "AGENT_NAME=RuinosAgent"
+set "DISPLAY_NAME=Ruinos Agent Service"
 set "DESCRIPTION=Remote Monitoring and Management Agent"
-set "INSTALL_DIR=C:\Program Files\RMM Agent"
-set "CONFIG_DIR=C:\ProgramData\RMM Agent"
-set "DATA_DIR=C:\ProgramData\RMM Agent\Data"
-set "LOG_DIR=C:\ProgramData\RMM Agent\Logs"
-set "SERVICE_EXE=%INSTALL_DIR%\rmm-agent.exe"
+set "INSTALL_DIR=C:\Program Files\Ruinos Agent"
+set "CONFIG_DIR=C:\ProgramData\Ruinos Agent"
+set "DATA_DIR=C:\ProgramData\Ruinos Agent\Data"
+set "LOG_DIR=C:\ProgramData\Ruinos Agent\Logs"
+set "SERVICE_EXE=%INSTALL_DIR%\ruinos-agent.exe"
 
-echo RMM Agent 安装程序
+echo Ruinos Agent 安装程序
 echo ==================
 
 REM 检查管理员权限

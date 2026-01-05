@@ -509,25 +509,25 @@ function formatPrometheusMetrics(metrics: SystemMetrics, env: Env): string {
   const version = env.API_VERSION || 'unknown';
   
   return `
-# HELP rmm_uptime_seconds Total uptime in seconds
-# TYPE rmm_uptime_seconds counter
-rmm_uptime_seconds{environment="${environment}",version="${version}"} ${Math.floor(metrics.uptime / 1000)}
+# HELP ruinos_uptime_seconds Total uptime in seconds
+# TYPE ruinos_uptime_seconds counter
+ruinos_uptime_seconds{environment="${environment}",version="${version}"} ${Math.floor(metrics.uptime / 1000)}
 
-# HELP rmm_requests_total Total number of requests
-# TYPE rmm_requests_total counter
-rmm_requests_total{environment="${environment}",version="${version}"} ${metrics.requestCount}
+# HELP ruinos_requests_total Total number of requests
+# TYPE ruinos_requests_total counter
+ruinos_requests_total{environment="${environment}",version="${version}"} ${metrics.requestCount}
 
-# HELP rmm_error_rate Error rate percentage
-# TYPE rmm_error_rate gauge
-rmm_error_rate{environment="${environment}",version="${version}"} ${metrics.errorRate}
+# HELP ruinos_error_rate Error rate percentage
+# TYPE ruinos_error_rate gauge
+ruinos_error_rate{environment="${environment}",version="${version}"} ${metrics.errorRate}
 
-# HELP rmm_response_time_ms Average response time in milliseconds
-# TYPE rmm_response_time_ms gauge
-rmm_response_time_ms{environment="${environment}",version="${version}"} ${metrics.averageResponseTime}
+# HELP ruinos_response_time_ms Average response time in milliseconds
+# TYPE ruinos_response_time_ms gauge
+ruinos_response_time_ms{environment="${environment}",version="${version}"} ${metrics.averageResponseTime}
 
-# HELP rmm_active_connections Number of active WebSocket connections
-# TYPE rmm_active_connections gauge
-rmm_active_connections{environment="${environment}",version="${version}"} ${metrics.activeConnections}
+# HELP ruinos_active_connections Number of active WebSocket connections
+# TYPE ruinos_active_connections gauge
+ruinos_active_connections{environment="${environment}",version="${version}"} ${metrics.activeConnections}
 `.trim();
 }
 

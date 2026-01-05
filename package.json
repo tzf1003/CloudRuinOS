@@ -1,7 +1,7 @@
 {
-  "name": "lightweight-rmm",
+  "name": "ruinos",
   "version": "0.1.0",
-  "description": "轻量化 RMM 系统 - Remote Monitoring and Management System",
+  "description": "Ruinos - 远程监控与管理系统",
   "private": true,
   "workspaces": [
     "server",

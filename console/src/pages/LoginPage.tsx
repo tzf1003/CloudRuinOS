@@ -10,7 +10,7 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // 获取重定向目标
+  // 获取重定向目�?
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/dashboard';
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -18,7 +18,7 @@ export function LoginPage() {
     setError(null);
 
     if (!password.trim()) {
-      setError('请输入密码');
+      setError('请输入密�?);
       return;
     }
 
@@ -34,12 +34,12 @@ export function LoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Logo 和标题 */}
+        {/* Logo 和标�?*/}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4 shadow-lg shadow-blue-500/30">
             <Shield className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">CloudRuinOS</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">Ruinos</h1>
           <p className="text-slate-400">远程监控管理系统</p>
         </div>
 
@@ -47,7 +47,7 @@ export function LoginPage() {
         <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 shadow-xl border border-white/20">
           <div className="flex items-center gap-2 mb-6">
             <Lock className="w-5 h-5 text-blue-400" />
-            <h2 className="text-xl font-semibold text-white">管理员登录</h2>
+            <h2 className="text-xl font-semibold text-white">管理员登�?/h2>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -62,14 +62,14 @@ export function LoginPage() {
             {/* 密码输入 */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-2">
-                管理员密码
+                管理员密�?
               </label>
               <input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="输入管理员密码..."
+                placeholder="输入管理员密�?.."
                 className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 disabled={isLoading}
                 autoFocus
@@ -85,7 +85,7 @@ export function LoginPage() {
               {isLoading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>登录中...</span>
+                  <span>登录�?..</span>
                 </>
               ) : (
                 <>
@@ -99,7 +99,7 @@ export function LoginPage() {
           {/* 帮助信息 */}
           <div className="mt-6 pt-6 border-t border-white/10">
             <p className="text-xs text-slate-400 text-center">
-              密码存储在服务端环境变量 <code className="text-blue-400">ADMIN_API_KEY</code> 中
+              密码存储在服务端环境变量 <code className="text-blue-400">ADMIN_API_KEY</code> �?
             </p>
           </div>
         </div>

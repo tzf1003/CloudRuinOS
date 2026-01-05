@@ -36,7 +36,7 @@ export interface Notification {
 }
 
 export interface NotificationConfig {
-  // WebSocket 推送配置
+  // WebSocket 推送配�?
   websocketEnabled: boolean;
   
   // Webhook 配置
@@ -70,7 +70,7 @@ export const DEFAULT_NOTIFICATION_CONFIG: NotificationConfig = {
   mutedTypes: [],
 };
 
-// ============= 通知服务类 =============
+// ============= 通知服务�?=============
 
 export class NotificationService {
   private env: Env;
@@ -103,7 +103,7 @@ export class NotificationService {
     // 存储通知
     await this.storeNotification(fullNotification);
 
-    // 通过各渠道发送
+    // 通过各渠道发�?
     await Promise.allSettled([
       this.sendWebSocketNotification(fullNotification),
       this.sendWebhookNotification(fullNotification),
@@ -126,7 +126,7 @@ export class NotificationService {
       type: 'device_offline',
       priority: offlineDuration > 30 ? 'high' : 'normal',
       title: '设备离线警告',
-      message: `设备 ${deviceId} 已离线 ${offlineDuration} 分钟`,
+      message: `设备 ${deviceId} 已离�?${offlineDuration} 分钟`,
       deviceId,
       metadata: {
         lastSeen,
@@ -214,8 +214,8 @@ export class NotificationService {
     return this.sendNotification({
       type: 'enrollment_new',
       priority: 'normal',
-      title: '新设备注册',
-      message: `新设备 ${deviceId} 已成功注册 (${platform} ${version})`,
+      title: '新设备注�?,
+      message: `新设�?${deviceId} 已成功注�?(${platform} ${version})`,
       deviceId,
       metadata: {
         platform,
@@ -253,7 +253,7 @@ export class NotificationService {
   // ============= 通知渠道实现 =============
 
   /**
-   * WebSocket 推送 (通过 Durable Object 广播给在线管理员)
+   * WebSocket 推�?(通过 Durable Object 广播给在线管理员)
    */
   private async sendWebSocketNotification(notification: Notification): Promise<void> {
     if (!this.config.websocketEnabled) return;
@@ -263,15 +263,15 @@ export class NotificationService {
       // 通过 KV 存储待推送的通知，由 WebSocket 会话轮询获取
       const pendingKey = `notification:pending:${notification.id}`;
       await this.env.KV.put(pendingKey, JSON.stringify(notification), {
-        expirationTtl: 300, // 5分钟内必须推送
+        expirationTtl: 300, // 5分钟内必须推�?
       });
 
-      // 在 KV 中记录待推送列表
+      // �?KV 中记录待推送列�?
       const listKey = 'notification:pending_list';
       const existingList = await this.env.KV.get<string[]>(listKey, 'json') || [];
       existingList.push(notification.id);
       
-      // 只保留最近 100 条
+      // 只保留最�?100 �?
       if (existingList.length > 100) {
         existingList.splice(0, existingList.length - 100);
       }
@@ -286,7 +286,7 @@ export class NotificationService {
   }
 
   /**
-   * Webhook 推送
+   * Webhook 推�?
    */
   private async sendWebhookNotification(notification: Notification): Promise<void> {
     if (!this.config.webhookEnabled || !this.config.webhookUrl) return;
@@ -314,7 +314,7 @@ export class NotificationService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'User-Agent': 'CloudRuinOS-Notification/1.0',
+          'User-Agent': 'Ruinos-Notification/1.0',
           'X-Signature': signature,
           'X-Timestamp': Date.now().toString(),
         },
@@ -330,7 +330,7 @@ export class NotificationService {
   }
 
   /**
-   * Slack 推送
+   * Slack 推�?
    */
   private async sendSlackNotification(notification: Notification): Promise<void> {
     if (!this.config.slackEnabled || !this.config.slackWebhookUrl) return;
@@ -355,7 +355,7 @@ export class NotificationService {
               short: true,
             },
             {
-              title: '优先级',
+              title: '优先�?,
               value: notification.priority,
               short: true,
             },
@@ -365,7 +365,7 @@ export class NotificationService {
               short: true,
             }] : []),
           ],
-          footer: 'CloudRuinOS',
+          footer: 'Ruinos',
           ts: Math.floor(notification.timestamp / 1000),
         }],
       };
@@ -381,7 +381,7 @@ export class NotificationService {
   }
 
   /**
-   * Discord 推送
+   * Discord 推�?
    */
   private async sendDiscordNotification(notification: Notification): Promise<void> {
     if (!this.config.discordEnabled || !this.config.discordWebhookUrl) return;
@@ -401,10 +401,10 @@ export class NotificationService {
           color: colorMap[notification.priority],
           fields: [
             { name: '类型', value: notification.type, inline: true },
-            { name: '优先级', value: notification.priority, inline: true },
+            { name: '优先�?, value: notification.priority, inline: true },
             ...(notification.deviceId ? [{ name: '设备ID', value: notification.deviceId, inline: true }] : []),
           ],
-          footer: { text: 'CloudRuinOS' },
+          footer: { text: 'Ruinos' },
           timestamp: new Date(notification.timestamp).toISOString(),
         }],
       };
@@ -448,7 +448,7 @@ export class NotificationService {
     try {
       const key = `notification:${notification.id}`;
       await this.env.KV.put(key, JSON.stringify(notification), {
-        expirationTtl: 86400 * 30, // 保留 30 天
+        expirationTtl: 86400 * 30, // 保留 30 �?
       });
     } catch (error) {
       console.error('Failed to store notification:', error);
@@ -543,7 +543,7 @@ export class NotificationService {
         }
       }
 
-      // 清空待推送列表
+      // 清空待推送列�?
       await this.env.KV.delete(listKey);
 
       return notifications;
@@ -576,12 +576,12 @@ export function createNotificationService(env: Env, config?: Partial<Notificatio
 }
 
 /**
- * 设备离线检测定时任务
+ * 设备离线检测定时任�?
  * 检查长时间未心跳的设备并发送通知
  */
 export async function checkOfflineDevices(env: Env, notificationService: NotificationService): Promise<void> {
   try {
-    const offlineThreshold = 5 * 60 * 1000; // 5 分钟无心跳视为离线
+    const offlineThreshold = 5 * 60 * 1000; // 5 分钟无心跳视为离�?
     const cutoffTime = Date.now() - offlineThreshold;
 
     // 查询离线设备
@@ -592,7 +592,7 @@ export async function checkOfflineDevices(env: Env, notificationService: Notific
     `).bind(cutoffTime).all();
 
     for (const device of offlineDevices.results || []) {
-      // 更新设备状态
+      // 更新设备状�?
       await env.DB.prepare(`
         UPDATE devices SET status = 'offline' WHERE id = ?
       `).bind(device.id).run();

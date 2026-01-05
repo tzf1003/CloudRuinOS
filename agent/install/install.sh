@@ -1,8 +1,7 @@
 #!/bin/bash
 
-# RMM Agent 安装脚本 - Linux/macOS 版本
-# 支持系统服务安装和配置
-
+# Ruinos Agent 安装脚本 - Linux/macOS 版本
+# 支持系统服务安装和配�?
 set -e
 
 # 颜色输出
@@ -13,18 +12,17 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # 配置变量
-AGENT_NAME="rmm-agent"
-SERVICE_USER="rmm-agent"
-SERVICE_GROUP="rmm-agent"
-INSTALL_DIR="/opt/rmm-agent"
-CONFIG_DIR="/etc/rmm-agent"
-DATA_DIR="/var/lib/rmm-agent"
-LOG_DIR="/var/log/rmm-agent"
-SYSTEMD_SERVICE_FILE="/etc/systemd/system/rmm-agent.service"
-LAUNCHD_PLIST="/Library/LaunchDaemons/com.example.rmm-agent.plist"
+AGENT_NAME="ruinos-agent"
+SERVICE_USER="ruinos-agent"
+SERVICE_GROUP="ruinos-agent"
+INSTALL_DIR="/opt/ruinos-agent"
+CONFIG_DIR="/etc/ruinos-agent"
+DATA_DIR="/var/lib/ruinos-agent"
+LOG_DIR="/var/log/ruinos-agent"
+SYSTEMD_SERVICE_FILE="/etc/systemd/system/ruinos-agent.service"
+LAUNCHD_PLIST="/Library/LaunchDaemons/com.ruinos.agent.plist"
 
-# 检测操作系统
-detect_os() {
+# 检测操作系�?detect_os() {
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
         OS="linux"
         if command -v systemctl >/dev/null 2>&1; then
@@ -40,7 +38,7 @@ detect_os() {
         exit 1
     fi
     
-    echo -e "${BLUE}检测到操作系统: $OS (初始化系统: $INIT_SYSTEM)${NC}"
+    echo -e "${BLUE}检测到操作系统: $OS (初始化系�? $INIT_SYSTEM)${NC}"
 }
 
 # 日志函数
@@ -56,11 +54,10 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# 检查权限
-check_permissions() {
+# 检查权�?check_permissions() {
     if [[ $EUID -ne 0 ]]; then
-        log_error "此脚本需要 root 权限运行"
-        echo "请使用: sudo $0"
+        log_error "此脚本需�?root 权限运行"
+        echo "请使�? sudo $0"
         exit 1
     fi
 }
@@ -69,7 +66,7 @@ check_permissions() {
 create_user() {
     if [[ "$OS" == "linux" ]]; then
         if ! getent group "$SERVICE_GROUP" >/dev/null 2>&1; then
-            log_info "创建组: $SERVICE_GROUP"
+            log_info "创建�? $SERVICE_GROUP"
             groupadd --system "$SERVICE_GROUP"
         fi
         
@@ -78,7 +75,7 @@ create_user() {
             useradd --system --gid "$SERVICE_GROUP" \
                     --home-dir "$DATA_DIR" \
                     --shell /bin/false \
-                    --comment "RMM Agent Service User" \
+                    --comment "Ruinos Agent Service User" \
                     "$SERVICE_USER"
         fi
     elif [[ "$OS" == "macos" ]]; then
@@ -92,7 +89,7 @@ create_user() {
             
             dscl . -create /Users/"$SERVICE_USER"
             dscl . -create /Users/"$SERVICE_USER" UserShell /usr/bin/false
-            dscl . -create /Users/"$SERVICE_USER" RealName "RMM Agent Service"
+            dscl . -create /Users/"$SERVICE_USER" RealName "Ruinos Agent Service"
             dscl . -create /Users/"$SERVICE_USER" UniqueID "$next_uid"
             dscl . -create /Users/"$SERVICE_USER" PrimaryGroupID 20
             dscl . -create /Users/"$SERVICE_USER" NFSHomeDirectory "$DATA_DIR"
@@ -123,21 +120,20 @@ create_directories() {
     chmod 750 "$LOG_DIR"
 }
 
-# 安装二进制文件
-install_binary() {
+# 安装二进制文�?install_binary() {
     local binary_path="$1"
     
     if [[ ! -f "$binary_path" ]]; then
-        log_error "找不到 Agent 二进制文件: $binary_path"
+        log_error "找不�?Agent 二进制文�? $binary_path"
         exit 1
     fi
     
-    log_info "安装 Agent 二进制文件..."
+    log_info "安装 Agent 二进制文�?.."
     cp "$binary_path" "$INSTALL_DIR/$AGENT_NAME"
     chown root:root "$INSTALL_DIR/$AGENT_NAME"
     chmod 755 "$INSTALL_DIR/$AGENT_NAME"
     
-    # 创建符号链接到 /usr/local/bin
+    # 创建符号链接�?/usr/local/bin
     ln -sf "$INSTALL_DIR/$AGENT_NAME" "/usr/local/bin/$AGENT_NAME"
 }
 
@@ -231,7 +227,7 @@ install_systemd_service() {
     
     cat > "$SYSTEMD_SERVICE_FILE" << EOF
 [Unit]
-Description=RMM Agent Service
+Description=Ruinos Agent Service
 Documentation=https://github.com/your-org/rmm-agent
 After=network-online.target
 Wants=network-online.target
@@ -341,7 +337,7 @@ install_service() {
 
 # 启动服务
 start_service() {
-    log_info "启动 RMM Agent 服务..."
+    log_info "启动 Ruinos Agent 服务..."
     
     case "$INIT_SYSTEM" in
         "systemd")
@@ -352,18 +348,17 @@ start_service() {
             launchctl start "com.example.rmm-agent"
             ;;
         *)
-            log_warn "请手动启动服务"
+            log_warn "请手动启动服�?
             ;;
     esac
 }
 
-# 显示安装后信息
-show_post_install_info() {
+# 显示安装后信�?show_post_install_info() {
     echo
-    log_info "RMM Agent 安装完成！"
+    log_info "Ruinos Agent 安装完成�?
     echo
     echo "安装位置:"
-    echo "  二进制文件: $INSTALL_DIR/$AGENT_NAME"
+    echo "  二进制文�? $INSTALL_DIR/$AGENT_NAME"
     echo "  配置文件: $CONFIG_DIR/config.toml"
     echo "  数据目录: $DATA_DIR"
     echo "  日志目录: $LOG_DIR"
@@ -374,7 +369,7 @@ show_post_install_info() {
             echo "  启动服务: sudo systemctl start $AGENT_NAME"
             echo "  停止服务: sudo systemctl stop $AGENT_NAME"
             echo "  重启服务: sudo systemctl restart $AGENT_NAME"
-            echo "  查看状态: sudo systemctl status $AGENT_NAME"
+            echo "  查看状�? sudo systemctl status $AGENT_NAME"
             echo "  查看日志: sudo journalctl -u $AGENT_NAME -f"
             ;;
         "launchd")
@@ -384,36 +379,32 @@ show_post_install_info() {
             ;;
     esac
     echo
-    echo "下一步:"
+    echo "下一�?"
     echo "1. 编辑配置文件: $CONFIG_DIR/config.toml"
-    echo "2. 设置服务器 URL 和其他配置"
-    echo "3. 重启服务以应用配置更改"
+    echo "2. 设置服务�?URL 和其他配�?
+    echo "3. 重启服务以应用配置更�?
     echo "4. 使用 enrollment token 注册设备"
 }
 
-# 主函数
-main() {
+# 主函�?main() {
     local binary_path="$1"
     local config_template="$2"
     local install_service_flag="$3"
     
-    echo "RMM Agent 安装程序"
+    echo "Ruinos Agent 安装程序"
     echo "=================="
     
-    # 检查参数
-    if [[ -z "$binary_path" ]]; then
+    # 检查参�?    if [[ -z "$binary_path" ]]; then
         echo "用法: $0 <agent_binary> [config_template] [--service]"
-        echo "  agent_binary: Agent 二进制文件路径"
+        echo "  agent_binary: Agent 二进制文件路�?
         echo "  config_template: 配置文件模板路径（可选）"
         echo "  --service: 安装为系统服务（可选）"
         exit 1
     fi
     
-    # 检测操作系统
-    detect_os
+    # 检测操作系�?    detect_os
     
-    # 检查权限
-    check_permissions
+    # 检查权�?    check_permissions
     
     # 创建用户
     create_user
@@ -435,5 +426,4 @@ main() {
     show_post_install_info
 }
 
-# 运行主函数
-main "$@"
+# 运行主函�?main "$@"

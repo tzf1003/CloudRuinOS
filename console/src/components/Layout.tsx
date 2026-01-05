@@ -56,7 +56,7 @@ export function Layout({ children }: LayoutProps) {
               <Monitor className="h-8 w-8 text-blue-600 mr-3" />
               <div>
                 <h1 className="text-xl font-semibold text-gray-900">
-                  RMM Console
+                  Ruinos Console
                 </h1>
                 <p className="text-sm text-gray-500 hidden sm:block">
                   远程监控和管理系统

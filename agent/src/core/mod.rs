@@ -47,7 +47,7 @@ pub struct Agent {
 
 impl Agent {
     pub async fn new() -> Result<Self> {
-        info!("Initializing RMM Agent");
+        info!("Initializing Ruinos Agent");
 
         // 获取配置目录
         let config_dir = Self::get_config_dir()?;
@@ -69,7 +69,7 @@ impl Agent {
         // 初始化调度器
         let scheduler = Scheduler::new();
 
-        // 初始化 HTTP 客户端
+        // 初始�?HTTP 客户�?
         let tls_config = TlsConfig::default();
         let http_client = HttpClient::new(tls_config)?;
 
@@ -108,7 +108,7 @@ impl Agent {
     }
 
     pub async fn new_with_config(config_manager: ConfigManager) -> Result<Self> {
-        info!("Initializing RMM Agent with configuration");
+        info!("Initializing Ruinos Agent with configuration");
 
         let config = config_manager.config();
 
@@ -137,7 +137,7 @@ impl Agent {
         // 初始化调度器
         let scheduler = Scheduler::new();
 
-        // 初始化 HTTP 客户端
+        // 初始�?HTTP 客户�?
         let tls_config = TlsConfig::default();
         let http_client = HttpClient::new(tls_config)?;
 
@@ -176,9 +176,9 @@ impl Agent {
     }
 
     pub async fn run(&self) -> Result<()> {
-        info!("RMM Agent starting");
+        info!("Ruinos Agent starting");
 
-        // 检查现有凭证
+        // 检查现有凭�?
         let config_dir = Self::get_config_dir()?;
         let credentials_file = config_dir.join("credentials.json");
 
@@ -192,12 +192,12 @@ impl Agent {
             info!("No valid credentials found, enrollment required");
         }
 
-        // 检查注册状态
+        // 检查注册状�?
         let enrollment_status = self.state_manager.get_enrollment_status().await;
         match enrollment_status {
             EnrollmentStatus::NotEnrolled => {
                 info!("Agent not enrolled, enrollment required");
-                // 注册逻辑将在后续任务中实现
+                // 注册逻辑将在后续任务中实�?
             }
             EnrollmentStatus::Enrolled => {
                 info!("Agent enrolled, starting normal operation");
@@ -220,7 +220,7 @@ impl Agent {
                         })
                     };
 
-                    // 等待心跳任务或关闭信号
+                    // 等待心跳任务或关闭信�?
                     tokio::select! {
                         _ = heartbeat_task => {
                             error!("Heartbeat loop terminated unexpectedly");
@@ -241,10 +241,10 @@ impl Agent {
             }
         }
 
-        // 设置基本的调度任务
+        // 设置基本的调度任�?
         self.setup_scheduled_tasks().await?;
 
-        info!("RMM Agent running - core implementation pending");
+        info!("Ruinos Agent running - core implementation pending");
 
         // 等待关闭信号
         tokio::signal::ctrl_c().await?;
@@ -342,7 +342,7 @@ impl Agent {
         }
     }
 
-    // 获取器方法
+    // 获取器方�?
     pub fn state_manager(&self) -> &StateManager {
         &self.state_manager
     }

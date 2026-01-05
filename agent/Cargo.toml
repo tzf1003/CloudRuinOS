@@ -1,9 +1,9 @@
 [package]
-name = "rmm-agent"
+name = "ruinos-agent"
 version = "0.1.0"
 edition = "2021"
-description = "RMM Agent - Cross-platform remote management client"
-authors = ["RMM Team"]
+description = "Ruinos Agent - 跨平台远程管理客户端"
+authors = ["Ruinos Team"]
 license = "MIT"
 
 [features]

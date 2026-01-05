@@ -166,9 +166,9 @@ export class RollbackManager {
     
     switch (environment) {
       case 'production':
-        return 'https://rmm-server-prod.your-subdomain.workers.dev';
+        return 'https://ruinos-server-prod.your-subdomain.workers.dev';
       case 'test':
-        return 'https://rmm-server-test.your-subdomain.workers.dev';
+        return 'https://ruinos-server-test.your-subdomain.workers.dev';
       default:
         return 'http://localhost:8787';
     }

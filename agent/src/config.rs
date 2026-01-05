@@ -316,37 +316,37 @@ impl ConfigManager {
     /// 获取默认配置目录
     fn get_default_config_dir() -> Result<String> {
         #[cfg(target_os = "windows")]
-        return Ok("C:\\ProgramData\\RMM Agent".to_string());
+        return Ok("C:\\ProgramData\\Ruinos Agent".to_string());
 
         #[cfg(target_os = "linux")]
-        return Ok("/etc/rmm-agent".to_string());
+        return Ok("/etc/ruinos-agent".to_string());
 
         #[cfg(target_os = "macos")]
-        return Ok("/etc/rmm-agent".to_string());
+        return Ok("/etc/ruinos-agent".to_string());
     }
 
     /// 获取默认数据目录
     fn get_default_data_dir() -> Result<String> {
         #[cfg(target_os = "windows")]
-        return Ok("C:\\ProgramData\\RMM Agent\\Data".to_string());
+        return Ok("C:\\ProgramData\\Ruinos Agent\\Data".to_string());
 
         #[cfg(target_os = "linux")]
-        return Ok("/var/lib/rmm-agent".to_string());
+        return Ok("/var/lib/ruinos-agent".to_string());
 
         #[cfg(target_os = "macos")]
-        return Ok("/var/lib/rmm-agent".to_string());
+        return Ok("/var/lib/ruinos-agent".to_string());
     }
 
     /// 获取默认日志目录
     fn get_default_log_dir() -> Result<String> {
         #[cfg(target_os = "windows")]
-        return Ok("C:\\ProgramData\\RMM Agent\\Logs".to_string());
+        return Ok("C:\\ProgramData\\Ruinos Agent\\Logs".to_string());
 
         #[cfg(target_os = "linux")]
-        return Ok("/var/log/rmm-agent".to_string());
+        return Ok("/var/log/ruinos-agent".to_string());
 
         #[cfg(target_os = "macos")]
-        return Ok("/var/log/rmm-agent".to_string());
+        return Ok("/var/log/ruinos-agent".to_string());
     }
 
     /// 创建默认配置
