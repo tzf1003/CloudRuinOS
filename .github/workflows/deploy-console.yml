@@ -36,7 +36,7 @@ jobs:
       - name: Build application
         run: npm run -w console build
         env:
-          VITE_API_BASE_URL: https://ruinos-server.your-subdomain.workers.dev
+          VITE_API_BASE_URL: ${{ secrets.RUINOS_SERVER_URL || 'https://ruinos-server.your-account.workers.dev' }}
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

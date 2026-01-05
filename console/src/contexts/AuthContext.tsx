@@ -20,8 +20,8 @@ const AUTH_EXPIRES_KEY = 'rmm_auth_expires';
 // 从环境变量或配置获取 API 基础 URL
 const getApiBaseUrl = (): string => {
   // 优先使用环境变量
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
   }
   // 开发环境默认指向本地 Worker
   if (import.meta.env.DEV) {
