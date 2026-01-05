@@ -33,7 +33,7 @@ function getAllowedOrigins(env: any): string[] {
 /**
  * 检查请求源是否被允许
  */
-function isOriginAllowed(origin: string | null, allowedOrigins: string[]): boolean {
+function isOriginAllowed(origin: string | null | undefined, allowedOrigins: string[]): boolean {
   if (!origin) return true; // 无 origin 的请求（如同源请求）默认允许
 
   // 如果允许所有源
