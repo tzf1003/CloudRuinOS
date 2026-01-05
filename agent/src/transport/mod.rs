@@ -579,17 +579,17 @@ impl HttpClient {
                 // 加载系统根证书
                 #[cfg(feature = "tls-pinning")]
                 {
-                    match rustls_native_certs::load_native_certs() {
-                        Ok(certs) => {
-                            for cert in certs {
-                                if let Err(e) = root_store.add(cert) {
-                                    tracing::warn!("Failed to add root certificate: {:?}", e);
-                                }
-                            }
+                    let cert_result = rustls_native_certs::load_native_certs();
+                    for cert in cert_result.certs {
+                        if let Err(e) = root_store.add(cert) {
+                            tracing::warn!("Failed to add root certificate: {:?}", e);
                         }
-                        Err(e) => {
-                            tracing::warn!("Failed to load native certs: {:?}", e);
-                        }
+                    }
+                    if !cert_result.errors.is_empty() {
+                        tracing::warn!(
+                            "Some errors occurred while loading native certs: {:?}",
+                            cert_result.errors
+                        );
                     }
                 }
 
