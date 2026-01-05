@@ -1,0 +1,86 @@
+name = "rmm-server"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# 生产环境配置
+[env.production]
+name = "rmm-server-prod"
+vars = { ENVIRONMENT = "production" }
+
+# 测试环境配置
+[env.test]
+name = "rmm-server-test"
+vars = { ENVIRONMENT = "test" }
+
+# D1 数据库配置
+[[d1_databases]]
+binding = "DB"
+database_name = "rmm-db-local"
+database_id = "c59df70d-6c08-4205-a63d-44aea39f4615"
+preview_database_id = "5195f8dc-5709-4794-9720-3d218faff0aa"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "rmm-db-prod"
+database_id = "c59df70d-6c08-4205-a63d-44aea39f4615"  # 生产环境使用 rmm-db-local
+
+[[env.test.d1_databases]]
+binding = "DB"
+database_name = "rmm-db-test"
+database_id = "44aa0d9e-6ff1-4439-8a08-3742c4f59a6c"  # 测试环境使用 rmm-db-preview
+
+# KV 存储配置 (本地开发)
+[[kv_namespaces]]
+binding = "KV"
+id = "f41b76e95ce84d4ba3a4953fa00dcae8"
+preview_id = "9e2f2a3f16d34405b74b5eb775ef07cf"
+
+[[env.production.kv_namespaces]]
+binding = "KV"
+id = "f41b76e95ce84d4ba3a4953fa00dcae8"  # 生产环境使用 RMM_KV_LOCAL
+
+[[env.test.kv_namespaces]]
+binding = "KV"
+id = "9e2f2a3f16d34405b74b5eb775ef07cf"  # 测试环境使用 RMM_KV_LOCAL_preview
+
+# R2 对象存储配置
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "rmm-files-dev"
+preview_bucket_name = "rmm-files-dev"
+
+[env.production.r2_buckets]
+binding = "R2"
+bucket_name = "rmm-files-prod"
+
+[env.test.r2_buckets]
+binding = "R2"
+bucket_name = "rmm-files-test"
+
+# Durable Objects 配置
+[[durable_objects.bindings]]
+name = "SESSION_DO"
+class_name = "SessionDurableObject"
+
+# Durable Objects 迁移
+[[migrations]]
+tag = "v1"
+new_classes = [ "SessionDurableObject" ]
+
+# 环境变量
+[vars]
+ENVIRONMENT = "development"
+API_VERSION = "v1"
+MAX_FILE_SIZE = "10485760"  # 10MB
+SESSION_TIMEOUT = "1800"    # 30 minutes
+HEARTBEAT_INTERVAL = "60"   # 60 seconds
+NONCE_WINDOW = "300"        # 5 minutes
+
+# Secrets (通过 wrangler secret put 命令设置)
+# ENROLLMENT_SECRET - 用于生成 enrollment tokens
+# JWT_SECRET - 用于 JWT 签名
+# WEBHOOK_SECRET - 用于 webhook 验证
+# DB_ENCRYPTION_KEY - 用于数据库加密
+# ADMIN_API_KEY - 管理员 API 密钥 (已废弃，保留兼容)
+# ADMIN_PASSWORD - 管理员登录密码 (必需)
