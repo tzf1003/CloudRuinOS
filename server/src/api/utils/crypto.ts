@@ -200,7 +200,8 @@ export async function validateEnrollmentToken(
 export async function generateEnrollmentToken(
   kvManager: KVStorageManager,
   expiresInSeconds: number = 3600,
-  createdBy?: string
+  createdBy?: string,
+  description?: string
 ): Promise<string | null> {
   try {
     // 生成随机 token
@@ -210,7 +211,7 @@ export async function generateEnrollmentToken(
       .substring(0, 32); // 截取到合适长度
 
     // 存储到 KV
-    const success = await kvManager.setEnrollmentToken(token, expiresInSeconds, createdBy);
+    const success = await kvManager.setEnrollmentToken(token, expiresInSeconds, createdBy, description);
     
     if (!success) {
       return null;

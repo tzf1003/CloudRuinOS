@@ -194,16 +194,16 @@ export function SessionDetailsModal({ session, isOpen, onClose }: SessionDetails
                          currentSession.status === 'pending' ? '等待中' : '已过期'}
                       </span>
                     </div>
-                    {currentSession.devicePlatform && (
+                    {currentSession.device_platform && (
                       <div className="flex justify-between">
                         <span className="text-sm text-gray-500">设备平台:</span>
-                        <span className="text-sm text-gray-900">{currentSession.devicePlatform}</span>
+                        <span className="text-sm text-gray-900">{currentSession.device_platform}</span>
                       </div>
                     )}
-                    {currentSession.deviceVersion && (
+                    {currentSession.device_version && (
                       <div className="flex justify-between">
                         <span className="text-sm text-gray-500">设备版本:</span>
-                        <span className="text-sm text-gray-900">{currentSession.deviceVersion}</span>
+                        <span className="text-sm text-gray-900">{currentSession.device_version}</span>
                       </div>
                     )}
                   </div>

@@ -19,7 +19,7 @@ export function CreateTokenDialog({ onClose, onSuccess }: CreateTokenDialogProps
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    let finalExpiresIn: number | 'never' | 'custom' = expiresIn;
+    let finalExpiresIn: number | 'never' = expiresIn;
     
     if (expiresIn === 'custom' && customExpiry) {
       const customValue = parseInt(customExpiry);
@@ -33,15 +33,10 @@ export function CreateTokenDialog({ onClose, onSuccess }: CreateTokenDialogProps
       return;
     }
 
-    // Convert 'custom' to a number if still present (shouldn't happen due to above checks)
-    const expiresInValue: number | 'never' = typeof finalExpiresIn === 'number' || finalExpiresIn === 'never' 
-      ? finalExpiresIn 
-      : 3600; // fallback
-
     try {
       await generateTokenMutation.mutateAsync({
         description: description.trim() || undefined,
-        expiresIn: expiresInValue,
+        expiresIn: finalExpiresIn,
         maxUsage,
         createdBy: createdBy.trim() || 'console',
       });

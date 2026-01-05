@@ -38,7 +38,7 @@ export function useSessionCleanup({
   // 获取会话剩余时间
   const getTimeRemaining = useCallback((session: Session): number => {
     const now = Date.now();
-    const expiresAt = (session.expiresAt || 0) * 1000;
+    const expiresAt = (session.expires_at || session.expiresAt || 0) * 1000;
     return expiresAt - now;
   }, []);
 

@@ -115,7 +115,7 @@ export function DeviceDetailsModal({ device, isOpen, onClose }: DeviceDetailsMod
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-900">设备注册</span>
                     <span className="text-xs text-gray-500">
-                      {formatTimestamp(device.createdAt)}
+                      {formatTimestamp(device.created_at)}
                     </span>
                   </div>
                 </div>
@@ -129,7 +129,7 @@ export function DeviceDetailsModal({ device, isOpen, onClose }: DeviceDetailsMod
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-900">最后更新</span>
                     <span className="text-xs text-gray-500">
-                      {formatTimestamp(device.updatedAt)}
+                      {formatTimestamp(device.updated_at)}
                     </span>
                   </div>
                 </div>
@@ -146,7 +146,7 @@ export function DeviceDetailsModal({ device, isOpen, onClose }: DeviceDetailsMod
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-900">最后心跳</span>
                     <span className="text-xs text-gray-500">
-                      {formatTimestamp(device.lastSeen)}
+                      {formatTimestamp(device.last_seen)}
                     </span>
                   </div>
                 </div>

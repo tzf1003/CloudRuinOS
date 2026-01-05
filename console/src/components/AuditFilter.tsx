@@ -250,8 +250,8 @@ export function AuditFilter({
             <input
               type="text"
               placeholder="过滤设备..."
-              value={filters.deviceId || ''}
-              onChange={(e) => updateFilter('deviceId', e.target.value)}
+              value={filters.device_id || ''}
+              onChange={(e) => updateFilter('device_id', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
             />
           </div>
@@ -260,8 +260,8 @@ export function AuditFilter({
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">操作类型</label>
             <select
-              value={filters.actionType || ''}
-              onChange={(e) => updateFilter('actionType', e.target.value)}
+              value={filters.action_type || ''}
+              onChange={(e) => updateFilter('action_type', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
             >
               {actionTypes.map((type) => (
@@ -312,8 +312,8 @@ export function AuditFilter({
               <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="datetime-local"
-                value={filters.startTime ? new Date(filters.startTime * 1000).toISOString().slice(0, 16) : ''}
-                onChange={(e) => updateFilter('startTime', e.target.value ? Math.floor(new Date(e.target.value).getTime() / 1000) : null)}
+                value={filters.start_time ? new Date(filters.start_time * 1000).toISOString().slice(0, 16) : ''}
+                onChange={(e) => updateFilter('start_time', e.target.value ? Math.floor(new Date(e.target.value).getTime() / 1000) : null)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               />
             </div>
@@ -325,8 +325,8 @@ export function AuditFilter({
               <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="datetime-local"
-                value={filters.endTime ? new Date(filters.endTime * 1000).toISOString().slice(0, 16) : ''}
-                onChange={(e) => updateFilter('endTime', e.target.value ? Math.floor(new Date(e.target.value).getTime() / 1000) : null)}
+                value={filters.end_time ? new Date(filters.end_time * 1000).toISOString().slice(0, 16) : ''}
+                onChange={(e) => updateFilter('end_time', e.target.value ? Math.floor(new Date(e.target.value).getTime() / 1000) : null)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               />
             </div>

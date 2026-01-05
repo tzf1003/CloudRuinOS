@@ -160,7 +160,7 @@ export function SessionsPage() {
   // 获取会话活动状态
   const getSessionActivityStatus = (session: Session) => {
     const now = Date.now();
-    const lastActivity = session.lastActivity;
+    const lastActivity = session.last_activity || session.lastActivity;
     
     if (!lastActivity) return 'unknown';
     

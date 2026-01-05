@@ -130,7 +130,7 @@ export function SessionDiagnostics({ session, isOpen, onClose }: SessionDiagnost
           break;
 
         case 'activity-check':
-          const lastActivity = session.lastActivity;
+          const lastActivity = session.last_activity || session.lastActivity;
           if (lastActivity) {
             const timeSinceActivity = now - lastActivity * 1000;
             if (timeSinceActivity < 60000) { // 1分钟内

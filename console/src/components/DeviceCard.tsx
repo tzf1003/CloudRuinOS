@@ -53,10 +53,10 @@ export function DeviceCard({ device, onSelect }: DeviceCardProps) {
       <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
         <div className="flex items-center space-x-1">
           <Clock className="h-3 w-3" />
-          <span>最后活动: {formatRelativeTime(device.lastSeen)}</span>
+          <span>最后活动: {formatRelativeTime(device.last_seen)}</span>
         </div>
         <div>
-          注册于: {new Date((device.createdAt || 0) * 1000).toLocaleDateString('zh-CN')}
+          注册于: {new Date(device.created_at * 1000).toLocaleDateString('zh-CN')}
         </div>
       </div>
     </div>

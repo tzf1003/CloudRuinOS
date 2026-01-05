@@ -24,7 +24,6 @@ export interface Environment {
   DB_ENCRYPTION_KEY: string;
   ADMIN_API_KEY: string;
   ADMIN_PASSWORD: string;  // 管理员登录密码
-  SERVER_PUBLIC_KEY?: string;  // 服务端公钥（可选）
   
   // Environment variables
   ENVIRONMENT: string;

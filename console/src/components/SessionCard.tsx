@@ -244,9 +244,9 @@ export function SessionCard({
              isExpiring ? `${Math.floor(timeRemaining / (1000 * 60))} 分钟后过期` :
              getTimeRemaining()}
           </div>
-          {session.devicePlatform && (
+          {session.device_platform && (
             <div className="text-gray-400">
-              {session.devicePlatform}
+              {session.device_platform}
             </div>
           )}
         </div>
