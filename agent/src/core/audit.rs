@@ -381,9 +381,9 @@ impl AuditLogger {
         let command_parts: Vec<&str> = command_name.split_whitespace().collect();
 
         if let Some(first_part) = command_parts.first() {
-            return sensitive_commands.iter().any(|&sensitive| {
-                *first_part == sensitive || first_part.contains(sensitive)
-            });
+            return sensitive_commands
+                .iter()
+                .any(|&sensitive| *first_part == sensitive || first_part.contains(sensitive));
         }
 
         false

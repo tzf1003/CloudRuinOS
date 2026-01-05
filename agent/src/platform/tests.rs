@@ -15,7 +15,8 @@ use std::os::unix::process::ExitStatusExt;
 pub struct MockCommandExecutor {
     expected_calls: std::sync::Mutex<Vec<(String, Vec<String>)>>,
     responses: std::sync::Mutex<Vec<Result<Output>>>,
-    custom_handler: std::sync::Mutex<Option<Arc<dyn Fn(&str, &[String]) -> Result<Output> + Send + Sync>>>,
+    custom_handler:
+        std::sync::Mutex<Option<Arc<dyn Fn(&str, &[String]) -> Result<Output> + Send + Sync>>>,
 }
 
 impl MockCommandExecutor {
