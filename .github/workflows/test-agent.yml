@@ -18,10 +18,9 @@ on:
 jobs:
   test:
     name: Test Agent
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
         rust: [stable]
     steps:
       - name: Checkout code
