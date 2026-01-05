@@ -123,7 +123,7 @@ jobs:
     - name: Cache target directory
       uses: actions/cache@v4
       with:
-        path: agent/target
+        path: target
         key: ${{ runner.os }}-${{ matrix.target }}-target-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
           ${{ runner.os }}-${{ matrix.target }}-target-
@@ -135,13 +135,12 @@ jobs:
     - name: List build output (debug)
       shell: bash
       run: |
-        echo "Listing agent/target/${{ matrix.target }}/release/"
-        ls -la agent/target/${{ matrix.target }}/release/ || echo "Directory not found"
+        echo "Listing target/${{ matrix.target }}/release/"
+        ls -la target/${{ matrix.target }}/release/ | head -20 || echo "Directory not found"
 
     - name: Prepare artifact (Windows)
       if: runner.os == 'Windows'
       shell: pwsh
-      working-directory: agent
       run: |
         New-Item -ItemType Directory -Force -Path artifacts
         $exe_path = "target/${{ matrix.target }}/release/rmm-agent.exe"
@@ -150,13 +149,12 @@ jobs:
           Write-Host "Artifact prepared: artifacts/${{ matrix.artifact_name }}"
         } else {
           Write-Host "Binary not found at: $exe_path"
-          Get-ChildItem -Recurse target/${{ matrix.target }}/release/*.exe
+          Get-ChildItem -Recurse target/${{ matrix.target }}/release/*.exe -ErrorAction SilentlyContinue
           exit 1
         }
 
     - name: Prepare artifact (Unix)
       if: runner.os != 'Windows'
-      working-directory: agent
       run: |
         mkdir -p artifacts
         exe_path="target/${{ matrix.target }}/release/rmm-agent"
@@ -166,7 +164,7 @@ jobs:
           echo "Artifact prepared: artifacts/${{ matrix.artifact_name }}"
         else
           echo "Binary not found at: $exe_path"
-          find target/${{ matrix.target }}/release/ -type f -perm +111 2>/dev/null || true
+          find target/${{ matrix.target }}/release/ -maxdepth 1 -type f -executable 2>/dev/null || true
           exit 1
         fi
 
@@ -174,7 +172,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.artifact_name }}
-        path: agent/artifacts/${{ matrix.artifact_name }}
+        path: artifacts/${{ matrix.artifact_name }}
         if-no-files-found: error
 
   # ==================== 发布阶段 ====================
