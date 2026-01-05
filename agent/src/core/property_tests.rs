@@ -1298,7 +1298,8 @@ mod file_list_functionality_tests {
                 // 验证所有项目都是目录
                 for file_info in &file_list {
                     prop_assert!(file_info.is_dir);
-                    prop_assert_eq!(file_info.size, 0); // 目录大小为 0
+                    // 目录在不同的文件系统上大小不同（Linux通常是4096，Windows可能是0）
+                    // 所以我们只验证它是目录即可
                 }
 
                 Ok(())
