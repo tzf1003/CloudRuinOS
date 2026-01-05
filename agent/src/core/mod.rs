@@ -69,7 +69,7 @@ impl Agent {
         // 初始化调度器
         let scheduler = Scheduler::new();
 
-        // 初始�?HTTP 客户�?
+        // 初始化 HTTP 客户端
         let tls_config = TlsConfig::default();
         let http_client = HttpClient::new(tls_config)?;
 
@@ -137,7 +137,7 @@ impl Agent {
         // 初始化调度器
         let scheduler = Scheduler::new();
 
-        // 初始�?HTTP 客户�?
+        // 初始化 HTTP 客户端
         let tls_config = TlsConfig::default();
         let http_client = HttpClient::new(tls_config)?;
 
@@ -178,7 +178,7 @@ impl Agent {
     pub async fn run(&self) -> Result<()> {
         info!("Ruinos Agent starting");
 
-        // 检查现有凭�?
+        // 检查现有凭证
         let config_dir = Self::get_config_dir()?;
         let credentials_file = config_dir.join("credentials.json");
 
@@ -192,12 +192,12 @@ impl Agent {
             info!("No valid credentials found, enrollment required");
         }
 
-        // 检查注册状�?
+        // 检查注册状态
         let enrollment_status = self.state_manager.get_enrollment_status().await;
         match enrollment_status {
             EnrollmentStatus::NotEnrolled => {
                 info!("Agent not enrolled, enrollment required");
-                // 注册逻辑将在后续任务中实�?
+                // 注册逻辑将在后续任务中实现
             }
             EnrollmentStatus::Enrolled => {
                 info!("Agent enrolled, starting normal operation");
@@ -220,7 +220,7 @@ impl Agent {
                         })
                     };
 
-                    // 等待心跳任务或关闭信�?
+                    // 等待心跳任务或关闭信号
                     tokio::select! {
                         _ = heartbeat_task => {
                             error!("Heartbeat loop terminated unexpectedly");
@@ -241,7 +241,7 @@ impl Agent {
             }
         }
 
-        // 设置基本的调度任�?
+        // 设置基本的调度任务
         self.setup_scheduled_tasks().await?;
 
         info!("Ruinos Agent running - core implementation pending");
@@ -342,7 +342,7 @@ impl Agent {
         }
     }
 
-    // 获取器方�?
+    // 获取器方法
     pub fn state_manager(&self) -> &StateManager {
         &self.state_manager
     }
