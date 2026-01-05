@@ -854,7 +854,7 @@ impl WebSocketClient {
             .map_err(|e| WebSocketError::InvalidMessage(e.to_string()))?;
 
         write
-            .send(Message::Text(auth_json))
+            .send(Message::Text(auth_json.into()))
             .await
             .map_err(|e| WebSocketError::MessageSendFailed(e.to_string()))?;
 
@@ -895,7 +895,7 @@ impl WebSocketClient {
                                             let response_json = serde_json::to_string(&response)
                                                 .map_err(|e| WebSocketError::InvalidMessage(e.to_string()))?;
 
-                                            write.send(Message::Text(response_json)).await
+                                            write.send(Message::Text(response_json.into())).await
                                                 .map_err(|e| WebSocketError::MessageSendFailed(e.to_string()))?;
                                         }
                                         Ok(None) => {
@@ -932,7 +932,7 @@ impl WebSocketClient {
                 heartbeat_msg = heartbeat_rx.recv() => {
                     if let Some(msg) = heartbeat_msg {
                         if let Ok(json) = serde_json::to_string(&msg) {
-                            if let Err(e) = write.send(Message::Text(json)).await {
+                            if let Err(e) = write.send(Message::Text(json.into())).await {
                                 tracing::error!("Failed to send heartbeat: {}", e);
                                 break;
                             }

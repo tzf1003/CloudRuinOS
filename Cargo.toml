@@ -4,15 +4,15 @@ resolver = "2"
 
 [workspace.dependencies]
 # 网络和 HTTP 客户端
-reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 tokio = { version = "1.0", features = ["full"] }
-tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
+tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
 
 # 加密和安全
 ed25519-dalek = { version = "2.0", features = ["rand_core"] }
 rand = "0.8"
-rustls = { version = "0.21", features = ["dangerous_configuration"] }
-rustls-native-certs = "0.6"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-native-certs = "0.8"
 
 # 序列化
 serde = { version = "1.0", features = ["derive"] }
