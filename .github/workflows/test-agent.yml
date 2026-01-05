@@ -34,7 +34,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
@@ -58,13 +58,13 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --manifest-path agent/Cargo.toml --lib
+          args: --manifest-path agent/Cargo.toml --lib --features linux
 
       - name: Run integration tests
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --manifest-path agent/Cargo.toml --test integration_test
+          args: --manifest-path agent/Cargo.toml --test integration_test --features linux
         env:
           TEST_SERVER_URL: ${{ secrets.TEST_API_BASE_URL }}
 
@@ -72,7 +72,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --manifest-path agent/Cargo.toml --features proptest property_tests
+          args: --manifest-path agent/Cargo.toml --features linux,proptest property_tests
 
   build:
     name: Build Agent Binaries
