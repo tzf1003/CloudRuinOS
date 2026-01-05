@@ -51,7 +51,7 @@ jobs:
         working-directory: server
         run: |
           # Update SERVER_URL in wrangler.toml for production environment
-          sed -i 's/vars = { ENVIRONMENT = "production", SERVER_URL = "" }/vars = { ENVIRONMENT = "production", SERVER_URL = "${{ secrets.RUINOS_SERVER_URL }}" }/' wrangler.toml
+          sed -i 's|^SERVER_URL = ""$|SERVER_URL = "${{ secrets.RUINOS_SERVER_URL }}"|' wrangler.toml
           npx wrangler deploy --env production
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
