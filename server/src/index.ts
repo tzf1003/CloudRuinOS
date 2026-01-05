@@ -33,6 +33,9 @@ export default {
     } catch (error) {
       console.error('Request handling error:', error);
       
+      // Check if debug mode is enabled
+      const isDebugMode = (env as any).DEBUG_MODE === 'true';
+      
       // If it's a secrets validation error, return specific error
       if (error instanceof Error && error.message.includes('Missing required secrets')) {
         const errorResponse = new Response(JSON.stringify({
@@ -45,10 +48,20 @@ export default {
         return addCorsHeaders(errorResponse, request, env);
       }
       
-      const errorResponse = new Response(JSON.stringify({
+      // In debug mode, return detailed error information
+      const errorDetails = isDebugMode && error instanceof Error ? {
+        error: 'Internal server error',
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        url: request.url,
+        method: request.method,
+      } : {
         error: 'Internal server error',
         message: 'An unexpected error occurred',
-      }), {
+      };
+      
+      const errorResponse = new Response(JSON.stringify(errorDetails, null, 2), {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
       });
