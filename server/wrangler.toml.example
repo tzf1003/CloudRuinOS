@@ -1,3 +1,7 @@
+# Wrangler 配置文件模板
+# 复制此文件为 wrangler.toml 并填入实际值
+# 获取配置值请参考: .github/DEPLOYMENT_CONFIG.md
+
 name = "rmm-server"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
@@ -17,37 +21,37 @@ vars = { ENVIRONMENT = "test" }
 [[d1_databases]]
 binding = "DB"
 database_name = "rmm-db-local"
-database_id = "c59df70d-6c08-4205-a63d-44aea39f4615"
-preview_database_id = "5195f8dc-5709-4794-9720-3d218faff0aa"
+database_id = "your-d1-database-id"           # 运行 wrangler d1 list 获取
+preview_database_id = "your-preview-db-id"    # 预览环境数据库 ID
 
-[env.production.d1_databases]
+[[env.production.d1_databases]]
 binding = "DB"
 database_name = "rmm-db-prod"
-database_id = "your-prod-d1-database-id"  # 需要替换为生产环境 D1 数据库 ID
+database_id = "your-prod-d1-database-id"      # 生产环境 D1 数据库 ID
 
-[env.test.d1_databases]
+[[env.test.d1_databases]]
 binding = "DB"
 database_name = "rmm-db-test"
-database_id = "your-test-d1-database-id"  # 需要替换为测试环境 D1 数据库 ID
+database_id = "your-test-d1-database-id"      # 测试环境 D1 数据库 ID
 
 # KV 存储配置 (本地开发)
 [[kv_namespaces]]
 binding = "KV"
-id = "f41b76e95ce84d4ba3a4953fa00dcae8"
-preview_id = "9e2f2a3f16d34405b74b5eb775ef07cf"
+id = "your-kv-namespace-id"                   # 运行 wrangler kv namespace list 获取
+preview_id = "your-preview-kv-id"             # 预览环境 KV ID
 
-[env.production.kv_namespaces]
+[[env.production.kv_namespaces]]
 binding = "KV"
-id = "your-prod-kv-namespace-id"  # 需要替换为生产环境 KV namespace ID
+id = "your-prod-kv-namespace-id"              # 生产环境 KV namespace ID
 
-[env.test.kv_namespaces]
+[[env.test.kv_namespaces]]
 binding = "KV"
-id = "your-test-kv-namespace-id"  # 需要替换为测试环境 KV namespace ID
+id = "your-test-kv-namespace-id"              # 测试环境 KV namespace ID
 
 # R2 对象存储配置
 [[r2_buckets]]
 binding = "R2"
-bucket_name = "rmm-files-dev"
+bucket_name = "rmm-files-dev"                 # 运行 wrangler r2 bucket list 获取
 preview_bucket_name = "rmm-files-dev"
 
 [env.production.r2_buckets]
@@ -78,9 +82,8 @@ HEARTBEAT_INTERVAL = "60"   # 60 seconds
 NONCE_WINDOW = "300"        # 5 minutes
 
 # Secrets (通过 wrangler secret put 命令设置)
-# ENROLLMENT_SECRET - 用于生成 enrollment tokens
-# JWT_SECRET - 用于 JWT 签名
-# WEBHOOK_SECRET - 用于 webhook 验证
-# DB_ENCRYPTION_KEY - 用于数据库加密
-# ADMIN_API_KEY - 管理员 API 密钥 (已废弃，保留兼容)
-# ADMIN_PASSWORD - 管理员登录密码 (必需)
+# wrangler secret put JWT_SECRET
+# wrangler secret put ENCRYPTION_KEY
+# wrangler secret put ADMIN_PASSWORD
+# wrangler secret put ENROLLMENT_SECRET
+# wrangler secret put WEBHOOK_SECRET

@@ -120,6 +120,9 @@ coverage/
 # Sensitive environment files
 .dev.vars
 server/.dev.vars
+server/wrangler.toml
 
 # Nested git repositories
 .github/skills/ObsidianSkills/
+agent/install/config.toml
+

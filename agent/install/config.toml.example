@@ -1,5 +1,6 @@
 # RMM Agent 配置文件模板
-# 此文件包含 Agent 的默认配置设置
+# 复制此文件为 config.toml 并填入实际值
+# 获取配置值请参考: .github/DEPLOYMENT_CONFIG.md
 
 [agent]
 # Agent 基本配置
@@ -9,7 +10,7 @@ device_id = ""  # 将在注册时自动填充
 
 [server]
 # 服务端连接配置
-base_url = "https://your-rmm-server.example.com"
+base_url = "https://your-api-domain.example.com"  # 替换为实际的 API 域名
 enrollment_endpoint = "/agent/enroll"
 heartbeat_endpoint = "/agent/heartbeat"
 websocket_endpoint = "/sessions"
@@ -20,7 +21,7 @@ request_timeout = 60
 
 [heartbeat]
 # 心跳配置
-interval = 30  # 心跳间隔（秒）
+interval = 60  # 心跳间隔（秒）- 推荐值：60秒
 retry_attempts = 3
 retry_delay = 5  # 重试延迟（秒）
 
@@ -43,7 +44,7 @@ ech_enabled = false
 
 [logging]
 # 日志配置
-level = "info"  # trace, debug, info, warn, error
+level = "info"  # trace, debug, info, warn, error - 推荐：info
 file_path = ""  # 空字符串表示输出到控制台
 max_file_size = "10MB"
 max_files = 5
@@ -88,12 +89,12 @@ blocked_commands = [
 ]
 
 [reconnect]
-# 重连策略配置
-initial_delay = 1      # 初始延迟（秒）
-max_delay = 300        # 最大延迟（秒）
-backoff_factor = 2.0   # 退避因子
-max_attempts = 0       # 最大重试次数（0 表示无限制）
-jitter = true          # 是否添加随机抖动
+# 重连策略配置 - 指数退避策略
+initial_delay = 5      # 初始延迟（秒）- 推荐：5秒
+max_delay = 300        # 最大延迟（秒）- 推荐：300秒 (5分钟)
+backoff_factor = 2.0   # 退避因子 - 推荐：2.0
+max_attempts = 0       # 最大重试次数（0 = 无限制）
+jitter = true          # 随机抖动 - 推荐：true
 
 [service]
 # 服务配置（仅在作为系统服务运行时使用）
