@@ -712,7 +712,8 @@ impl HttpClient {
 
     /// 执行网络安全检查
     #[allow(clippy::field_reassign_with_default)]
-    pub async fn perform_security_checks(&self, _hostname: &str) -> Result<SecurityCheckResult> {
+    #[allow(unused_variables)]
+    pub async fn perform_security_checks(&self, hostname: &str) -> Result<SecurityCheckResult> {
         let mut result = SecurityCheckResult::default();
 
         // TLS 验证检查
