@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# RMM System Secrets Management Script
+# Ruinos System Secrets Management Script
 # This script helps set up Cloudflare secrets for different environments
 
 set -e
@@ -100,8 +100,23 @@ setup_secrets() {
         print_status "Generated ADMIN_API_KEY: $ADMIN_API_KEY"
     fi
     set_secret "$env" "ADMIN_API_KEY" "$ADMIN_API_KEY"
-    
+
+    # Admin password for console login
+    if [ -z "$ADMIN_PASSWORD" ]; then
+        print_warning "ADMIN_PASSWORD not set. Please enter a strong password for console login:"
+        read -s -p "Enter ADMIN_PASSWORD: " ADMIN_PASSWORD
+        echo ""
+        read -s -p "Confirm ADMIN_PASSWORD: " ADMIN_PASSWORD_CONFIRM
+        echo ""
+        if [ "$ADMIN_PASSWORD" != "$ADMIN_PASSWORD_CONFIRM" ]; then
+            print_error "Passwords do not match!"
+            exit 1
+        fi
+    fi
+    set_secret "$env" "ADMIN_PASSWORD" "$ADMIN_PASSWORD"
+
     print_status "Secrets setup completed for environment: $env"
+    print_warning "Important: Save your ADMIN_PASSWORD - you'll need it to access the console!"
 }
 
 # Function to list current secrets
@@ -136,13 +151,24 @@ rotate_secrets() {
     NEW_WEBHOOK_SECRET=$(generate_secret)
     NEW_DB_ENCRYPTION_KEY=$(generate_secret)
     NEW_ADMIN_API_KEY=$(generate_secret)
-    
+
+    print_warning "ADMIN_PASSWORD rotation requires manual input. Enter new password:"
+    read -s -p "Enter new ADMIN_PASSWORD: " NEW_ADMIN_PASSWORD
+    echo ""
+    read -s -p "Confirm new ADMIN_PASSWORD: " NEW_ADMIN_PASSWORD_CONFIRM
+    echo ""
+    if [ "$NEW_ADMIN_PASSWORD" != "$NEW_ADMIN_PASSWORD_CONFIRM" ]; then
+        print_error "Passwords do not match!"
+        exit 1
+    fi
+
     # Set new secrets
     set_secret "$env" "ENROLLMENT_SECRET" "$NEW_ENROLLMENT_SECRET"
     set_secret "$env" "JWT_SECRET" "$NEW_JWT_SECRET"
     set_secret "$env" "WEBHOOK_SECRET" "$NEW_WEBHOOK_SECRET"
     set_secret "$env" "DB_ENCRYPTION_KEY" "$NEW_DB_ENCRYPTION_KEY"
     set_secret "$env" "ADMIN_API_KEY" "$NEW_ADMIN_API_KEY"
+    set_secret "$env" "ADMIN_PASSWORD" "$NEW_ADMIN_PASSWORD"
     
     print_status "Secrets rotation completed for environment: $env"
     print_warning "Make sure to update any external systems that use these secrets!"
@@ -156,7 +182,7 @@ backup_secrets() {
     print_status "Creating secrets backup for environment: $env"
     
     cat > "$backup_file" << EOF
-# RMM System Secrets Backup - Environment: $env
+# Ruinos System Secrets Backup - Environment: $env
 # Generated on: $(date)
 # WARNING: This file contains sensitive information. Store securely!
 
@@ -165,6 +191,7 @@ JWT_SECRET=$JWT_SECRET
 WEBHOOK_SECRET=$WEBHOOK_SECRET
 DB_ENCRYPTION_KEY=$DB_ENCRYPTION_KEY
 ADMIN_API_KEY=$ADMIN_API_KEY
+ADMIN_PASSWORD=$ADMIN_PASSWORD
 EOF
     
     chmod 600 "$backup_file"
@@ -211,7 +238,7 @@ case "$1" in
         backup_secrets "$2"
         ;;
     *)
-        echo "RMM System Secrets Management"
+        echo "Ruinos System Secrets Management"
         echo ""
         echo "Usage: $0 <command> [arguments]"
         echo ""

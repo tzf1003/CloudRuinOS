@@ -1,10 +1,10 @@
 # Secrets Management Guide
 
-This document describes how to manage secrets for the RMM system across different environments.
+This document describes how to manage secrets for the Ruinos system across different environments.
 
 ## Overview
 
-The RMM system uses Cloudflare Workers secrets to store sensitive configuration data. Secrets are environment-specific and are managed through the Wrangler CLI.
+The Ruinos system uses Cloudflare Workers secrets to store sensitive configuration data. Secrets are environment-specific and are managed through the Wrangler CLI.
 
 ## Required Secrets
 
@@ -17,6 +17,7 @@ The RMM system uses Cloudflare Workers secrets to store sensitive configuration 
 | `WEBHOOK_SECRET` | Used to verify webhook payloads | External integrations |
 | `DB_ENCRYPTION_KEY` | Used to encrypt sensitive data in database | Data protection |
 | `ADMIN_API_KEY` | Used for administrative API operations | Management operations |
+| `ADMIN_PASSWORD` | Console login password for administrators | Web UI access |
 
 ### Environment-Specific Configuration
 
