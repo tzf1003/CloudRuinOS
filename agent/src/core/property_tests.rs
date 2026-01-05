@@ -31,19 +31,13 @@ impl crate::platform::FileSystem for MockFileSystem {
 
         while let Some(entry) = entries.next_entry().await? {
             let metadata = entry.metadata().await?;
-            let file_type = if metadata.is_dir() {
-                crate::platform::FileType::Directory
-            } else {
-                crate::platform::FileType::File
-            };
 
             files.push(crate::platform::FileInfo {
-                name: entry.file_name().to_string_lossy().to_string(),
-                path: entry.path().to_string_lossy().to_string(),
+                path: entry.path(),
                 size: metadata.len(),
-                is_directory: metadata.is_dir(),
+                is_dir: metadata.is_dir(),
                 modified: metadata.modified().ok(),
-                file_type,
+                checksum: None,
             });
         }
 
