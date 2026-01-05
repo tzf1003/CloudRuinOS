@@ -438,6 +438,7 @@ class ApiClient {
   }
 }
 
-// Create singleton instance
-export const apiClient = new ApiClient();
+// Create singleton instance with environment-based URL
+const baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
+export const apiClient = new ApiClient(baseURL);
 export default ApiClient;

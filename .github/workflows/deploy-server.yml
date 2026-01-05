@@ -32,8 +32,27 @@ jobs:
         working-directory: server
         run: npm run type-check
 
+      - name: Sync Secrets to Cloudflare Worker
+        working-directory: server
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo "Setting up Cloudflare Worker secrets..."
+          echo "${{ secrets.ENROLLMENT_SECRET }}" | npx wrangler secret put ENROLLMENT_SECRET --env production
+          echo "${{ secrets.JWT_SECRET }}" | npx wrangler secret put JWT_SECRET --env production
+          echo "${{ secrets.WEBHOOK_SECRET }}" | npx wrangler secret put WEBHOOK_SECRET --env production
+          echo "${{ secrets.DB_ENCRYPTION_KEY }}" | npx wrangler secret put DB_ENCRYPTION_KEY --env production
+          echo "${{ secrets.ADMIN_API_KEY }}" | npx wrangler secret put ADMIN_API_KEY --env production
+          echo "${{ secrets.ADMIN_PASSWORD }}" | npx wrangler secret put ADMIN_PASSWORD --env production
+          echo "All secrets have been synced successfully!"
+
       - name: Deploy to Cloudflare Workers
-        run: cd server && npx wrangler deploy
+        working-directory: server
+        run: |
+          # Update SERVER_URL in wrangler.toml for production environment
+          sed -i 's/vars = { ENVIRONMENT = "production", SERVER_URL = "" }/vars = { ENVIRONMENT = "production", SERVER_URL = "${{ secrets.RUINOS_SERVER_URL }}" }/' wrangler.toml
+          npx wrangler deploy --env production
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

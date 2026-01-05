@@ -27,9 +27,9 @@ export default {
       
       // 使用路由处理请求
       const response = await router.handle(request, env, ctx);
-      
+
       // 添加 CORS 头
-      return addCorsHeaders(response);
+      return addCorsHeaders(response, request, env);
     } catch (error) {
       console.error('Request handling error:', error);
       
@@ -42,7 +42,7 @@ export default {
           status: 500,
           headers: { 'Content-Type': 'application/json' },
         });
-        return addCorsHeaders(errorResponse);
+        return addCorsHeaders(errorResponse, request, env);
       }
       
       const errorResponse = new Response(JSON.stringify({
@@ -52,7 +52,7 @@ export default {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
       });
-      return addCorsHeaders(errorResponse);
+      return addCorsHeaders(errorResponse, request, env);
     }
   },
 };

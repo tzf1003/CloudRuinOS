@@ -99,13 +99,16 @@ exit /b 0
 
 REM 创建默认配置文件
 :create_default_config
+set "SERVER_URL=%RUINOS_SERVER_URL%"
+if "%SERVER_URL%"=="" set "SERVER_URL=https://your-rmm-server.example.com"
+
 echo [agent] > "%CONFIG_DIR%\config.toml"
 echo name = "rmm-agent" >> "%CONFIG_DIR%\config.toml"
 echo version = "0.1.0" >> "%CONFIG_DIR%\config.toml"
 echo device_id = "" >> "%CONFIG_DIR%\config.toml"
 echo. >> "%CONFIG_DIR%\config.toml"
 echo [server] >> "%CONFIG_DIR%\config.toml"
-echo base_url = "https://your-rmm-server.example.com" >> "%CONFIG_DIR%\config.toml"
+echo base_url = "%SERVER_URL%" >> "%CONFIG_DIR%\config.toml"
 echo enrollment_endpoint = "/agent/enroll" >> "%CONFIG_DIR%\config.toml"
 echo heartbeat_endpoint = "/agent/heartbeat" >> "%CONFIG_DIR%\config.toml"
 echo websocket_endpoint = "/sessions" >> "%CONFIG_DIR%\config.toml"

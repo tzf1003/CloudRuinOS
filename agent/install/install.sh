@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Ruinos Agent 安装脚本 - Linux/macOS 版本
-# 支持系统服务安装和配�?
+# 支持系统服务安装和配�?
 set -e
 
 # 颜色输出
@@ -22,7 +22,7 @@ LOG_DIR="/var/log/ruinos-agent"
 SYSTEMD_SERVICE_FILE="/etc/systemd/system/ruinos-agent.service"
 LAUNCHD_PLIST="/Library/LaunchDaemons/com.ruinos.agent.plist"
 
-# 检测操作系�?detect_os() {
+# 检测操作系�?detect_os() {
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
         OS="linux"
         if command -v systemctl >/dev/null 2>&1; then
@@ -38,7 +38,7 @@ LAUNCHD_PLIST="/Library/LaunchDaemons/com.ruinos.agent.plist"
         exit 1
     fi
     
-    echo -e "${BLUE}检测到操作系统: $OS (初始化系�? $INIT_SYSTEM)${NC}"
+    echo -e "${BLUE}检测到操作系统: $OS (初始化系�? $INIT_SYSTEM)${NC}"
 }
 
 # 日志函数
@@ -54,10 +54,10 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# 检查权�?check_permissions() {
+# 检查权�?check_permissions() {
     if [[ $EUID -ne 0 ]]; then
-        log_error "此脚本需�?root 权限运行"
-        echo "请使�? sudo $0"
+        log_error "此脚本需�?root 权限运行"
+        echo "请使�? sudo $0"
         exit 1
     fi
 }
@@ -66,7 +66,7 @@ log_error() {
 create_user() {
     if [[ "$OS" == "linux" ]]; then
         if ! getent group "$SERVICE_GROUP" >/dev/null 2>&1; then
-            log_info "创建�? $SERVICE_GROUP"
+            log_info "创建�? $SERVICE_GROUP"
             groupadd --system "$SERVICE_GROUP"
         fi
         
@@ -120,20 +120,20 @@ create_directories() {
     chmod 750 "$LOG_DIR"
 }
 
-# 安装二进制文�?install_binary() {
+# 安装二进制文�?install_binary() {
     local binary_path="$1"
     
     if [[ ! -f "$binary_path" ]]; then
-        log_error "找不�?Agent 二进制文�? $binary_path"
+        log_error "找不�?Agent 二进制文�? $binary_path"
         exit 1
     fi
     
-    log_info "安装 Agent 二进制文�?.."
+    log_info "安装 Agent 二进制文�?.."
     cp "$binary_path" "$INSTALL_DIR/$AGENT_NAME"
     chown root:root "$INSTALL_DIR/$AGENT_NAME"
     chmod 755 "$INSTALL_DIR/$AGENT_NAME"
     
-    # 创建符号链接�?/usr/local/bin
+    # 创建符号链接�?/usr/local/bin
     ln -sf "$INSTALL_DIR/$AGENT_NAME" "/usr/local/bin/$AGENT_NAME"
 }
 
@@ -164,6 +164,8 @@ install_config() {
 
 # 创建默认配置
 create_default_config() {
+    local server_url="${RUINOS_SERVER_URL:-https://your-rmm-server.example.com}"
+
     cat > "$CONFIG_DIR/config.toml" << EOF
 [agent]
 name = "rmm-agent"
@@ -171,7 +173,7 @@ version = "0.1.0"
 device_id = ""
 
 [server]
-base_url = "https://your-rmm-server.example.com"
+base_url = "$server_url"
 enrollment_endpoint = "/agent/enroll"
 heartbeat_endpoint = "/agent/heartbeat"
 websocket_endpoint = "/sessions"
@@ -348,17 +350,17 @@ start_service() {
             launchctl start "com.example.rmm-agent"
             ;;
         *)
-            log_warn "请手动启动服�?
+            log_warn "请手动启动服�?
             ;;
     esac
 }
 
-# 显示安装后信�?show_post_install_info() {
+# 显示安装后信�?show_post_install_info() {
     echo
-    log_info "Ruinos Agent 安装完成�?
+    log_info "Ruinos Agent 安装完成�?
     echo
     echo "安装位置:"
-    echo "  二进制文�? $INSTALL_DIR/$AGENT_NAME"
+    echo "  二进制文�? $INSTALL_DIR/$AGENT_NAME"
     echo "  配置文件: $CONFIG_DIR/config.toml"
     echo "  数据目录: $DATA_DIR"
     echo "  日志目录: $LOG_DIR"
@@ -369,7 +371,7 @@ start_service() {
             echo "  启动服务: sudo systemctl start $AGENT_NAME"
             echo "  停止服务: sudo systemctl stop $AGENT_NAME"
             echo "  重启服务: sudo systemctl restart $AGENT_NAME"
-            echo "  查看状�? sudo systemctl status $AGENT_NAME"
+            echo "  查看状�? sudo systemctl status $AGENT_NAME"
             echo "  查看日志: sudo journalctl -u $AGENT_NAME -f"
             ;;
         "launchd")
@@ -379,14 +381,14 @@ start_service() {
             ;;
     esac
     echo
-    echo "下一�?"
+    echo "下一�?"
     echo "1. 编辑配置文件: $CONFIG_DIR/config.toml"
-    echo "2. 设置服务�?URL 和其他配�?
-    echo "3. 重启服务以应用配置更�?
+    echo "2. 设置服务�?URL 和其他配�?
+    echo "3. 重启服务以应用配置更�?
     echo "4. 使用 enrollment token 注册设备"
 }
 
-# 主函�?main() {
+# 主函�?main() {
     local binary_path="$1"
     local config_template="$2"
     local install_service_flag="$3"
@@ -394,17 +396,17 @@ start_service() {
     echo "Ruinos Agent 安装程序"
     echo "=================="
     
-    # 检查参�?    if [[ -z "$binary_path" ]]; then
+    # 检查参�?    if [[ -z "$binary_path" ]]; then
         echo "用法: $0 <agent_binary> [config_template] [--service]"
-        echo "  agent_binary: Agent 二进制文件路�?
+        echo "  agent_binary: Agent 二进制文件路�?
         echo "  config_template: 配置文件模板路径（可选）"
         echo "  --service: 安装为系统服务（可选）"
         exit 1
     fi
     
-    # 检测操作系�?    detect_os
+    # 检测操作系�?    detect_os
     
-    # 检查权�?    check_permissions
+    # 检查权�?    check_permissions
     
     # 创建用户
     create_user
@@ -426,4 +428,4 @@ start_service() {
     show_post_install_info
 }
 
-# 运行主函�?main "$@"
+# 运行主函�?main "$@"

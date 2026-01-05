@@ -11,6 +11,34 @@ import { generateDeviceId, generateEd25519KeyPair, validateEnrollmentToken } fro
 import { createDevice } from '../utils/database';
 import { createAuditService } from '../utils/audit';
 
+/**
+ * 获取服务器 URL
+ * 从环境变量或请求头中提取
+ */
+function getServerUrl(request: Request, env: any): string {
+  // 优先使用环境变量中配置的 SERVER_URL
+  if (env.SERVER_URL) {
+    return env.SERVER_URL;
+  }
+
+  // 从请求的 Host 头构建 URL
+  const host = request.headers.get('Host');
+  const protocol = request.url.startsWith('https://') ? 'https' : 'http';
+
+  if (host) {
+    return `${protocol}://${host}`;
+  }
+
+  // 后备方案：从完整请求 URL 中提取
+  try {
+    const url = new URL(request.url);
+    return url.origin;
+  } catch (e) {
+    // 如果都失败了，返回一个默认值
+    return 'https://ruinos-server.example.com';
+  }
+}
+
 // 设备注册请求类型
 export interface EnrollDeviceRequest {
   enrollment_token: string;
@@ -30,6 +58,7 @@ export interface EnrollDeviceResponse {
   public_key?: string;
   private_key?: string;
   server_public_key?: string;
+  server_url?: string;
   error?: string;
   error_code?: string;
 }
@@ -127,6 +156,7 @@ export async function enrollDevice(
       public_key: keyPair.publicKey,
       private_key: keyPair.privateKey,
       server_public_key: env.SERVER_PUBLIC_KEY || undefined, // 服务端公钥，用于验证服务端响应
+      server_url: getServerUrl(request, env), // 返回 server URL
     };
 
     return new Response(JSON.stringify(response), {

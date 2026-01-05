@@ -724,8 +724,29 @@ export class WebSocketManager {
 }
 
 // 创建单例实例
-export const webSocketManager = new WebSocketManager(
-  process.env.NODE_ENV === 'development' ? 'localhost:8787' : window.location.host
-);
+// Extract host from VITE_API_BASE_URL or use current location
+const getWebSocketHost = (): string => {
+  const apiUrl = import.meta.env.VITE_API_BASE_URL;
+
+  if (apiUrl && apiUrl !== '/api') {
+    // Extract host from full URL (e.g., "https://api.example.com" -> "api.example.com")
+    try {
+      const url = new URL(apiUrl);
+      return url.host;
+    } catch {
+      // If it's just a relative path, use window.location.host
+      return window.location.host;
+    }
+  }
+
+  // Development mode or no custom URL
+  if (import.meta.env.DEV) {
+    return 'localhost:8787';
+  }
+
+  return window.location.host;
+};
+
+export const webSocketManager = new WebSocketManager(getWebSocketHost());
 
 export default WebSocketManager;
