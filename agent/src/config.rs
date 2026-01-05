@@ -3,10 +3,9 @@
 
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 /// Agent 主配置结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -178,7 +177,7 @@ impl ConfigManager {
     }
 
     /// 创建默认配置
-    pub fn default() -> Self {
+    pub fn new_default() -> Self {
         let config = Self::create_default_config();
 
         Self {

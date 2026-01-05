@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::{Path, PathBuf};
-use tracing::{debug, error, info, warn};
+use std::path::PathBuf;
+use tracing::{debug, info};
 
 /// 文件信息结构
 #[derive(Debug, Clone, Serialize, Deserialize)]

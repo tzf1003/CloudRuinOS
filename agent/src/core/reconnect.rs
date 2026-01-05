@@ -223,7 +223,7 @@ impl ReconnectManager {
     {
         while self.should_reconnect() {
             // 等待重连延迟
-            if let Err(e) = self.wait_for_reconnect().await {
+            if self.wait_for_reconnect().await.is_err() {
                 return ReconnectResult::MaxAttemptsReached;
             }
 

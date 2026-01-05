@@ -67,7 +67,7 @@ async fn main() -> Result<()> {
         ];
 
         let mut loaded = false;
-        let mut config_manager = ConfigManager::default();
+        let mut config_manager = ConfigManager::new_default();
 
         for path in &default_paths {
             if std::path::Path::new(path).exists() {

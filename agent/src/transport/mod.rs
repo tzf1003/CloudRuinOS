@@ -4,7 +4,7 @@ use anyhow::Result;
 use futures::{SinkExt, StreamExt};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::time::{sleep, Instant};
+use tokio::time::sleep;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 #[derive(Clone)]
@@ -711,7 +711,8 @@ impl HttpClient {
     }
 
     /// 执行网络安全检查
-    pub async fn perform_security_checks(&self, hostname: &str) -> Result<SecurityCheckResult> {
+    #[allow(clippy::field_reassign_with_default)]
+    pub async fn perform_security_checks(&self, _hostname: &str) -> Result<SecurityCheckResult> {
         let mut result = SecurityCheckResult::default();
 
         // TLS 验证检查
@@ -872,7 +873,7 @@ impl WebSocketClient {
                     status: crate::core::protocol::PresenceStatus::Online,
                 };
 
-                if let Err(_) = heartbeat_tx_clone.send(presence_msg) {
+                if heartbeat_tx_clone.send(presence_msg).is_err() {
                     tracing::error!("Failed to send heartbeat message to channel");
                     break;
                 }

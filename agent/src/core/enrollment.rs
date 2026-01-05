@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Result};
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::time::Duration;
 use tracing::{debug, error, info};

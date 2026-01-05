@@ -28,9 +28,10 @@ use self::crypto::CryptoManager;
 use self::enrollment::{EnrollmentClient, EnrollmentConfig};
 use self::heartbeat::{HeartbeatClient, HeartbeatConfig};
 use self::reconnect::ReconnectManager;
-use self::scheduler::{Scheduler, SchedulerCommand, TaskType};
-use self::state::{AgentConfig, ConnectionStatus, EnrollmentStatus, StateManager};
+use self::scheduler::{Scheduler, TaskType};
+use self::state::{EnrollmentStatus, StateManager};
 
+#[allow(dead_code)]
 pub struct Agent {
     config_manager: ConfigManager,
     state_manager: StateManager,
@@ -93,7 +94,7 @@ impl Agent {
         let crypto_manager = Self::load_credentials(&config_dir).await?;
 
         Ok(Self {
-            config_manager: ConfigManager::default(),
+            config_manager: ConfigManager::new_default(),
             state_manager,
             crypto_manager,
             enrollment_client,
@@ -299,7 +300,7 @@ impl Agent {
         Ok(config_dir)
     }
 
-    async fn load_credentials(config_dir: &PathBuf) -> Result<Option<CryptoManager>> {
+    async fn load_credentials(config_dir: &std::path::Path) -> Result<Option<CryptoManager>> {
         let credentials_file = config_dir.join("credentials.json");
 
         if credentials_file.exists() {

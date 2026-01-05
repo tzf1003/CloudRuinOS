@@ -2,14 +2,9 @@ use crate::core::audit::{AuditLogger, AuditResult};
 use crate::core::files::{FileManager, FileManagerConfig};
 use crate::core::protocol::{FileInfo, WSMessage};
 use crate::platform::CommandExecutor;
-use anyhow::{anyhow, Result};
-use std::process::{Command, Stdio};
+use anyhow::Result;
 use std::time::{Duration, Instant};
-use tokio::process::Command as TokioCommand;
 use tokio::time::timeout;
-
-#[cfg(windows)]
-use std::os::windows::process::ExitStatusExt;
 
 /// 命令执行器
 pub struct CommandHandler {

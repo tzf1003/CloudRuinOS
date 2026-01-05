@@ -1,11 +1,8 @@
 use anyhow::{anyhow, Result};
 use serde_json::json;
-use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
-use crate::core::command::CommandHandler;
 use crate::core::crypto::{CryptoManager, SignableData};
 use crate::core::protocol::{
     Command, CommandType, HeartbeatRequest, HeartbeatResponse, SystemInfo,
@@ -59,7 +56,7 @@ impl HeartbeatClient {
     pub async fn send_heartbeat(
         &self,
         crypto_manager: &CryptoManager,
-        state_manager: &StateManager,
+        _state_manager: &StateManager,
     ) -> Result<HeartbeatResponse> {
         let device_id = crypto_manager
             .device_id()
@@ -228,7 +225,7 @@ impl HeartbeatClient {
     }
 
     /// 处理服务端下发的命令
-    async fn process_command(&self, cmd: &Command, state_manager: &StateManager) -> Result<()> {
+    async fn process_command(&self, cmd: &Command, _state_manager: &StateManager) -> Result<()> {
         info!(
             "Processing command: {} (type: {:?})",
             cmd.id, cmd.command_type
@@ -455,7 +452,7 @@ del "%~f0"
             // 启动升级脚本并退出
             use std::process::Command;
             Command::new("cmd")
-                .args(&["/C", "start", "/b", "", &script_path.to_string_lossy()])
+                .args(["/C", "start", "/b", "", &script_path.to_string_lossy()])
                 .spawn()
                 .map_err(|e| anyhow!("Failed to start upgrade script: {}", e))?;
 
@@ -519,7 +516,7 @@ del "%~f0"
     /// 验证升级包的 Ed25519 签名
     async fn verify_upgrade_signature(&self, binary: &[u8], signature: &str) -> Result<bool> {
         use base64::Engine;
-        use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+        use ed25519_dalek::{Signature, Verifier};
         use sha2::{Digest, Sha256};
 
         // 获取服务端公钥（从配置或硬编码）

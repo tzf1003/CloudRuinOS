@@ -1,4 +1,5 @@
 use anyhow::Result;
+use base64::Engine;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -124,6 +125,7 @@ impl AuditLogger {
     }
 
     /// 记录命令执行事件
+    #[allow(clippy::too_many_arguments)]
     pub fn log_command_execution(
         &self,
         session_id: Option<String>,
@@ -195,6 +197,7 @@ impl AuditLogger {
     }
 
     /// 记录文件下载事件
+    #[allow(clippy::too_many_arguments)]
     pub fn log_file_download(
         &self,
         session_id: Option<String>,
@@ -224,6 +227,7 @@ impl AuditLogger {
     }
 
     /// 记录文件上传事件
+    #[allow(clippy::too_many_arguments)]
     pub fn log_file_upload(
         &self,
         session_id: Option<String>,
@@ -638,7 +642,11 @@ impl AuditEventHandler {
                 events.len()
             );
             let sig_bytes = crypto.sign(sign_data.as_bytes());
-            format!("{}:{}", timestamp, base64::encode(&sig_bytes))
+            format!(
+                "{}:{}",
+                timestamp,
+                base64::engine::general_purpose::STANDARD.encode(&sig_bytes)
+            )
         } else {
             format!("{}:unsigned", timestamp)
         };
@@ -706,7 +714,7 @@ impl AuditEventHandler {
             .config
             .local_persistence_path
             .as_ref()
-            .map(|p| std::path::PathBuf::from(p))
+            .map(std::path::PathBuf::from)
             .unwrap_or_else(|| {
                 dirs::data_local_dir()
                     .unwrap_or_else(|| std::path::PathBuf::from("."))
@@ -740,7 +748,7 @@ impl AuditEventHandler {
             .config
             .local_persistence_path
             .as_ref()
-            .map(|p| std::path::PathBuf::from(p))
+            .map(std::path::PathBuf::from)
             .unwrap_or_else(|| {
                 dirs::data_local_dir()
                     .unwrap_or_else(|| std::path::PathBuf::from("."))

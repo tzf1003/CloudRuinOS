@@ -56,7 +56,7 @@ fn arb_agent_config() -> impl Strategy<Value = AgentConfig> {
         1u64..3600u64,    // heartbeat interval
     )
         .prop_map(|(security, base_url, heartbeat_interval)| {
-            let mut config = ConfigManager::default().config().clone();
+            let mut config = ConfigManager::new_default().config().clone();
             config.security = security;
             config.server.base_url = base_url;
             config.heartbeat.interval = heartbeat_interval;
@@ -250,7 +250,7 @@ mod tests {
             doh_enabled in any::<bool>(),
             ech_enabled in any::<bool>()
         ) {
-            let mut config = ConfigManager::default().config().clone();
+            let mut config = ConfigManager::new_default().config().clone();
             config.security.tls_verify = tls_verify;
             config.security.certificate_pinning = cert_pinning;
             config.security.doh_enabled = doh_enabled;
@@ -288,7 +288,7 @@ mod tests {
         let config_path = temp_dir.path().join("config.toml");
 
         // 创建初始配置
-        let mut initial_config = ConfigManager::default().config().clone();
+        let mut initial_config = ConfigManager::new_default().config().clone();
         initial_config.security.doh_enabled = false;
         initial_config.security.ech_enabled = false;
 
@@ -326,7 +326,7 @@ mod tests {
         let config_path = temp_dir.path().join("config.toml");
 
         // 创建初始配置
-        let mut config1 = ConfigManager::default().config().clone();
+        let mut config1 = ConfigManager::new_default().config().clone();
         config1.heartbeat.interval = 30;
         config1.security.tls_verify = true;
 

@@ -4,11 +4,16 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use std::path::Path;
 use std::process::Output;
-use std::time::SystemTime;
 use tokio::fs;
 use tokio::process::Command;
 
 pub struct WindowsCommandExecutor;
+
+impl Default for WindowsCommandExecutor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl WindowsCommandExecutor {
     pub fn new() -> Self {
@@ -31,6 +36,12 @@ impl CommandExecutor for WindowsCommandExecutor {
 }
 
 pub struct WindowsFileSystem;
+
+impl Default for WindowsFileSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl WindowsFileSystem {
     pub fn new() -> Self {

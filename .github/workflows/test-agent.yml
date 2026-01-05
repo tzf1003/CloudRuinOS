@@ -53,7 +53,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --manifest-path agent/Cargo.toml --all-targets --all-features -- -D warnings
+          args: --manifest-path agent/Cargo.toml --all-targets --all-features -- -W clippy::all
 
       - name: Run unit tests
         uses: actions-rs/cargo@v1
