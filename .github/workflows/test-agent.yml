@@ -72,7 +72,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --manifest-path agent/Cargo.toml --features linux,proptest property_tests
+          args: --manifest-path agent/Cargo.toml --features linux property_tests
 
   build:
     name: Build Agent Binaries
