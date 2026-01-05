@@ -540,35 +540,35 @@ export function Dashboard({
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">
-                {Math.floor(overview.metrics.uptime / 3600)}h
+                {Math.floor((overview.metrics.uptime ?? 0) / 3600)}h
               </div>
               <div className="text-sm text-gray-500">运行时间</div>
             </div>
             
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">
-                {overview.metrics.requestCount.toLocaleString()}
+                {(overview.metrics.requestCount ?? 0).toLocaleString()}
               </div>
               <div className="text-sm text-gray-500">请求总数</div>
             </div>
             
             <div className="text-center">
               <div className="text-2xl font-bold text-red-600">
-                {(overview.metrics.errorRate * 100).toFixed(1)}%
+                {((overview.metrics.errorRate ?? 0) * 100).toFixed(1)}%
               </div>
               <div className="text-sm text-gray-500">错误率</div>
             </div>
             
             <div className="text-center">
               <div className="text-2xl font-bold text-purple-600">
-                {Math.round(overview.metrics.averageResponseTime * 1000)}ms
+                {Math.round((overview.metrics.averageResponseTime ?? 0) * 1000)}ms
               </div>
               <div className="text-sm text-gray-500">平均响应时间</div>
             </div>
             
             <div className="text-center">
               <div className="text-2xl font-bold text-orange-600">
-                {overview.metrics.activeConnections}
+                {overview.metrics.activeConnections ?? 0}
               </div>
               <div className="text-sm text-gray-500">活跃连接</div>
             </div>
