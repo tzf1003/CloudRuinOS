@@ -1,5 +1,5 @@
 @echo off
-REM RMM System Secrets Management Script for Windows
+REM Ruinos System Secrets Management Script for Windows
 REM This script helps set up Cloudflare secrets for different environments
 
 setlocal enabledelayedexpansion
@@ -82,7 +82,15 @@ if "%ADMIN_API_KEY%"=="" (
 )
 call :set_secret %env% ADMIN_API_KEY %ADMIN_API_KEY%
 
+echo.
+echo [WARN] ADMIN_PASSWORD must be set manually. This is for console login.
+echo Please enter a strong password when prompted.
+cd server
+wrangler secret put ADMIN_PASSWORD --env %env%
+cd ..
+
 echo [INFO] Secrets setup completed for environment: %env%
+echo [WARN] Important: Save your ADMIN_PASSWORD - you'll need it to access the console!
 goto :eof
 
 :generate_secret
@@ -119,7 +127,7 @@ if "%1"=="setup" (
     )
     call :list_secrets %2
 ) else (
-    echo RMM System Secrets Management
+    echo Ruinos System Secrets Management
     echo.
     echo Usage: %0 ^<command^> [arguments]
     echo.
