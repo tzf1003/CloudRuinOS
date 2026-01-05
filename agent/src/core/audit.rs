@@ -382,7 +382,7 @@ impl AuditLogger {
 
         if let Some(first_part) = command_parts.first() {
             return sensitive_commands.iter().any(|&sensitive| {
-                first_part.contains(sensitive) || sensitive.contains(first_part)
+                *first_part == sensitive || first_part.contains(sensitive)
             });
         }
 

@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use proptest::prelude::*;
 use std::path::PathBuf;
 use std::process::Output;
+use std::sync::Arc;
 
 #[cfg(windows)]
 use std::os::windows::process::ExitStatusExt;
@@ -14,6 +15,7 @@ use std::os::unix::process::ExitStatusExt;
 pub struct MockCommandExecutor {
     expected_calls: std::sync::Mutex<Vec<(String, Vec<String>)>>,
     responses: std::sync::Mutex<Vec<Result<Output>>>,
+    custom_handler: std::sync::Mutex<Option<Arc<dyn Fn(&str, &[String]) -> Result<Output> + Send + Sync>>>,
 }
 
 impl MockCommandExecutor {
@@ -21,6 +23,7 @@ impl MockCommandExecutor {
         Self {
             expected_calls: std::sync::Mutex::new(Vec::new()),
             responses: std::sync::Mutex::new(Vec::new()),
+            custom_handler: std::sync::Mutex::new(None),
         }
     }
 
@@ -32,7 +35,7 @@ impl MockCommandExecutor {
     where
         F: Fn(&str, &[String]) -> Result<Output> + Send + Sync + 'static,
     {
-        // 简化的 mock 实现，实际项目中可能需要更复杂的 mock 框架
+        *self.custom_handler.lock().unwrap() = Some(Arc::new(f));
         self
     }
 }
@@ -40,12 +43,16 @@ impl MockCommandExecutor {
 #[async_trait]
 impl CommandExecutor for MockCommandExecutor {
     async fn execute(&self, cmd: &str, args: &[String]) -> Result<Output> {
-        // 模拟真实的命令执行行为
+        // 如果有自定义处理程序，优先使用它
+        if let Some(handler) = self.custom_handler.lock().unwrap().as_ref() {
+            return handler(cmd, args);
+        }
 
+        // 否则使用默认的模拟行为
         // 定义一些已知的"存在"的命令
         let valid_commands = [
             "echo", "ls", "dir", "cat", "type", "pwd", "whoami", "ps", "tasklist", "netstat",
-            "ipconfig", "ifconfig",
+            "ipconfig", "ifconfig", "sleep",
         ];
 
         // 检查命令是否存在

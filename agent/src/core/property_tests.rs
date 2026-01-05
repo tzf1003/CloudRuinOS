@@ -24,15 +24,41 @@ struct MockFileSystem;
 
 #[async_trait]
 impl crate::platform::FileSystem for MockFileSystem {
-    async fn list_files(&self, _path: &Path) -> anyhow::Result<Vec<crate::platform::FileInfo>> {
-        Ok(vec![])
+    async fn list_files(&self, path: &Path) -> anyhow::Result<Vec<crate::platform::FileInfo>> {
+        // 使用真实的文件系统读取目录
+        let mut entries = tokio::fs::read_dir(path).await?;
+        let mut files = Vec::new();
+
+        while let Some(entry) = entries.next_entry().await? {
+            let metadata = entry.metadata().await?;
+            let file_type = if metadata.is_dir() {
+                crate::platform::FileType::Directory
+            } else {
+                crate::platform::FileType::File
+            };
+
+            files.push(crate::platform::FileInfo {
+                name: entry.file_name().to_string_lossy().to_string(),
+                path: entry.path().to_string_lossy().to_string(),
+                size: metadata.len(),
+                is_directory: metadata.is_dir(),
+                modified: metadata.modified().ok(),
+                file_type,
+            });
+        }
+
+        Ok(files)
     }
 
-    async fn read_file(&self, _path: &Path) -> anyhow::Result<Vec<u8>> {
-        Ok(vec![])
+    async fn read_file(&self, path: &Path) -> anyhow::Result<Vec<u8>> {
+        // 使用真实的文件系统读取文件
+        let content = tokio::fs::read(path).await?;
+        Ok(content)
     }
 
-    async fn write_file(&self, _path: &Path, _data: &[u8]) -> anyhow::Result<()> {
+    async fn write_file(&self, path: &Path, data: &[u8]) -> anyhow::Result<()> {
+        // 使用真实的文件系统写入文件
+        tokio::fs::write(path, data).await?;
         Ok(())
     }
 }
