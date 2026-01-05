@@ -13,6 +13,10 @@ on:
     paths:
       - 'agent/**'
 
+# 添加权限配置，允许创建 Release
+permissions:
+  contents: write
+
 env:
   CARGO_TERM_COLOR: always
 
