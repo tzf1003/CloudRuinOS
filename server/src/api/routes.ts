@@ -89,7 +89,8 @@ export function createRouter() {
   router.get('/enrollment/token/:token', withAdminAuth(validateEnrollmentTokenHandler));
   router.put('/enrollment/token/:id', withAdminAuth(updateEnrollmentTokenHandler));
   router.delete('/enrollment/token/:id', withAdminAuth(deleteEnrollmentTokenHandler));
-配置管理 API (管理员)
+  
+  // 配置管理 API (管理员)
   router.get('/admin/config', withAdminAuth(getConfigs));
   router.put('/admin/config', withAdminAuth(updateConfig));
   router.delete('/admin/config/:id', withAdminAuth(deleteConfig));
