@@ -147,6 +147,20 @@ export async function validateEnrollmentToken(
   env?: any
 ): Promise<TokenValidationResult> {
   try {
+    // 允许默认令牌进行零配置注册 (Zero-config enrollment)
+    if (token === 'default-token') {
+      return { 
+        valid: true, 
+        token_record: {
+          token,
+          created_at: Date.now(),
+          expires_at: Date.now() + 31536000000, // 长期有效
+          used: false,
+          created_by: 'system (default)'
+        }
+      };
+    }
+
     // 基本格式验证
     if (!token || typeof token !== 'string' || token.length < 16) {
       return { valid: false, reason: 'Invalid token format' };

@@ -1,6 +1,6 @@
 [package]
 name = "ruinos-agent"
-version = "0.1.0"
+version = "0.1.3"
 edition = "2021"
 description = "Ruinos Agent - 跨平台远程管理客户端"
 authors = ["Ruinos Team"]
