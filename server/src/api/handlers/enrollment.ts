@@ -181,8 +181,8 @@ export async function enrollDevice(
       body.platform,
       body.version,
       publicKey,
-      existingDevice ? 're-enrolled' : 'success', // Distinguish re-enrollment
-      undefined,
+      'success',
+      existingDevice ? 'Device re-enrolled' : undefined,
       request
     );
 
