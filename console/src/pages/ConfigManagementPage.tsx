@@ -111,9 +111,14 @@ export function ConfigManagementPage() {
   }, []);
 
   const handleCreate = () => {
+    // Check if global config already exists
+    const hasGlobal = configs.some(c => c.scope === ConfigurationScope.GLOBAL);
+    
     setSelectedConfig(null);
-    setScope(ConfigurationScope.GLOBAL);
-    setTarget('default');
+    // If global exists, default to GROUP, otherwise GLOBAL
+    const defaultScope = hasGlobal ? ConfigurationScope.GROUP : ConfigurationScope.GLOBAL;
+    setScope(defaultScope);
+    setTarget(defaultScope === ConfigurationScope.GLOBAL ? 'default' : '');
     setConfigContent(JSON.stringify({
       heartbeat: {
         interval: 60
@@ -167,11 +172,16 @@ export function ConfigManagementPage() {
   };
 
   const handleDelete = async (config: Configuration) => {
+    if (config.scope === ConfigurationScope.GLOBAL) {
+        alert('全局配置禁止删除，请使用编辑功能修改。');
+        return;
+    }
+
     if (!confirm(`确定要删除 ${config.scope}:${config.target} 的配置吗？`)) return;
 
     startLoading();
     try {
-      await apiClient.deleteConfiguration(config.scope, config.target);
+      await apiClient.deleteConfiguration(config.id);
       fetchConfigs();
       if (selectedConfig?.id === config.id) {
         setSelectedConfig(null);
@@ -179,6 +189,7 @@ export function ConfigManagementPage() {
       }
     } catch (error) {
       console.error('Failed to delete configuration:', error);
+      alert('删除配置失败: ' + (error as any).message);
     } finally {
       stopLoading();
     }
@@ -314,7 +325,9 @@ export function ConfigManagementPage() {
                      disabled={!isCreating}
                      className="w-full bg-slate-950/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2 focus:ring-1 focus:ring-cyan-500 outline-none disabled:opacity-50"
                    >
-                     <option value={ConfigurationScope.GLOBAL}>全局</option>
+                     {/* Only allow selecting Global if it doesn't exist or we are creating it and want to enforce check (which we did in handleCreate default) */}
+                     {/* But user can still switch back to Global in dropdown unless we disable it */}
+                     <option value={ConfigurationScope.GLOBAL} disabled={isCreating && configs.some(c => c.scope === ConfigurationScope.GLOBAL)}>全局 {isCreating && configs.some(c => c.scope === ConfigurationScope.GLOBAL) ? '(已存在)' : ''}</option>
                      <option value={ConfigurationScope.GROUP}>组（令牌）</option>
                      <option value={ConfigurationScope.DEVICE}>设备</option>
                    </select>

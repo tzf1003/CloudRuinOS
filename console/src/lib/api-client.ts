@@ -284,25 +284,55 @@ class ApiClient {
     });
   }
 
+  // Helper to map DB row to frontend interface
+  private mapResponseToConfiguration(row: any): Configuration {
+      let configContent = {};
+      try {
+          configContent = typeof row.content === 'string' ? JSON.parse(row.content) : row.content;
+      } catch (e) {
+          console.warn('Failed to parse config content for id ' + row.id, e);
+      }
+      return {
+          id: row.id,
+          scope: row.scope,
+          target: row.target_id || (row.scope === 'global' ? 'default' : '-'),
+          config: configContent || {},
+          version: row.version,
+          updatedAt: row.updated_at * 1000, // Convert to ms for JS Date if needed, or keep as seconds? 
+          // Frontend usually expects ms or Date. Backend seems to store seconds (unixepoch()). 
+          // Let's assume frontend treats number as timestamp. If backend sends seconds, we might need * 1000?
+          // Looking at device lastSeen, it is usually seconds or ms. 
+          // Let's check other usages. DeviceRow has created_at INTEGER.
+          // Let's multiply by 1000 just in case to match JS Date.now() usually being ms.
+          // However, user's JSON showed: "created_at": 1767684109. This is seconds.
+          // If frontend uses new Date(timestamp), it expects ms. If it uses moment.unix(), it expects seconds.
+          // Let's stick to what it was or check usage.
+          // ConfigManagementPage uses: new Date(config.updatedAt).toLocaleString() ?? 
+          // No, it just shows {config.updatedBy}. It doesn't show date in the list snippet I saw?
+          // Wait, I saw it in list: NO.
+          // I saw detailed view: "最新版本 v... 由 ... 更新". No date shown.
+          // But let's check DeviceCard.tsx or similar if I can.
+          // Anyway, I'll pass raw value for now or assume seconds-to-ms if standard JS Date is used.
+          // 1767684109 seconds = year 2026. This matches current date context.
+          // JS Date takes ms. So 1767684109 * 1000.
+          updatedBy: row.updated_by
+      } as Configuration;
+  }
+
   // Configuration Management
   async getConfigurations(scope?: ConfigurationScope, target?: string): Promise<Configuration[]> {
     const response = await this.client.get<any>('/admin/config', {
       params: { scope, target }
     });
     
-    // Handle { data: [...] } wrapper returned by backend
+    let rawData: any[] = [];
     if (response.data && Array.isArray(response.data.data)) {
-      return response.data.data;
-    }
-    
-    // Fallback if it's directly an array
-    if (Array.isArray(response.data)) {
-      return response.data;
+      rawData = response.data.data;
+    } else if (Array.isArray(response.data)) {
+      rawData = response.data;
     }
 
-    // Default to empty array to prevent map errors
-    console.warn('Unexpected response format for getConfigurations:', response.data);
-    return [];
+    return rawData.map(row => this.mapResponseToConfiguration(row));
   }
 
   async getConfiguration(scope: ConfigurationScope, target = 'default'): Promise<Configuration | null> {
@@ -317,7 +347,7 @@ class ApiClient {
       }
 
       if (Array.isArray(data) && data.length > 0) {
-        return data[0];
+        return this.mapResponseToConfiguration(data[0]);
       }
       return null;
     } catch (error) {
@@ -348,8 +378,8 @@ class ApiClient {
     return response.data;
   }
 
-  async deleteConfiguration(scope: ConfigurationScope, target = 'default'): Promise<void> {
-    await this.client.delete(`/admin/config/${scope}/${encodeURIComponent(target)}`);
+  async deleteConfiguration(id: number): Promise<void> {
+    await this.client.delete(`/admin/config/${id}`);
   }
 
   // Audit Logs

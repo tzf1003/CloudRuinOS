@@ -127,9 +127,10 @@ export const VisualConfigEditor: React.FC<VisualConfigEditorProps> = ({
                 <label className="block text-sm font-medium text-slate-400 mb-1.5">心跳间隔 (秒)</label>
                 <input
                   type="number"
-                  value={config.heartbeat?.interval ?? 60}
+                  value={config.heartbeat?.interval ?? ''}
                   onChange={(e) => updateSection('heartbeat', 'interval', Number(e.target.value))}
-                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none"
+                  placeholder="60 (默认)"
+                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none placeholder:text-slate-600"
                 />
                 <p className="mt-1 text-xs text-slate-500">Agent 向服务器更新状态的频率</p>
               </div>
@@ -137,18 +138,20 @@ export const VisualConfigEditor: React.FC<VisualConfigEditorProps> = ({
                 <label className="block text-sm font-medium text-slate-400 mb-1.5">重试延迟 (秒)</label>
                 <input
                   type="number"
-                  value={config.heartbeat?.retry_delay ?? 5}
+                  value={config.heartbeat?.retry_delay ?? ''}
                   onChange={(e) => updateSection('heartbeat', 'retry_delay', Number(e.target.value))}
-                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none"
+                  placeholder="5 (默认)"
+                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none placeholder:text-slate-600"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-400 mb-1.5">重试次数</label>
                 <input
                   type="number"
-                  value={config.heartbeat?.retry_attempts ?? 3}
+                  value={config.heartbeat?.retry_attempts ?? ''}
                   onChange={(e) => updateSection('heartbeat', 'retry_attempts', Number(e.target.value))}
-                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none"
+                  placeholder="3 (默认)"
+                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none placeholder:text-slate-600"
                 />
               </div>
             </div>
@@ -238,10 +241,11 @@ export const VisualConfigEditor: React.FC<VisualConfigEditorProps> = ({
               <div>
                 <label className="block text-sm font-medium text-slate-400 mb-1.5">日志级别</label>
                 <select
-                  value={config.logging?.level ?? 'info'}
+                  value={config.logging?.level ?? ''}
                   onChange={(e) => updateSection('logging', 'level', e.target.value)}
                   className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none"
                 >
+                  <option value="" disabled className="text-slate-500">默认 (Info)</option>
                   <option value="trace">Trace (最详细)</option>
                   <option value="debug">Debug (调试)</option>
                   <option value="info">Info (标准)</option>
@@ -253,19 +257,20 @@ export const VisualConfigEditor: React.FC<VisualConfigEditorProps> = ({
                 <label className="block text-sm font-medium text-slate-400 mb-1.5">最大文件数</label>
                 <input
                   type="number"
-                  value={config.logging?.max_files ?? 5}
+                  value={config.logging?.max_files ?? ''}
                   onChange={(e) => updateSection('logging', 'max_files', Number(e.target.value))}
-                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none"
+                  placeholder="5 (默认)"
+                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none placeholder:text-slate-600"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-400 mb-1.5">最大文件大小</label>
                 <input
                   type="text"
-                  value={config.logging?.max_file_size ?? '10MB'}
+                  value={config.logging?.max_file_size ?? ''}
                   onChange={(e) => updateSection('logging', 'max_file_size', e.target.value)}
-                  placeholder="例如: 10MB"
-                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none"
+                  placeholder="10MB (默认)"
+                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none placeholder:text-slate-600"
                 />
               </div>
             </div>
@@ -281,18 +286,20 @@ export const VisualConfigEditor: React.FC<VisualConfigEditorProps> = ({
                 <label className="block text-sm font-medium text-slate-400 mb-1.5">初始重试延迟 (秒)</label>
                 <input
                   type="number"
-                  value={config.reconnect?.initial_delay ?? 1}
+                  value={config.reconnect?.initial_delay ?? ''}
                   onChange={(e) => updateSection('reconnect', 'initial_delay', Number(e.target.value))}
-                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none"
+                  placeholder="1 (默认)"
+                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none placeholder:text-slate-600"
                 />
               </div>
                <div>
                 <label className="block text-sm font-medium text-slate-400 mb-1.5">最大延迟 (秒)</label>
                 <input
                   type="number"
-                  value={config.reconnect?.max_delay ?? 60}
+                  value={config.reconnect?.max_delay ?? ''}
                   onChange={(e) => updateSection('reconnect', 'max_delay', Number(e.target.value))}
-                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none"
+                  placeholder="60 (默认)"
+                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none placeholder:text-slate-600"
                 />
               </div>
                <div>
@@ -300,18 +307,20 @@ export const VisualConfigEditor: React.FC<VisualConfigEditorProps> = ({
                 <input
                   type="number"
                   step="0.1"
-                  value={config.reconnect?.backoff_factor ?? 2.0}
+                  value={config.reconnect?.backoff_factor ?? ''}
                   onChange={(e) => updateSection('reconnect', 'backoff_factor', Number(e.target.value))}
-                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none"
+                  placeholder="2.0 (默认)"
+                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none placeholder:text-slate-600"
                 />
               </div>
                <div>
                 <label className="block text-sm font-medium text-slate-400 mb-1.5">最大尝试次数 (0 = 无限)</label>
                 <input
                   type="number"
-                  value={config.reconnect?.max_attempts ?? 0}
+                  value={config.reconnect?.max_attempts ?? ''}
                   onChange={(e) => updateSection('reconnect', 'max_attempts', Number(e.target.value))}
-                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none"
+                  placeholder="0 (默认)"
+                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none placeholder:text-slate-600"
                 />
               </div>
               <div className="flex items-center pt-2 md:col-span-2">
@@ -339,27 +348,30 @@ export const VisualConfigEditor: React.FC<VisualConfigEditorProps> = ({
                 <label className="block text-sm font-medium text-slate-400 mb-1.5">最大并发命令数</label>
                 <input
                   type="number"
-                  value={config.commands?.max_concurrent ?? 5}
+                  value={config.commands?.max_concurrent ?? ''}
                   onChange={(e) => updateSection('commands', 'max_concurrent', Number(e.target.value))}
-                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none"
+                  placeholder="5 (默认)"
+                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none placeholder:text-slate-600"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-400 mb-1.5">默认命令超时 (秒)</label>
                 <input
                   type="number"
-                  value={config.commands?.default_timeout ?? 30}
+                  value={config.commands?.default_timeout ?? ''}
                   onChange={(e) => updateSection('commands', 'default_timeout', Number(e.target.value))}
-                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none"
+                  placeholder="30 (默认)"
+                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none placeholder:text-slate-600"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-400 mb-1.5">最大文件操作大小</label>
                 <input
                   type="text"
-                  value={config.file_operations?.max_file_size ?? '100MB'}
+                  value={config.file_operations?.max_file_size ?? ''}
                   onChange={(e) => updateSection('file_operations', 'max_file_size', e.target.value)}
-                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none"
+                  placeholder="100MB (默认)"
+                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none placeholder:text-slate-600"
                 />
               </div>
               <div className="flex items-center pt-2 md:col-span-2">
