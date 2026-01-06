@@ -25,6 +25,7 @@ screenshots = []  # 截图功能，后期实现
 
 # 测试功能
 test-local = []  # 连接本地 Worker 进行测试
+mock-platform = [] # 使用模拟平台实现进行测试
 
 # 静态链接配置
 static-link = []

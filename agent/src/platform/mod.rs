@@ -212,6 +212,13 @@ pub fn create_command_executor() -> Result<Box<dyn CommandExecutor + Send + Sync
     #[cfg(all(target_os = "macos", feature = "macos"))]
     return Ok(Box::new(macos::MacOSCommandExecutor::new()));
 
+    #[cfg(feature = "mock-platform")]
+    return Ok(Box::new(MockCommandExecutor::new()));
+
+    // Fallback for testing when no platform feature is enabled
+    #[cfg(all(test, not(any(feature = "windows", feature = "linux", feature = "macos"))))]
+    return Ok(Box::new(tests::MockCommandExecutor::new()));
+
     #[cfg(not(any(
         all(target_os = "windows", feature = "windows"),
         all(target_os = "linux", feature = "linux"),
@@ -238,6 +245,13 @@ pub fn create_file_system() -> Result<Box<dyn FileSystem + Send + Sync>> {
     #[cfg(all(target_os = "macos", feature = "macos"))]
     return Ok(Box::new(macos::MacOSFileSystem::new()));
 
+    #[cfg(feature = "mock-platform")]
+    return Ok(Box::new(MockFileSystem::new()));
+
+    // Fallback for testing when no platform feature is enabled
+    #[cfg(all(test, not(any(feature = "windows", feature = "linux", feature = "macos"))))]
+    return Ok(Box::new(tests::MockFileSystem::new()));
+
     #[cfg(not(any(
         all(target_os = "windows", feature = "windows"),
         all(target_os = "linux", feature = "linux"),
@@ -249,3 +263,61 @@ pub fn create_file_system() -> Result<Box<dyn FileSystem + Send + Sync>> {
         std::env::consts::OS
     ))
 }
+
+#[cfg(any(test, feature = "mock-platform"))]
+pub struct MockCommandExecutor;
+
+#[cfg(any(test, feature = "mock-platform"))]
+impl MockCommandExecutor {
+    pub fn new() -> Self { Self }
+    
+    fn success_status() -> std::process::ExitStatus {
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::ExitStatusExt;
+            std::process::ExitStatus::from_raw(0)
+        }
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::ExitStatusExt;
+            std::process::ExitStatus::from_raw(0)
+        }
+        #[cfg(not(any(unix, windows)))]
+        panic!("Unsupported platform")
+    }
+}
+
+#[cfg(any(test, feature = "mock-platform"))]
+#[async_trait]
+impl CommandExecutor for MockCommandExecutor {
+    async fn execute(&self, cmd: &str, _args: &[String]) -> Result<Output> {
+        Ok(Output {
+            status: Self::success_status(),
+            stdout: format!("Mock output for {}", cmd).into_bytes(),
+            stderr: Vec::new(),
+        })
+    }
+}
+
+#[cfg(any(test, feature = "mock-platform"))]
+pub struct MockFileSystem;
+
+#[cfg(any(test, feature = "mock-platform"))]
+impl MockFileSystem {
+    pub fn new() -> Self { Self }
+}
+
+#[cfg(any(test, feature = "mock-platform"))]
+#[async_trait]
+impl FileSystem for MockFileSystem {
+    async fn list_files(&self, _path: &Path) -> Result<Vec<FileInfo>> {
+        Ok(Vec::new())
+    }
+    async fn read_file(&self, _path: &Path) -> Result<Vec<u8>> {
+        Ok(Vec::new())
+    }
+    async fn write_file(&self, _path: &Path, _data: &[u8]) -> Result<()> {
+        Ok(())
+    }
+}
+

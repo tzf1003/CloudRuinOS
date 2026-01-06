@@ -232,7 +232,7 @@ unit_test() {
     cd agent
     
     # 运行基础测试
-    if cargo test --quiet; then
+    if cargo test --features mock-platform --quiet; then
         log_info "✅ 单元测试通过"
     else
         log_error "❌ 单元测试失败"
@@ -241,7 +241,7 @@ unit_test() {
     fi
     
     # 运行集成测试
-    if cargo test --test integration_test --quiet; then
+    if cargo test --test integration_test --features mock-platform --quiet; then
         log_info "✅ 集成测试通过"
     else
         log_warn "⚠️ 集成测试失败或不存在"
@@ -276,7 +276,7 @@ $(grep -E "^\s*[a-zA-Z0-9_-]+\s*=" agent/Cargo.toml | grep -A 20 "\[features\]" 
 
 ### 测试状态
 - 编译检查: $(if cargo check --manifest-path agent/Cargo.toml --quiet; then echo "✅ 通过"; else echo "❌ 失败"; fi)
-- 单元测试: $(if cargo test --manifest-path agent/Cargo.toml --quiet; then echo "✅ 通过"; else echo "❌ 失败"; fi)
+- 单元测试: $(if cargo test --manifest-path agent/Cargo.toml --features mock-platform --quiet; then echo "✅ 通过"; else echo "❌ 失败"; fi)
 - 依赖检查: $(if cargo update --manifest-path agent/Cargo.toml --dry-run --quiet; then echo "✅ 通过"; else echo "❌ 失败"; fi)
 
 ## 建议

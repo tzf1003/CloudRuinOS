@@ -114,6 +114,28 @@ export interface AuditLog {
   timestamp: number;
 }
 
+export enum ConfigurationScope {
+  GLOBAL = 'global',
+  GROUP = 'group',
+  DEVICE = 'device'
+}
+
+export interface Configuration {
+  id: number;
+  scope: ConfigurationScope;
+  target: string;
+  config: Record<string, any>;
+  version: number;
+  updatedAt: number;
+  updatedBy: string;
+}
+
+export interface CreateConfigurationRequest {
+  scope: ConfigurationScope;
+  target?: string;
+  config: Record<string, any>;
+}
+
 export interface FileInfo {
   name: string;
   path: string;

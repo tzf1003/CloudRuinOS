@@ -77,6 +77,30 @@ impl CommandExecutor for MockCommandExecutor {
     }
 }
 
+// Mock FileSystem for testing
+pub struct MockFileSystem {
+    // Add fields if needed, e.g. in-memory file map
+}
+
+impl MockFileSystem {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+#[async_trait]
+impl FileSystem for MockFileSystem {
+    async fn list_files(&self, _path: &Path) -> Result<Vec<FileInfo>> {
+        Ok(Vec::new())
+    }
+    async fn read_file(&self, _path: &Path) -> Result<Vec<u8>> {
+        Ok(Vec::new())
+    }
+    async fn write_file(&self, _path: &Path, _data: &[u8]) -> Result<()> {
+        Ok(())
+    }
+}
+
 /// Property 26: 平台接口隔离
 /// *对于任何* 平台相关功能调用，Agent 应该通过 trait 接口正确隔离平台差异
 /// **Validates: Requirements 6.2**

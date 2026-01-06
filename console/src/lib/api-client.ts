@@ -14,7 +14,10 @@ import {
   HealthData,
   SystemMetrics,
   EnrollmentToken,
-  HealthStatus
+  HealthStatus,
+  Configuration,
+  CreateConfigurationRequest,
+  ConfigurationScope
 } from '../types/api';
 
 // Retry configuration interface
@@ -274,6 +277,42 @@ class ApiClient {
         'Content-Type': 'multipart/form-data',
       },
     });
+  }
+
+  // Configuration Management
+  async getConfigurations(scope?: ConfigurationScope, target?: string): Promise<Configuration[]> {
+    const response = await this.client.get<Configuration[]>('/admin/config', {
+      params: { scope, target }
+    });
+    return response.data;
+  }
+
+  async getConfiguration(scope: ConfigurationScope, target = 'default'): Promise<Configuration | null> {
+    try {
+      const response = await this.client.get<Configuration>(`/admin/config/${scope}/${encodeURIComponent(target)}`);
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return null; // Return null if not found
+      }
+      throw error;
+    }
+  }
+
+  async createConfiguration(config: CreateConfigurationRequest): Promise<Configuration> {
+    const response = await this.client.post<Configuration>('/admin/config', config);
+    return response.data;
+  }
+
+  async updateConfiguration(scope: ConfigurationScope, target: string, config: Record<string, any>): Promise<Configuration> {
+    const response = await this.client.put<Configuration>(`/admin/config/${scope}/${encodeURIComponent(target)}`, {
+      config
+    });
+    return response.data;
+  }
+
+  async deleteConfiguration(scope: ConfigurationScope, target = 'default'): Promise<void> {
+    await this.client.delete(`/admin/config/${scope}/${encodeURIComponent(target)}`);
   }
 
   // Audit Logs

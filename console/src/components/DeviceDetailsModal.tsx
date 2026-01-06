@@ -1,4 +1,5 @@
-import { X, Monitor, Cpu, HardDrive, Key } from 'lucide-react';
+import { X, Monitor, Cpu, HardDrive, Key, Settings } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Device } from '../types/api';
 import { formatTimestamp, formatRelativeTime, getDeviceStatusColor, cn } from '../lib/utils';
 
@@ -9,7 +10,14 @@ interface DeviceDetailsModalProps {
 }
 
 export function DeviceDetailsModal({ device, isOpen, onClose }: DeviceDetailsModalProps) {
+  const navigate = useNavigate();
   if (!isOpen || !device) return null;
+
+  const handleConfigManage = () => {
+      onClose();
+      navigate('/config');
+      // In a real app, we would pass config selection state via context or query params
+  };
 
   const statusColor = getDeviceStatusColor(device.status);
 
@@ -156,6 +164,13 @@ export function DeviceDetailsModal({ device, isOpen, onClose }: DeviceDetailsMod
 
           {/* Actions */}
           <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+            <button
+               onClick={handleConfigManage}
+               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center"
+            >
+               <Settings className="w-4 h-4 mr-2" />
+               配置管理
+            </button>
             <button
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"

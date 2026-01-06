@@ -11,6 +11,7 @@ import { SessionsPage } from './pages/SessionsPage';
 import { AuditPage } from './pages/AuditPage';
 import { StatusPage } from './pages/StatusPage';
 import { TokensPage } from './pages/TokensPage';
+import { ConfigManagementPage } from './pages/ConfigManagementPage';
 import { TerminalTestPage } from './pages/TerminalTestPage';
 import { LoginPage } from './pages/LoginPage';
 import { UIProvider } from './contexts/UIContext';
@@ -67,6 +68,11 @@ function App() {
                         <Route path="/tokens" element={
                           <RouteErrorBoundary routeName="令牌管理">
                             <TokensPage />
+                          </RouteErrorBoundary>
+                        } />
+                        <Route path="/config" element={
+                          <RouteErrorBoundary routeName="配置管理">
+                            <ConfigManagementPage />
                           </RouteErrorBoundary>
                         } />
                         <Route path="/audit" element={

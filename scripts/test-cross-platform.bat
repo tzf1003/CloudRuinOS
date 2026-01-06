@@ -184,7 +184,7 @@ if %errorlevel% equ 0 (
 REM 运行单元测试
 echo [INFO] 运行单元测试...
 
-cargo test --quiet >nul 2>&1
+cargo test --features mock-platform --quiet >nul 2>&1
 if %errorlevel% equ 0 (
     echo [INFO] ✅ 单元测试通过
 ) else (
@@ -194,7 +194,7 @@ if %errorlevel% equ 0 (
 )
 
 REM 运行集成测试
-cargo test --test integration_test --quiet >nul 2>&1
+cargo test --test integration_test --features mock-platform --quiet >nul 2>&1
 if %errorlevel% equ 0 (
     echo [INFO] ✅ 集成测试通过
 ) else (

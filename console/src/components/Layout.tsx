@@ -8,7 +8,8 @@ import {
   FolderOpen,
   BarChart3,
   Menu,
-  X
+  X,
+  Settings
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useState } from 'react';
@@ -25,6 +26,7 @@ const navigation = [
   { name: '文件管理', href: '/files', icon: FolderOpen },
   { name: '会话管理', href: '/sessions', icon: Radio },
   { name: '令牌管理', href: '/tokens', icon: Key },
+  { name: '配置管理', href: '/config', icon: Settings },
   { name: '审计日志', href: '/audit', icon: FileText },
   { name: '系统状态', href: '/status', icon: Activity },
 ];

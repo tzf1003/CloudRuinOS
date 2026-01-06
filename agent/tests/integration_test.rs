@@ -1,11 +1,23 @@
-use rmm_agent::Agent;
+use ruinos_agent::Agent;
+use ruinos_agent::config::{ConfigManager, BootstrapConfig};
 use std::time::Duration;
 use tokio::time::timeout;
+use anyhow::Result;
+
+// Helper to create a test agent
+async fn create_test_agent() -> Result<Agent> {
+    let bootstrap = BootstrapConfig {
+        server_url: "http://localhost:8080".to_string(),
+        enrollment_token: Some("test-token".to_string()),
+    };
+    let config_manager = ConfigManager::new(bootstrap);
+    Agent::new_with_config(config_manager).await
+}
 
 #[tokio::test]
 async fn test_agent_instantiation() {
     // 测试 Agent 能够成功创建
-    let result = timeout(Duration::from_secs(10), Agent::new()).await;
+    let result = timeout(Duration::from_secs(10), create_test_agent()).await;
 
     match result {
         Ok(Ok(agent)) => {
@@ -33,7 +45,7 @@ async fn test_agent_instantiation() {
 #[tokio::test]
 async fn test_agent_configuration() {
     // 测试 Agent 配置管理
-    let agent = Agent::new().await.expect("Agent 创建失败");
+    let agent = create_test_agent().await.expect("Failed to create agent");
 
     let config = agent.state_manager().get_config().await;
 
@@ -47,7 +59,7 @@ async fn test_agent_configuration() {
 
 #[tokio::test]
 async fn test_crypto_functionality() {
-    use rmm_agent::core::crypto::CryptoManager;
+    use ruinos_agent::core::crypto::CryptoManager;
 
     // 测试加密功能
     let crypto_manager = CryptoManager::generate().expect("密钥对生成失败");
@@ -76,7 +88,7 @@ async fn test_crypto_functionality() {
 
 #[tokio::test]
 async fn test_platform_abstraction() {
-    use rmm_agent::platform::{create_command_executor, create_file_system};
+    use ruinos_agent::platform::{create_command_executor, create_file_system};
 
     // 测试平台抽象 - 现在返回 Result
     let executor_result = create_command_executor();
@@ -86,7 +98,8 @@ async fn test_platform_abstraction() {
     #[cfg(any(
         all(target_os = "windows", feature = "windows"),
         all(target_os = "linux", feature = "linux"),
-        all(target_os = "macos", feature = "macos")
+        all(target_os = "macos", feature = "macos"),
+        feature = "mock-platform"
     ))]
     {
         assert!(executor_result.is_ok(), "命令执行器创建应该成功");
@@ -99,7 +112,8 @@ async fn test_platform_abstraction() {
     #[cfg(not(any(
         all(target_os = "windows", feature = "windows"),
         all(target_os = "linux", feature = "linux"),
-        all(target_os = "macos", feature = "macos")
+        all(target_os = "macos", feature = "macos"),
+        feature = "mock-platform"
     )))]
     {
         assert!(executor_result.is_err(), "不支持的平台应该返回错误");
