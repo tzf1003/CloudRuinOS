@@ -109,9 +109,16 @@ impl EnrollmentClient {
             // 设置设备 ID
             crypto_manager.set_device_id(device_id.clone());
 
-            // 保存凭证到文件
-            crypto_manager.save_credentials(credentials_path, device_id.clone())?;
-            info!("Device credentials saved to: {:?}", credentials_path);
+            // 仅当配置路径非空时保存凭证（避免 data_v5 创建）
+            // 在内存模式下，我们通过每次启动时重新注册（使用 MAC 地址身份）来获取会话和确认身份
+            // 只要 MAC 地址不变，Agent ID 就不变
+            let save_path_str = credentials_path.to_string_lossy();
+            if !save_path_str.contains("data_v5") && !save_path_str.is_empty() {
+                crypto_manager.save_credentials(credentials_path, device_id.clone())?;
+                info!("Device credentials saved to: {:?}", credentials_path);
+            } else {
+                 info!("Skipping credential persistence (Memory-only mode or data_v5 avoidance)");
+            }
 
             // 更新状态管理器
             state_manager

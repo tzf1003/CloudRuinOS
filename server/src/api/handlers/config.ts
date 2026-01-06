@@ -3,6 +3,7 @@ import { Env } from '../../index';
 import { verifyRequestIntegrity } from '../utils/crypto';
 import { getDeviceById } from '../utils/database';
 import { ConfigurationRow } from '../../database/schema';
+import { createKVManager } from '../../storage/kv-manager';
 
 // Helper: Deep Merge
 function deepMerge(target: any, source: any): any {
@@ -202,10 +203,47 @@ export async function updateConfig(request: Request, env: Env): Promise<Response
             `).bind(scope, targetId, contentStr, now, now).run();
         }
 
+        // Push 'config_update' command to relevant device(s)
+        const kvManager = createKVManager(env.KV);
+        const commandPayload = { config: JSON.parse(contentStr) }; // Send the config content
+        const commandType = 'config_update';
+        const commandTTL = 86400; // 24 hours
+
+        if (scope === 'device') {
+            await pushCommandToDevice(kvManager, targetId!, commandType, commandPayload, commandTTL);
+        } else if (scope === 'token') {
+             // For group/token scope, we need to find all devices enrolled with this token
+             const { results: devices } = await env.DB.prepare('SELECT id FROM devices WHERE enrollment_token = ?').bind(targetId).all<any>();
+             for (const device of devices) {
+                 await pushCommandToDevice(kvManager, device.id, commandType, commandPayload, commandTTL);
+             }
+        } 
+        // Note: Global scope updates might require a different strategy (e.g. version check during heartbeat) 
+        // to avoid enqueueing millions of commands. For now, we skip auto-push for global scope, 
+        // assuming global config is pulled on startup or periodic sync.
+
         return new Response(JSON.stringify({ status: 'ok' }), { headers: { 'Content-Type': 'application/json' } });
     } catch (e: any) {
          return new Response(JSON.stringify({ error: e.message }), { status: 500 });
     }
+}
+
+// Helper to push command
+async function pushCommandToDevice(kvManager: any, deviceId: string, type: string, payload: any, ttl: number) {
+    const commandId = crypto.randomUUID();
+    const command = {
+        id: commandId,
+        device_id: deviceId,
+        type: type,
+        priority: 'high',
+        payload: payload,
+        status: 'pending',
+        created_at: Date.now(),
+        expires_at: Date.now() + (ttl * 1000),
+        retry_count: 0,
+        max_retries: 3
+    };
+    await kvManager.enqueueCommand(command);
 }
 
 export async function deleteConfig(request: Request, env: Env): Promise<Response> {
