@@ -16,13 +16,13 @@ pub mod property_tests;
 pub mod network_config_tests;
 
 use anyhow::Result;
-use std::path::PathBuf;
-use std::time::Duration;
-use tracing::{error, info};
 use base64::{engine::general_purpose, Engine as _};
 use serde_json::json;
+use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::RwLock;
+use tracing::{error, info};
 
 use crate::config::ConfigManager;
 use crate::platform::{create_command_executor, create_file_system};
@@ -109,7 +109,7 @@ impl Agent {
         // 尝试加载现有凭证
         let credentials_file = config.credentials_path();
         let crypto_manager = if credentials_file.exists() {
-             match CryptoManager::from_credentials_file(&credentials_file) {
+            match CryptoManager::from_credentials_file(&credentials_file) {
                 Ok(manager) => {
                     info!("Loaded existing credentials from: {:?}", credentials_file);
                     Some(manager)
@@ -120,7 +120,7 @@ impl Agent {
                 }
             }
         } else {
-             None
+            None
         };
 
         Ok(Self {
@@ -159,43 +159,59 @@ impl Agent {
             let enrollment_status = self.state_manager.get_enrollment_status().await;
             match enrollment_status {
                 EnrollmentStatus::NotEnrolled => {
-                    let token = self.config_manager.read().await.bootstrap.enrollment_token.clone()
-                        .unwrap_or_else(|| "".to_string()); 
-                        
-                    info!("Agent not enrolled. Attempting enrollment with token: '{}'", if token.is_empty() { "DEFAULT" } else { &token });
-                    
+                    let token = self
+                        .config_manager
+                        .read()
+                        .await
+                        .bootstrap
+                        .enrollment_token
+                        .clone()
+                        .unwrap_or_else(|| "".to_string());
+
+                    info!(
+                        "Agent not enrolled. Attempting enrollment with token: '{}'",
+                        if token.is_empty() { "DEFAULT" } else { &token }
+                    );
+
                     match self.enroll_with_token(token).await {
                         Ok(device_id) => {
-                                info!("Enrollment successful. Device ID: {}", device_id);
-                                // Reload crypto manager
-                                let config_dir = Self::get_config_dir()?;
-                                let credentials_file = config_dir.join("credentials.json");
-                                self.crypto_manager = Some(CryptoManager::from_credentials_file(&credentials_file)?);
-                                self.config_manager.write().await.update_device_id(device_id)?;
-                                // Loop continues and will hit Enrolled state next
-                            },
-                            Err(e) => {
-                                error!("Enrollment failed: {}", e);
-                                tokio::time::sleep(Duration::from_secs(10)).await;
-                            }
+                            info!("Enrollment successful. Device ID: {}", device_id);
+                            // Reload crypto manager
+                            let config_dir = Self::get_config_dir()?;
+                            let credentials_file = config_dir.join("credentials.json");
+                            self.crypto_manager =
+                                Some(CryptoManager::from_credentials_file(&credentials_file)?);
+                            self.config_manager
+                                .write()
+                                .await
+                                .update_device_id(device_id)?;
+                            // Loop continues and will hit Enrolled state next
                         }
+                        Err(e) => {
+                            error!("Enrollment failed: {}", e);
+                            tokio::time::sleep(Duration::from_secs(10)).await;
+                        }
+                    }
                     // Removed else { wait } block because we always try
                 }
                 EnrollmentStatus::Enrolled => {
                     info!("Agent enrolled, starting normal operation");
-                    
+
                     // 确保 CryptoManager 已加载 (如果是刚注册完，上面已经加载了；如果是重启，可能未加载)
                     if self.crypto_manager.is_none() {
-                         let config_dir = Self::get_config_dir()?;
-                         let credentials_file = config_dir.join("credentials.json");
-                         if credentials_file.exists() {
-                             self.crypto_manager = Some(CryptoManager::from_credentials_file(&credentials_file)?);
-                         } else {
-                             // 状态是 Enrolled 但没有文件？状态不一致
-                             error!("Enrolled state but no credentials file! Resetting status.");
-                             self.state_manager.set_enrollment_status(EnrollmentStatus::NotEnrolled).await?;
-                             continue;
-                         }
+                        let config_dir = Self::get_config_dir()?;
+                        let credentials_file = config_dir.join("credentials.json");
+                        if credentials_file.exists() {
+                            self.crypto_manager =
+                                Some(CryptoManager::from_credentials_file(&credentials_file)?);
+                        } else {
+                            // 状态是 Enrolled 但没有文件？状态不一致
+                            error!("Enrolled state but no credentials file! Resetting status.");
+                            self.state_manager
+                                .set_enrollment_status(EnrollmentStatus::NotEnrolled)
+                                .await?;
+                            continue;
+                        }
                     }
 
                     // 同步配置
@@ -214,7 +230,11 @@ impl Agent {
 
                             tokio::spawn(async move {
                                 if let Err(e) = heartbeat_client
-                                    .start_heartbeat_loop(&crypto_manager, &state_manager, &config_manager)
+                                    .start_heartbeat_loop(
+                                        &crypto_manager,
+                                        &state_manager,
+                                        &config_manager,
+                                    )
                                     .await
                                 {
                                     error!("Heartbeat loop failed: {}", e);
@@ -245,8 +265,10 @@ impl Agent {
                 EnrollmentStatus::EnrollmentFailed(ref error) => {
                     error!("Agent enrollment failed previously: {}", error);
                     // Reset to retry
-                     self.state_manager.set_enrollment_status(EnrollmentStatus::NotEnrolled).await?;
-                     tokio::time::sleep(Duration::from_secs(5)).await;
+                    self.state_manager
+                        .set_enrollment_status(EnrollmentStatus::NotEnrolled)
+                        .await?;
+                    tokio::time::sleep(Duration::from_secs(5)).await;
                 }
             }
         }
@@ -301,56 +323,64 @@ impl Agent {
             let base_url = &cm.config().server.base_url;
             format!("{}/agent/config", base_url.trim_end_matches('/'))
         };
-        
+
         info!("Syncing config from {}", url);
-        
+
         // Scope for read lock to get Device ID
         let device_id = {
             let cm = self.config_manager.read().await;
-            cm.config().agent.device_id.clone().ok_or(anyhow::anyhow!("No Device ID"))?
+            cm.config()
+                .agent
+                .device_id
+                .clone()
+                .ok_or(anyhow::anyhow!("No Device ID"))?
         };
-            
+
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?
             .as_millis() as u64;
-            
+
         let nonce = CryptoManager::generate_nonce();
-        
+
         let payload = json!({
             "device_id": device_id,
             "timestamp": timestamp,
             "nonce": nonce,
         });
-        
+
         // 签名
-        let signature = self.crypto_manager.as_ref().unwrap().sign(payload.to_string().as_bytes());
-        
+        let signature = self
+            .crypto_manager
+            .as_ref()
+            .unwrap()
+            .sign(payload.to_string().as_bytes());
+
         let body = json!({
             "device_id": device_id,
             "timestamp": timestamp,
             "nonce": nonce,
             "signature": signature,
         });
-        
+
         // 使用 http_client 发送请求
-        let response = self.http_client.post(&url)
-            .json(&body)
-            .send()
-            .await?;
-            
+        let response = self.http_client.post(&url).json(&body).send().await?;
+
         if !response.status().is_success() {
-             let error_text = response.text().await?;
-             error!("Config sync failed: {}", error_text);
-             return Ok(());
+            let error_text = response.text().await?;
+            error!("Config sync failed: {}", error_text);
+            return Ok(());
         }
 
         let resp_json: serde_json::Value = response.json().await?;
-        
+
         if let Some(config_content) = resp_json.get("config") {
-            self.config_manager.write().await.update_from_json(&config_content.to_string())?;
+            self.config_manager
+                .write()
+                .await
+                .update_from_json(&config_content.to_string())?;
             info!("Dynamic config updated via sync");
         }
-        
+
         Ok(())
     }
 

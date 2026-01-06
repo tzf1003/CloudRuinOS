@@ -216,7 +216,10 @@ pub fn create_command_executor() -> Result<Box<dyn CommandExecutor + Send + Sync
     return Ok(Box::new(MockCommandExecutor::new()));
 
     // Fallback for testing when no platform feature is enabled
-    #[cfg(all(test, not(any(feature = "windows", feature = "linux", feature = "macos"))))]
+    #[cfg(all(
+        test,
+        not(any(feature = "windows", feature = "linux", feature = "macos"))
+    ))]
     return Ok(Box::new(tests::MockCommandExecutor::new()));
 
     #[cfg(not(any(
@@ -249,7 +252,10 @@ pub fn create_file_system() -> Result<Box<dyn FileSystem + Send + Sync>> {
     return Ok(Box::new(MockFileSystem::new()));
 
     // Fallback for testing when no platform feature is enabled
-    #[cfg(all(test, not(any(feature = "windows", feature = "linux", feature = "macos"))))]
+    #[cfg(all(
+        test,
+        not(any(feature = "windows", feature = "linux", feature = "macos"))
+    ))]
     return Ok(Box::new(tests::MockFileSystem::new()));
 
     #[cfg(not(any(
@@ -269,8 +275,10 @@ pub struct MockCommandExecutor;
 
 #[cfg(any(test, feature = "mock-platform"))]
 impl MockCommandExecutor {
-    pub fn new() -> Self { Self }
-    
+    pub fn new() -> Self {
+        Self
+    }
+
     fn success_status() -> std::process::ExitStatus {
         #[cfg(unix)]
         {
@@ -304,7 +312,9 @@ pub struct MockFileSystem;
 
 #[cfg(any(test, feature = "mock-platform"))]
 impl MockFileSystem {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 #[cfg(any(test, feature = "mock-platform"))]
@@ -320,4 +330,3 @@ impl FileSystem for MockFileSystem {
         Ok(())
     }
 }
-

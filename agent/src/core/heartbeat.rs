@@ -1,9 +1,9 @@
 use anyhow::{anyhow, Result};
 use serde_json::json;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tracing::{debug, error, info, warn};
 use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
+use tracing::{debug, error, info, warn};
 
 use crate::config::ConfigManager;
 use crate::core::crypto::{CryptoManager, SignableData};
@@ -94,7 +94,8 @@ impl HeartbeatClient {
         debug!("Sending heartbeat for device: {}", device_id);
 
         // 发送请求
-        self.send_heartbeat_with_retry(&heartbeat_request, server_url).await
+        self.send_heartbeat_with_retry(&heartbeat_request, server_url)
+            .await
     }
 
     /// 带重试的心跳发送
@@ -173,10 +174,13 @@ impl HeartbeatClient {
         config_manager: &Arc<RwLock<ConfigManager>>,
     ) -> Result<()> {
         let (mut interval_duration, mut server_url) = {
-             let cm = config_manager.read().await;
-             (cm.config().heartbeat_interval(), cm.config().heartbeat_url())
+            let cm = config_manager.read().await;
+            (
+                cm.config().heartbeat_interval(),
+                cm.config().heartbeat_url(),
+            )
         };
-        
+
         info!(
             "Starting heartbeat loop with interval: {:?}",
             interval_duration
@@ -184,35 +188,41 @@ impl HeartbeatClient {
 
         let mut interval = tokio::time::interval(interval_duration);
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-        
+
         // Consume first tick
         interval.tick().await;
 
         loop {
             // Check for config updates
             {
-                 let cm = config_manager.read().await;
-                 let new_interval = cm.config().heartbeat_interval();
-                 let new_url = cm.config().heartbeat_url();
-                 
-                 if new_interval != interval_duration {
-                      info!("Heartbeat interval updated: {:?} -> {:?}", interval_duration, new_interval);
-                      interval_duration = new_interval;
-                      interval = tokio::time::interval(interval_duration);
-                      interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-                      interval.tick().await; // Reset tick
-                 }
-                 
-                 if new_url != server_url {
-                      info!("Heartbeat URL updated: {} -> {}", server_url, new_url);
-                      server_url = new_url;
-                 }
+                let cm = config_manager.read().await;
+                let new_interval = cm.config().heartbeat_interval();
+                let new_url = cm.config().heartbeat_url();
+
+                if new_interval != interval_duration {
+                    info!(
+                        "Heartbeat interval updated: {:?} -> {:?}",
+                        interval_duration, new_interval
+                    );
+                    interval_duration = new_interval;
+                    interval = tokio::time::interval(interval_duration);
+                    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                    interval.tick().await; // Reset tick
+                }
+
+                if new_url != server_url {
+                    info!("Heartbeat URL updated: {} -> {}", server_url, new_url);
+                    server_url = new_url;
+                }
             }
-            
+
             // Wait for next tick
             interval.tick().await;
 
-            match self.send_heartbeat(crypto_manager, state_manager, &server_url).await {
+            match self
+                .send_heartbeat(crypto_manager, state_manager, &server_url)
+                .await
+            {
                 Ok(response) => {
                     debug!("Heartbeat successful: {:?}", response);
 
@@ -220,7 +230,10 @@ impl HeartbeatClient {
                     if let Some(commands) = response.commands {
                         info!("Received {} commands from server", commands.len());
                         for cmd in commands {
-                            if let Err(e) = self.process_command(&cmd, state_manager, config_manager).await {
+                            if let Err(e) = self
+                                .process_command(&cmd, state_manager, config_manager)
+                                .await
+                            {
                                 error!("Failed to process command {}: {}", cmd.id, e);
                             }
                         }
@@ -262,10 +275,10 @@ impl HeartbeatClient {
 
     /// 处理服务端下发的命令
     async fn process_command(
-        &self, 
-        cmd: &Command, 
+        &self,
+        cmd: &Command,
         _state_manager: &StateManager,
-        config_manager: &Arc<RwLock<ConfigManager>>
+        config_manager: &Arc<RwLock<ConfigManager>>,
     ) -> Result<()> {
         info!(
             "Processing command: {} (type: {:?})",
@@ -275,13 +288,19 @@ impl HeartbeatClient {
         match cmd.command_type {
             CommandType::ConfigUpdate => {
                 info!("Received config update command");
-                 if let Some(config_content) = cmd.payload.get("config") {
-                    config_manager.write().await.update_from_json(&config_content.to_string())?;
+                if let Some(config_content) = cmd.payload.get("config") {
+                    config_manager
+                        .write()
+                        .await
+                        .update_from_json(&config_content.to_string())?;
                     info!("Configuration updated successfully via heartbeat");
-                 } else {
-                     warn!("ConfigUpdate command missing 'config' payload payload: {:?}", cmd.payload);
-                 }
-                 return Ok(());
+                } else {
+                    warn!(
+                        "ConfigUpdate command missing 'config' payload payload: {:?}",
+                        cmd.payload
+                    );
+                }
+                return Ok(());
             }
             CommandType::Upgrade => {
                 // 处理升级命令

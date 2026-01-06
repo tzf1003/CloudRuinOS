@@ -3,7 +3,7 @@
 // Property 28: 配置热更新
 // Validates: Requirements 6.4, 6.5
 
-use crate::config::{AgentConfig, ConfigManager, SecuritySection, BootstrapConfig};
+use crate::config::{AgentConfig, BootstrapConfig, ConfigManager, SecuritySection};
 use proptest::prelude::*;
 // file imports removed as they are no longer needed
 use tempfile::TempDir;
@@ -90,7 +90,7 @@ mod tests {
                 enrollment_token: None,
             };
             let mut manager = ConfigManager::new(bootstrap);
-            
+
             // 应用初始配置
             let initial_json = serde_json::to_string(&initial_config).expect("Serialize initial config failed");
             manager.update_from_json(&initial_json).expect("Initial update failed");
@@ -173,7 +173,7 @@ mod tests {
                 enrollment_token: None,
             };
             let mut manager = ConfigManager::new(bootstrap);
-            
+
             // 应用配置
             let json = serde_json::to_string(&config).expect("Serialize config failed");
             manager.update_from_json(&json).expect("Update failed");
@@ -203,7 +203,7 @@ mod tests {
                 enrollment_token: None,
             };
             let mut manager = ConfigManager::new(bootstrap);
-            
+
             // 应用配置
             let json = serde_json::to_string(&config).expect("Serialize config failed");
             manager.update_from_json(&json).expect("Update failed");
@@ -231,7 +231,7 @@ mod tests {
                  enrollment_token: None,
             };
             let mut manager = ConfigManager::new(bootstrap);
-            
+
             // 构建完整配置
             let mut config = manager.config().clone();
             config.security.tls_verify = tls_verify;
@@ -262,16 +262,18 @@ mod tests {
     fn test_network_feature_toggle_basic() {
         // 创建初始配置
         let bootstrap = BootstrapConfig {
-                 server_url: "http://default".to_string(),
-                 enrollment_token: None,
+            server_url: "http://default".to_string(),
+            enrollment_token: None,
         };
         let mut manager = ConfigManager::new(bootstrap);
-        
+
         let mut initial_config = manager.config().clone();
         initial_config.security.doh_enabled = false;
         initial_config.security.ech_enabled = false;
 
-        manager.update_from_json(&serde_json::to_string(&initial_config).unwrap()).unwrap();
+        manager
+            .update_from_json(&serde_json::to_string(&initial_config).unwrap())
+            .unwrap();
 
         assert!(!manager.config().security.doh_enabled);
         assert!(!manager.config().security.ech_enabled);
@@ -281,7 +283,9 @@ mod tests {
         updated_config.security.doh_enabled = true;
         updated_config.security.ech_enabled = true;
 
-        manager.update_from_json(&serde_json::to_string(&updated_config).unwrap()).unwrap();
+        manager
+            .update_from_json(&serde_json::to_string(&updated_config).unwrap())
+            .unwrap();
 
         // 验证新配置生效
         assert!(manager.config().security.doh_enabled);
@@ -291,8 +295,8 @@ mod tests {
     #[test]
     fn test_config_hot_reload_basic() {
         let bootstrap = BootstrapConfig {
-             server_url: "http://default".to_string(),
-             enrollment_token: None,
+            server_url: "http://default".to_string(),
+            enrollment_token: None,
         };
         let mut manager = ConfigManager::new(bootstrap);
 
@@ -300,8 +304,10 @@ mod tests {
         let mut config1 = manager.config().clone();
         config1.heartbeat.interval = 30;
         config1.security.tls_verify = true;
-        
-        manager.update_from_json(&serde_json::to_string(&config1).unwrap()).unwrap();
+
+        manager
+            .update_from_json(&serde_json::to_string(&config1).unwrap())
+            .unwrap();
 
         assert_eq!(manager.config().heartbeat.interval, 30);
         assert!(manager.config().security.tls_verify);
@@ -311,7 +317,9 @@ mod tests {
         config2.heartbeat.interval = 60;
         config2.security.tls_verify = false;
 
-        manager.update_from_json(&serde_json::to_string(&config2).unwrap()).unwrap();
+        manager
+            .update_from_json(&serde_json::to_string(&config2).unwrap())
+            .unwrap();
 
         // 验证新配置生效
         assert_eq!(manager.config().heartbeat.interval, 60);

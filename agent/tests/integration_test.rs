@@ -1,8 +1,8 @@
+use anyhow::Result;
+use ruinos_agent::config::{BootstrapConfig, ConfigManager};
 use ruinos_agent::Agent;
-use ruinos_agent::config::{ConfigManager, BootstrapConfig};
 use std::time::Duration;
 use tokio::time::timeout;
-use anyhow::Result;
 
 // Helper to create a test agent
 async fn create_test_agent() -> Result<Agent> {

@@ -162,41 +162,38 @@ impl ConfigManager {
     /// 使用 Bootstrap 配置初始化
     pub fn new(bootstrap: BootstrapConfig) -> Self {
         let mut config = Self::create_default_config();
-        
+
         // 应用 Bootstrap 配置
         config.server.base_url = bootstrap.server_url.clone();
-        
+
         info!("初始化配置管理器 (Bootstrap URL: {})", bootstrap.server_url);
 
-        Self {
-            config,
-            bootstrap,
-        }
+        Self { config, bootstrap }
     }
 
     /// 从 JSON 更新动态配置 (内存中)
     pub fn update_from_json(&mut self, json_content: &str) -> Result<()> {
-         let new_config: AgentConfig = serde_json::from_str(json_content)
-            .map_err(|e| anyhow!("解析服务器配置失败: {}", e))?;
-        
-         // 验证新配置
-         // 注意：我们可能需要保留某些本地状态 (如 device_id)
-         let current_device_id = self.config.agent.device_id.clone();
-         
-         self.config = new_config;
-         
-         // 恢复设备 ID (防止配置覆盖丢失 ID)
-         if self.config.agent.device_id.is_none() {
-             self.config.agent.device_id = current_device_id;
-         }
-         
-         // 强制覆盖 Server URL 为 Bootstrap 的值 (防止配置错误导致断连)
-         self.config.server.base_url = self.bootstrap.server_url.clone();
+        let new_config: AgentConfig =
+            serde_json::from_str(json_content).map_err(|e| anyhow!("解析服务器配置失败: {}", e))?;
 
-         info!("已更新内存配置");
-         Ok(())
+        // 验证新配置
+        // 注意：我们可能需要保留某些本地状态 (如 device_id)
+        let current_device_id = self.config.agent.device_id.clone();
+
+        self.config = new_config;
+
+        // 恢复设备 ID (防止配置覆盖丢失 ID)
+        if self.config.agent.device_id.is_none() {
+            self.config.agent.device_id = current_device_id;
+        }
+
+        // 强制覆盖 Server URL 为 Bootstrap 的值 (防止配置错误导致断连)
+        self.config.server.base_url = self.bootstrap.server_url.clone();
+
+        info!("已更新内存配置");
+        Ok(())
     }
-    
+
     // Legacy methods placeholders or removed
 
     /// 获取配置
@@ -209,7 +206,7 @@ impl ConfigManager {
         self.config.agent.device_id = Some(device_id);
         Ok(())
     }
-    
+
     /// 验证配置
     pub fn validate_config(config: &mut AgentConfig) -> Result<()> {
         // 验证服务器 URL

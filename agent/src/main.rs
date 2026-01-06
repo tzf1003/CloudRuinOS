@@ -7,7 +7,7 @@ mod core;
 mod platform;
 mod transport;
 
-use crate::config::{ConfigManager, BootstrapConfig};
+use crate::config::{BootstrapConfig, ConfigManager};
 use crate::core::Agent;
 
 // 构建时信息
@@ -64,14 +64,14 @@ async fn main() -> Result<()> {
             }
         }
     }
-    
+
     // 如果命令行未指定，尝试从环境变量获取
     if server_url.is_none() {
         if let Ok(url) = env::var("RMM_SERVER_URL") {
             server_url = Some(url);
         }
     }
-    
+
     if enrollment_token.is_none() {
         if let Ok(token) = env::var("RMM_ENROLLMENT_TOKEN") {
             enrollment_token = Some(token);
@@ -83,7 +83,7 @@ async fn main() -> Result<()> {
         server_url: server_url.unwrap_or_else(|| "https://api.c.54321000.xyz".to_string()),
         enrollment_token,
     };
-    
+
     let config_manager = ConfigManager::new(bootstrap);
 
     // 初始化日志
