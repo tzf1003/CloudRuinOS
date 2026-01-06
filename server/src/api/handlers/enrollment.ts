@@ -134,13 +134,13 @@ export async function enrollDevice(
     }
 
     // 标记 enrollment token 为已使用
-    await kvManager.markTokenUsed(body.enrollment_token, deviceId);
+    await kvManager.markTokenUsed(tokenToValidate, deviceId);
 
     // 记录成功的注册事件
     const auditService = createAuditService(env);
     await auditService.logDeviceRegistration(
       deviceId,
-      body.enrollment_token,
+      tokenToValidate,
       body.platform,
       body.version,
       keyPair.publicKey,

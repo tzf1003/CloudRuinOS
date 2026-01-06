@@ -135,14 +135,15 @@ impl HeartbeatClient {
         request: &HeartbeatRequest,
         server_url: &str,
     ) -> Result<HeartbeatResponse> {
-        let url = format!("{}/agent/heartbeat", server_url);
+        // server_url 已经包含了 /agent/heartbeat 端点
+        let url = server_url;
         let body = serde_json::to_string(request)?;
 
         debug!("Sending heartbeat to: {}", url);
 
         let response = self
             .http_client
-            .post(&url)
+            .post(url)
             .header("Content-Type", "application/json")
             .body(body)
             .send()

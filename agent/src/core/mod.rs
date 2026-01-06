@@ -140,6 +140,14 @@ impl Agent {
     pub async fn run(&mut self) -> Result<()> {
         info!("Ruinos Agent starting");
 
+        // 如果启动时发现状态为 Enrolling，说明上次运行未正常结束，重置为 NotEnrolled
+        if let EnrollmentStatus::Enrolling = self.state_manager.get_enrollment_status().await {
+            tracing::warn!("Agent found in Enrolling state on startup. Resetting to NotEnrolled.");
+            self.state_manager
+                .set_enrollment_status(EnrollmentStatus::NotEnrolled)
+                .await?;
+        }
+
         // 检查现有凭证
         let config_dir = Self::get_config_dir()?;
         let credentials_file = config_dir.join("credentials.json");

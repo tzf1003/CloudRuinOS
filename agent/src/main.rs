@@ -87,16 +87,20 @@ async fn main() -> Result<()> {
     let config_manager = ConfigManager::new(bootstrap);
 
     // 初始化日志
+    // 优先使用 RUST_LOG 环境变量，如果没有设置，则使用配置中的日志级别
     let log_level = &config_manager.config().logging.level;
-    let env_filter = format!(
+    let default_filter = format!(
         "ruinos_agent={},{}={}",
         log_level,
         env!("CARGO_PKG_NAME").replace('-', "_"),
         log_level
     );
 
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(default_filter));
+
     tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::new(env_filter))
+        .with_env_filter(env_filter)
         .init();
 
     // 显示版本和构建信息

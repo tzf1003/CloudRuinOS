@@ -133,6 +133,7 @@ pub enum PresenceStatus {
 /// 设备注册请求
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnrollmentRequest {
+    #[serde(rename = "enrollment_token")]
     pub token: String,
     pub public_key: String,
     pub platform: String,

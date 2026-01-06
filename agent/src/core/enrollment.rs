@@ -111,10 +111,11 @@ impl EnrollmentClient {
         &self,
         request: &EnrollmentRequest,
     ) -> Result<EnrollmentResponse> {
-        let url = format!("{}/agent/enroll", self.server_url);
+        // server_url 已经包含了 /agent/enroll 端点
+        let url = &self.server_url;
         debug!("Sending enrollment request to: {}", url);
 
-        let response = self.http_client.post(&url).json(request).send().await?;
+        let response = self.http_client.post(url).json(request).send().await?;
 
         if !response.status().is_success() {
             return Err(anyhow!(
