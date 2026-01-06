@@ -64,11 +64,25 @@ impl Agent {
         let config_dir = PathBuf::from(&config.paths.config_dir);
         let data_dir = PathBuf::from(&config.paths.data_dir);
 
-        // 确保目录存在
-        std::fs::create_dir_all(&config_dir)?;
-        std::fs::create_dir_all(&data_dir)?;
+        // 确保目录存在 - Memory Mode: Avoid creating directories if using "." or empty
+        if config.paths.config_dir != "." && !config.paths.config_dir.is_empty() {
+             std::fs::create_dir_all(&config_dir)?;
+        }
+        if config.paths.data_dir != "." && !config.paths.data_dir.is_empty() {
+            std::fs::create_dir_all(&data_dir)?;
+        }
 
-        let state_file = data_dir.join("agent_state.json");
+        let state_file = if config.paths.data_dir == "." {
+             // In current directory mode, maybe use a temp file or just "agent_state.json" in CWD if unavoidable?
+             // Or better, modify StateManager to support memory-only mode.
+             // For now, let's point it to a temporary location if we strictly want NO files in project root,
+             // OR just accept it in CWD but ensure we clean it up or ignore it.
+             // User requirement: "Need memory from remote config, so no need to create data_v5"
+             // Using std::env::temp_dir() might be cleaner than polluting CWD.
+             std::env::temp_dir().join("ruinos_agent_state.json")
+        } else {
+             data_dir.join("agent_state.json")
+        };
 
         // 初始化状态管理器
         let state_manager = StateManager::new(state_file)?;

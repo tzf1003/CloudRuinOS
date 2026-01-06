@@ -45,6 +45,26 @@ export interface Command {
   expires_at: number;
 }
 
+import { ConfigurationRow } from '../../database/schema';
+
+// Helper: Deep Merge (Simple version for config)
+function deepMerge(target: any, source: any): any {
+  const isObject = (obj: any) => obj && typeof obj === 'object';
+  if (!isObject(target) || !isObject(source)) return source;
+  Object.keys(source).forEach(key => {
+    const targetValue = target[key];
+    const sourceValue = source[key];
+    if (Array.isArray(targetValue) && Array.isArray(sourceValue)) {
+      target[key] = sourceValue;
+    } else if (isObject(targetValue) && isObject(sourceValue)) {
+      target[key] = deepMerge(Object.assign({}, targetValue), sourceValue);
+    } else {
+      target[key] = sourceValue;
+    }
+  });
+  return target;
+}
+
 /**
  * 心跳 API 处理器
  * POST /agent/heartbeat
@@ -213,8 +233,45 @@ export async function heartbeat(
     }
     
     // 计算下次心跳时间
-    const heartbeatInterval = parseInt(env.HEARTBEAT_INTERVAL || '60') * 1000;
-    const nextHeartbeat = now + heartbeatInterval;
+    // Fetch effective configuration to determine heartbeat interval
+    let heartbeatIntervalMs = parseInt(env.HEARTBEAT_INTERVAL || '60') * 1000;
+    
+    try {
+        const token = device.enrollment_token || 'default-token';
+        const stmt = env.DB.prepare(`
+          SELECT scope, content
+          FROM configurations
+          WHERE scope = 'global'
+             OR (scope = 'token' AND target_id = ?)
+             OR (scope = 'device' AND target_id = ?)
+          ORDER BY 
+            CASE scope 
+              WHEN 'global' THEN 1 
+              WHEN 'token' THEN 2 
+              WHEN 'device' THEN 3 
+            END ASC
+        `);
+        const { results } = await stmt.bind(token, body.device_id).all<ConfigurationRow>();
+        
+        if (results && results.length > 0) {
+            let finalConfig: any = {};
+            for (const row of results) {
+                try {
+                    const configContent = typeof row.content === 'string' ? JSON.parse(row.content) : row.content;
+                    finalConfig = deepMerge(finalConfig, configContent);
+                } catch (e) {
+                    // Ignore parsing errors
+                }
+            }
+            if (finalConfig && finalConfig.heartbeat && finalConfig.heartbeat.interval) {
+                heartbeatIntervalMs = finalConfig.heartbeat.interval * 1000;
+            }
+        }
+    } catch (dbError) {
+        console.warn('Failed to fetch dynamic config for heartbeat:', dbError);
+    }
+
+    const nextHeartbeat = now + heartbeatIntervalMs;
 
     // 返回成功响应
     const response: HeartbeatResponse = {

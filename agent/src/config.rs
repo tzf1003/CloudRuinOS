@@ -303,12 +303,18 @@ impl ConfigManager {
     /// 获取默认配置目录
     fn get_default_config_dir() -> Result<String> {
         // Use local directory for development/debugging to avoid permission issues and ensure clean state
-        return Ok("data_v5".to_string());
+        // return Ok("data_v5".to_string());
+        // 临时使用空字符串，避免创建目录。实际生产环境应使用系统标准路径。
+        // 在内存模式下，我们希望尽量少使用文件系统。
+        // 如果必须返回一个路径，使用当前目录的点 "."，或者一个临时目录。
+        // 但根据需求"不需要创建data_v5"，我们尝试返回 "."
+         return Ok(".".to_string());
     }
 
     /// 获取默认数据目录
     fn get_default_data_dir() -> Result<String> {
-        return Ok("data_v5".to_string());
+        // return Ok("data_v5".to_string());
+         return Ok(".".to_string());
     }
 
     /// 获取默认日志目录
@@ -465,7 +471,11 @@ impl AgentConfig {
 
     /// 获取凭证文件路径
     pub fn credentials_path(&self) -> PathBuf {
-        PathBuf::from(&self.paths.data_dir).join(&self.paths.credentials_file)
+        if self.paths.data_dir == "." {
+            std::env::temp_dir().join("ruinos_agent_credentials.json")
+        } else {
+             PathBuf::from(&self.paths.data_dir).join(&self.paths.credentials_file)
+        }
     }
 
     /// 解析文件大小字符串为字节数
