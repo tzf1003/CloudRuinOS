@@ -126,3 +126,4 @@ server/.dev.vars
 .github/skills/ObsidianSkills/
 agent/install/config.toml
 
+*.pem

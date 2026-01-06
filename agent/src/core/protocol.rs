@@ -54,6 +54,7 @@ pub enum CommandType {
     FileList,
     FileGet,
     FilePut,
+    ConfigUpdate,
 }
 
 /// WebSocket 消息类型

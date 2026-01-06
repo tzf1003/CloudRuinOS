@@ -7,7 +7,7 @@ mod core;
 mod platform;
 mod transport;
 
-use crate::config::ConfigManager;
+use crate::config::{ConfigManager, BootstrapConfig};
 use crate::core::Agent;
 
 // 构建时信息
@@ -20,18 +20,28 @@ const GIT_HASH: &str = env!("GIT_HASH");
 async fn main() -> Result<()> {
     // 解析命令行参数
     let args: Vec<String> = env::args().collect();
-    let mut config_path = None;
+    let mut server_url: Option<String> = None;
+    let mut enrollment_token: Option<String> = None;
     let mut service_mode = false;
 
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
-            "--config" => {
+            "--server" => {
                 if i + 1 < args.len() {
-                    config_path = Some(args[i + 1].clone());
+                    server_url = Some(args[i + 1].clone());
                     i += 2;
                 } else {
-                    eprintln!("错误: --config 需要指定配置文件路径");
+                    eprintln!("错误: --server 需要指定 URL");
+                    std::process::exit(1);
+                }
+            }
+            "--token" => {
+                if i + 1 < args.len() {
+                    enrollment_token = Some(args[i + 1].clone());
+                    i += 2;
+                } else {
+                    eprintln!("错误: --token 需要指定令牌");
                     std::process::exit(1);
                 }
             }
@@ -54,42 +64,27 @@ async fn main() -> Result<()> {
             }
         }
     }
-
-    // 加载配置
-    let config_manager = if let Some(path) = config_path {
-        ConfigManager::load_from_file(path)?
-    } else {
-        // 尝试从默认位置加载配置
-        let default_paths = [
-            "config.toml",
-            "/etc/ruinos-agent/config.toml",
-            "C:\\ProgramData\\Ruinos Agent\\config.toml",
-        ];
-
-        let mut loaded = false;
-        let mut config_manager = ConfigManager::new_default();
-
-        for path in &default_paths {
-            if std::path::Path::new(path).exists() {
-                match ConfigManager::load_from_file(path) {
-                    Ok(cm) => {
-                        config_manager = cm;
-                        loaded = true;
-                        break;
-                    }
-                    Err(e) => {
-                        eprintln!("警告: 加载配置文件 {} 失败: {}", path, e);
-                    }
-                }
-            }
+    
+    // 如果命令行未指定，尝试从环境变量获取
+    if server_url.is_none() {
+        if let Ok(url) = env::var("RMM_SERVER_URL") {
+            server_url = Some(url);
         }
-
-        if !loaded {
-            eprintln!("警告: 未找到配置文件，使用默认配置");
+    }
+    
+    if enrollment_token.is_none() {
+        if let Ok(token) = env::var("RMM_ENROLLMENT_TOKEN") {
+            enrollment_token = Some(token);
         }
+    }
 
-        config_manager
+    // 初始化配置管理器
+    let bootstrap = BootstrapConfig {
+        server_url: server_url.unwrap_or_else(|| "https://api.c.54321000.xyz".to_string()),
+        enrollment_token,
     };
+    
+    let config_manager = ConfigManager::new(bootstrap);
 
     // 初始化日志
     let log_level = &config_manager.config().logging.level;
@@ -154,7 +149,7 @@ async fn main() -> Result<()> {
     info!("Service mode: {}", service_mode);
 
     // 创建并启动 Agent
-    let agent = Agent::new_with_config(config_manager).await?;
+    let mut agent = Agent::new_with_config(config_manager).await?;
 
     if let Err(e) = agent.run().await {
         error!("Agent failed: {}", e);
@@ -172,13 +167,14 @@ fn print_help() {
     println!("    ruinos-agent [OPTIONS]");
     println!();
     println!("OPTIONS:");
-    println!("    --config <FILE>    指定配置文件路径");
+    println!("    --server <URL>     指定服务器 URL (env: RMM_SERVER_URL)");
+    println!("    --token <TOKEN>    指定注册令牌 (env: RMM_ENROLLMENT_TOKEN)");
     println!("    --service          以服务模式运行");
     println!("    --help, -h         显示帮助信息");
     println!("    --version, -v      显示版本信息");
     println!();
     println!("EXAMPLES:");
-    println!("    ruinos-agent --config /etc/ruinos-agent/config.toml");
+    println!("    ruinos-agent --server https://api.example.com --token my-token");
     println!("    ruinos-agent --service");
 }
 

@@ -76,26 +76,26 @@ export async function enrollDevice(
     // 解析请求体
     const body = await request.json() as EnrollDeviceRequest;
     
+    // 如果未提供 enrollment_token，使用默认令牌 'default-token'
+    const tokenToValidate = body.enrollment_token || 'default-token';
+    
     // 验证必需字段
-    if (!body.enrollment_token || !body.platform || !body.version) {
+    if (!body.platform || !body.version) {
       return createErrorResponse('Missing required fields', 'INVALID_REQUEST', 400);
     }
-
-    // 验证平台类型
-    if (!['windows', 'linux', 'macos'].includes(body.platform)) {
-      return createErrorResponse('Invalid platform', 'INVALID_PLATFORM', 400);
-    }
+    
+    // ...
 
     const kvManager = createKVManager(env.KV);
     
     // 验证 enrollment token
-    const tokenValidation = await validateEnrollmentToken(kvManager, body.enrollment_token, env);
+    const tokenValidation = await validateEnrollmentToken(kvManager, tokenToValidate, env);
     if (!tokenValidation.valid) {
       // 记录失败的注册尝试
       const auditService = createAuditService(env);
       await auditService.logDeviceRegistration(
         'unknown',
-        body.enrollment_token,
+        tokenToValidate,
         body.platform,
         body.version,
         '',

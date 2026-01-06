@@ -7,6 +7,14 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tracing::{info, warn};
 
+/// 启动配置（Bootstrap Configuration）
+/// 仅包含连接服务器所需的最小信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BootstrapConfig {
+    pub server_url: String,
+    pub enrollment_token: Option<String>,
+}
+
 /// Agent 主配置结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentConfig {
@@ -144,111 +152,66 @@ pub struct MacOSServiceSection {
 /// 配置管理器
 pub struct ConfigManager {
     config: AgentConfig,
-    config_path: PathBuf,
-    last_modified: Option<std::time::SystemTime>,
+    pub bootstrap: BootstrapConfig,
+    // 移除文件路径依赖，支持纯内存模式
+    // config_path: PathBuf,
+    // last_modified: Option<std::time::SystemTime>,
 }
 
 impl ConfigManager {
-    /// 从文件加载配置
-    pub fn load_from_file<P: AsRef<Path>>(config_path: P) -> Result<Self> {
-        let config_path = config_path.as_ref().to_path_buf();
-
-        info!("加载配置文件: {:?}", config_path);
-
-        let config_content = std::fs::read_to_string(&config_path)
-            .map_err(|e| anyhow!("读取配置文件失败: {}", e))?;
-
-        let mut config: AgentConfig =
-            toml::from_str(&config_content).map_err(|e| anyhow!("解析配置文件失败: {}", e))?;
-
-        // 验证配置
-        Self::validate_config(&mut config)?;
-
-        // 获取文件修改时间
-        let last_modified = std::fs::metadata(&config_path)
-            .ok()
-            .and_then(|m| m.modified().ok());
-
-        Ok(Self {
-            config,
-            config_path,
-            last_modified,
-        })
-    }
-
-    /// 创建默认配置
-    pub fn new_default() -> Self {
-        let config = Self::create_default_config();
+    /// 使用 Bootstrap 配置初始化
+    pub fn new(bootstrap: BootstrapConfig) -> Self {
+        let mut config = Self::create_default_config();
+        
+        // 应用 Bootstrap 配置
+        config.server.base_url = bootstrap.server_url.clone();
+        
+        info!("初始化配置管理器 (Bootstrap URL: {})", bootstrap.server_url);
 
         Self {
             config,
-            config_path: PathBuf::new(),
-            last_modified: None,
+            bootstrap,
         }
     }
+
+    /// 从 JSON 更新动态配置 (内存中)
+    pub fn update_from_json(&mut self, json_content: &str) -> Result<()> {
+         let new_config: AgentConfig = serde_json::from_str(json_content)
+            .map_err(|e| anyhow!("解析服务器配置失败: {}", e))?;
+        
+         // 验证新配置
+         // 注意：我们可能需要保留某些本地状态 (如 device_id)
+         let current_device_id = self.config.agent.device_id.clone();
+         
+         self.config = new_config;
+         
+         // 恢复设备 ID (防止配置覆盖丢失 ID)
+         if self.config.agent.device_id.is_none() {
+             self.config.agent.device_id = current_device_id;
+         }
+         
+         // 强制覆盖 Server URL 为 Bootstrap 的值 (防止配置错误导致断连)
+         self.config.server.base_url = self.bootstrap.server_url.clone();
+
+         info!("已更新内存配置");
+         Ok(())
+    }
+    
+    // Legacy methods placeholders or removed
 
     /// 获取配置
     pub fn config(&self) -> &AgentConfig {
         &self.config
     }
 
-    /// 检查配置文件是否已更新
-    pub fn check_for_updates(&mut self) -> Result<bool> {
-        if self.config_path.as_os_str().is_empty() {
-            return Ok(false);
-        }
-
-        let metadata = std::fs::metadata(&self.config_path)
-            .map_err(|e| anyhow!("获取配置文件元数据失败: {}", e))?;
-
-        let current_modified = metadata
-            .modified()
-            .map_err(|e| anyhow!("获取文件修改时间失败: {}", e))?;
-
-        if let Some(last_modified) = self.last_modified {
-            if current_modified > last_modified {
-                info!("检测到配置文件更新，重新加载...");
-                self.reload()?;
-                return Ok(true);
-            }
-        }
-
-        Ok(false)
-    }
-
-    /// 重新加载配置
-    pub fn reload(&mut self) -> Result<()> {
-        let new_manager = Self::load_from_file(&self.config_path)?;
-        self.config = new_manager.config;
-        self.last_modified = new_manager.last_modified;
-
-        info!("配置文件重新加载完成");
-        Ok(())
-    }
-
-    /// 保存配置到文件
-    pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let config_content =
-            toml::to_string_pretty(&self.config).map_err(|e| anyhow!("序列化配置失败: {}", e))?;
-
-        std::fs::write(path, config_content).map_err(|e| anyhow!("写入配置文件失败: {}", e))?;
-
-        Ok(())
-    }
-
     /// 更新设备 ID
     pub fn update_device_id(&mut self, device_id: String) -> Result<()> {
         self.config.agent.device_id = Some(device_id);
-
-        if !self.config_path.as_os_str().is_empty() {
-            self.save_to_file(&self.config_path)?;
-        }
-
         Ok(())
     }
-
+    
     /// 验证配置
-    fn validate_config(config: &mut AgentConfig) -> Result<()> {
+    pub fn validate_config(config: &mut AgentConfig) -> Result<()> {
         // 验证服务器 URL
         if config.server.base_url.is_empty() {
             return Err(anyhow!("服务器 URL 不能为空"));

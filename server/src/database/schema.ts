@@ -98,6 +98,58 @@ export interface EnrollmentTokenRow {
   max_usage: number;
 }
 
+// ============= 配置表 (configurations) =============
+
+/**
+ * 配置作用域枚举
+ */
+export type ConfigScope = 'global' | 'token' | 'device';
+
+/**
+ * 配置表记录
+ */
+export interface ConfigurationRow {
+  /** 自增主键 */
+  id: number;
+  /** 配置作用域 */
+  scope: ConfigScope;
+  /** 目标 ID (Global为NULL, Token为Token字符串, Device为DeviceID) */
+  target_id: string | null;
+  /** JSON 格式的配置内容 */
+  content: string;
+  /** 配置版本号 */
+  version: number;
+  /** 创建时间戳 */
+  created_at: number;
+  /** 更新时间戳 */
+  updated_at: number;
+  /** 更新者 */
+  updated_by: string;
+}
+
+/**
+ * 创建配置所需的参数
+ */
+export interface ConfigurationInsert {
+  scope: ConfigScope;
+  target_id?: string | null;
+  content: string;
+  version?: number;
+  created_at: number;
+  updated_at: number;
+  updated_by?: string;
+}
+
+/**
+ * 更新配置的可选参数
+ */
+export interface ConfigurationUpdate {
+  content?: string;
+  version?: number;
+  updated_at: number;
+  updated_by?: string;
+}
+
 /**
  * 创建注册令牌所需的参数
  */

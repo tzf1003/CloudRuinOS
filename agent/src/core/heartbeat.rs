@@ -2,7 +2,10 @@ use anyhow::{anyhow, Result};
 use serde_json::json;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tracing::{debug, error, info, warn};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
+use crate::config::ConfigManager;
 use crate::core::crypto::{CryptoManager, SignableData};
 use crate::core::protocol::{
     Command, CommandType, HeartbeatRequest, HeartbeatResponse, SystemInfo,
@@ -57,6 +60,7 @@ impl HeartbeatClient {
         &self,
         crypto_manager: &CryptoManager,
         _state_manager: &StateManager,
+        server_url: &str,
     ) -> Result<HeartbeatResponse> {
         let device_id = crypto_manager
             .device_id()
@@ -90,18 +94,19 @@ impl HeartbeatClient {
         debug!("Sending heartbeat for device: {}", device_id);
 
         // 发送请求
-        self.send_heartbeat_with_retry(&heartbeat_request).await
+        self.send_heartbeat_with_retry(&heartbeat_request, server_url).await
     }
 
     /// 带重试的心跳发送
     async fn send_heartbeat_with_retry(
         &self,
         request: &HeartbeatRequest,
+        server_url: &str,
     ) -> Result<HeartbeatResponse> {
         let mut last_error = None;
 
         for attempt in 1..=self.max_retry_attempts {
-            match self.send_heartbeat_request(request).await {
+            match self.send_heartbeat_request(request, server_url).await {
                 Ok(response) => {
                     if attempt > 1 {
                         info!("Heartbeat succeeded on attempt {}", attempt);
@@ -127,8 +132,9 @@ impl HeartbeatClient {
     async fn send_heartbeat_request(
         &self,
         request: &HeartbeatRequest,
+        server_url: &str,
     ) -> Result<HeartbeatResponse> {
-        let url = format!("{}/agent/heartbeat", self.server_url);
+        let url = format!("{}/agent/heartbeat", server_url);
         let body = serde_json::to_string(request)?;
 
         debug!("Sending heartbeat to: {}", url);
@@ -164,19 +170,49 @@ impl HeartbeatClient {
         &self,
         crypto_manager: &CryptoManager,
         state_manager: &StateManager,
+        config_manager: &Arc<RwLock<ConfigManager>>,
     ) -> Result<()> {
+        let (mut interval_duration, mut server_url) = {
+             let cm = config_manager.read().await;
+             (cm.config().heartbeat_interval(), cm.config().heartbeat_url())
+        };
+        
         info!(
             "Starting heartbeat loop with interval: {:?}",
-            self.heartbeat_interval
+            interval_duration
         );
 
-        let mut interval = tokio::time::interval(self.heartbeat_interval);
+        let mut interval = tokio::time::interval(interval_duration);
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        
+        // Consume first tick
+        interval.tick().await;
 
         loop {
+            // Check for config updates
+            {
+                 let cm = config_manager.read().await;
+                 let new_interval = cm.config().heartbeat_interval();
+                 let new_url = cm.config().heartbeat_url();
+                 
+                 if new_interval != interval_duration {
+                      info!("Heartbeat interval updated: {:?} -> {:?}", interval_duration, new_interval);
+                      interval_duration = new_interval;
+                      interval = tokio::time::interval(interval_duration);
+                      interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                      interval.tick().await; // Reset tick
+                 }
+                 
+                 if new_url != server_url {
+                      info!("Heartbeat URL updated: {} -> {}", server_url, new_url);
+                      server_url = new_url;
+                 }
+            }
+            
+            // Wait for next tick
             interval.tick().await;
 
-            match self.send_heartbeat(crypto_manager, state_manager).await {
+            match self.send_heartbeat(crypto_manager, state_manager, &server_url).await {
                 Ok(response) => {
                     debug!("Heartbeat successful: {:?}", response);
 
@@ -184,7 +220,7 @@ impl HeartbeatClient {
                     if let Some(commands) = response.commands {
                         info!("Received {} commands from server", commands.len());
                         for cmd in commands {
-                            if let Err(e) = self.process_command(&cmd, state_manager).await {
+                            if let Err(e) = self.process_command(&cmd, state_manager, config_manager).await {
                                 error!("Failed to process command {}: {}", cmd.id, e);
                             }
                         }
@@ -225,13 +261,28 @@ impl HeartbeatClient {
     }
 
     /// 处理服务端下发的命令
-    async fn process_command(&self, cmd: &Command, _state_manager: &StateManager) -> Result<()> {
+    async fn process_command(
+        &self, 
+        cmd: &Command, 
+        _state_manager: &StateManager,
+        config_manager: &Arc<RwLock<ConfigManager>>
+    ) -> Result<()> {
         info!(
             "Processing command: {} (type: {:?})",
             cmd.id, cmd.command_type
         );
 
         match cmd.command_type {
+            CommandType::ConfigUpdate => {
+                info!("Received config update command");
+                 if let Some(config_content) = cmd.payload.get("config") {
+                    config_manager.write().await.update_from_json(&config_content.to_string())?;
+                    info!("Configuration updated successfully via heartbeat");
+                 } else {
+                     warn!("ConfigUpdate command missing 'config' payload payload: {:?}", cmd.payload);
+                 }
+                 return Ok(());
+            }
             CommandType::Upgrade => {
                 // 处理升级命令
                 info!("Received upgrade command");

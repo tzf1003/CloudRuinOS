@@ -19,6 +19,10 @@ use anyhow::Result;
 use std::path::PathBuf;
 use std::time::Duration;
 use tracing::{error, info};
+use base64::{engine::general_purpose, Engine as _};
+use serde_json::json;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 use crate::config::ConfigManager;
 use crate::platform::{create_command_executor, create_file_system};
@@ -33,7 +37,7 @@ use self::state::{EnrollmentStatus, StateManager};
 
 #[allow(dead_code)]
 pub struct Agent {
-    config_manager: ConfigManager,
+    config_manager: Arc<RwLock<ConfigManager>>,
     state_manager: StateManager,
     crypto_manager: Option<CryptoManager>,
     enrollment_client: EnrollmentClient,
@@ -47,70 +51,14 @@ pub struct Agent {
 
 impl Agent {
     pub async fn new() -> Result<Self> {
-        info!("Initializing Ruinos Agent");
-
-        // 获取配置目录
-        let config_dir = Self::get_config_dir()?;
-        let state_file = config_dir.join("agent_state.json");
-
-        // 初始化状态管理器
-        let state_manager = StateManager::new(state_file)?;
-
-        // 初始化注册客户端
-        let config = state_manager.get_config().await;
-        let enrollment_config = EnrollmentConfig {
-            server_url: config.server_url.clone(),
-            timeout: Duration::from_secs(config.request_timeout),
-            retry_attempts: 3,
-            retry_delay: Duration::from_secs(5),
-        };
-        let enrollment_client = EnrollmentClient::new(enrollment_config)?;
-
-        // 初始化调度器
-        let scheduler = Scheduler::new();
-
-        // 初始化 HTTP 客户端
-        let tls_config = TlsConfig::default();
-        let http_client = HttpClient::new(tls_config)?;
-
-        // 初始化心跳客户端
-        let heartbeat_config = HeartbeatConfig {
-            server_url: config.server_url.clone(),
-            heartbeat_interval: Duration::from_secs(config.heartbeat_interval),
-            max_retry_attempts: 3,
-            retry_delay: Duration::from_secs(5),
-        };
-        let heartbeat_client = HeartbeatClient::new(heartbeat_config, http_client.clone());
-
-        // 初始化重连管理器
-        let reconnect_strategy = reconnect::ReconnectStrategy::exponential_backoff();
-        let reconnect_manager = ReconnectManager::new(reconnect_strategy);
-
-        // 创建平台特定的执行器
-        let command_executor = create_command_executor()?;
-        let file_system = create_file_system()?;
-
-        // 尝试加载现有凭证
-        let crypto_manager = Self::load_credentials(&config_dir).await?;
-
-        Ok(Self {
-            config_manager: ConfigManager::new_default(),
-            state_manager,
-            crypto_manager,
-            enrollment_client,
-            heartbeat_client,
-            scheduler,
-            http_client,
-            reconnect_manager,
-            command_executor,
-            file_system,
-        })
+        unimplemented!("Use new_with_config");
     }
 
     pub async fn new_with_config(config_manager: ConfigManager) -> Result<Self> {
         info!("Initializing Ruinos Agent with configuration");
 
-        let config = config_manager.config();
+        let config_manager = Arc::new(RwLock::new(config_manager));
+        let config = config_manager.read().await.config().clone();
 
         // 获取配置目录
         let config_dir = PathBuf::from(&config.paths.config_dir);
@@ -159,7 +107,21 @@ impl Agent {
         let file_system = create_file_system()?;
 
         // 尝试加载现有凭证
-        let crypto_manager = Self::load_credentials_from_config(&config_manager).await?;
+        let credentials_file = config.credentials_path();
+        let crypto_manager = if credentials_file.exists() {
+             match CryptoManager::from_credentials_file(&credentials_file) {
+                Ok(manager) => {
+                    info!("Loaded existing credentials from: {:?}", credentials_file);
+                    Some(manager)
+                }
+                Err(e) => {
+                    error!("Failed to load credentials: {}", e);
+                    None
+                }
+            }
+        } else {
+             None
+        };
 
         Ok(Self {
             config_manager,
@@ -175,7 +137,7 @@ impl Agent {
         })
     }
 
-    pub async fn run(&self) -> Result<()> {
+    pub async fn run(&mut self) -> Result<()> {
         info!("Ruinos Agent starting");
 
         // 检查现有凭证
@@ -192,65 +154,102 @@ impl Agent {
             info!("No valid credentials found, enrollment required");
         }
 
-        // 检查注册状态
-        let enrollment_status = self.state_manager.get_enrollment_status().await;
-        match enrollment_status {
-            EnrollmentStatus::NotEnrolled => {
-                info!("Agent not enrolled, enrollment required");
-                // 注册逻辑将在后续任务中实现
-            }
-            EnrollmentStatus::Enrolled => {
-                info!("Agent enrolled, starting normal operation");
-
-                // 启动心跳循环
-                if let Some(crypto_manager) = &self.crypto_manager {
-                    info!("Starting heartbeat loop");
-                    let heartbeat_task = {
-                        let heartbeat_client = self.heartbeat_client.clone();
-                        let crypto_manager = crypto_manager.clone();
-                        let state_manager = self.state_manager.clone();
-
-                        tokio::spawn(async move {
-                            if let Err(e) = heartbeat_client
-                                .start_heartbeat_loop(&crypto_manager, &state_manager)
-                                .await
-                            {
-                                error!("Heartbeat loop failed: {}", e);
+        loop {
+            // 检查注册状态
+            let enrollment_status = self.state_manager.get_enrollment_status().await;
+            match enrollment_status {
+                EnrollmentStatus::NotEnrolled => {
+                    let token = self.config_manager.read().await.bootstrap.enrollment_token.clone()
+                        .unwrap_or_else(|| "".to_string()); 
+                        
+                    info!("Agent not enrolled. Attempting enrollment with token: '{}'", if token.is_empty() { "DEFAULT" } else { &token });
+                    
+                    match self.enroll_with_token(token).await {
+                        Ok(device_id) => {
+                                info!("Enrollment successful. Device ID: {}", device_id);
+                                // Reload crypto manager
+                                let config_dir = Self::get_config_dir()?;
+                                let credentials_file = config_dir.join("credentials.json");
+                                self.crypto_manager = Some(CryptoManager::from_credentials_file(&credentials_file)?);
+                                self.config_manager.write().await.update_device_id(device_id)?;
+                                // Loop continues and will hit Enrolled state next
+                            },
+                            Err(e) => {
+                                error!("Enrollment failed: {}", e);
+                                tokio::time::sleep(Duration::from_secs(10)).await;
                             }
-                        })
-                    };
-
-                    // 等待心跳任务或关闭信号
-                    tokio::select! {
-                        _ = heartbeat_task => {
-                            error!("Heartbeat loop terminated unexpectedly");
                         }
-                        _ = tokio::signal::ctrl_c() => {
-                            info!("Received shutdown signal");
-                        }
+                    // Removed else { wait } block because we always try
+                }
+                EnrollmentStatus::Enrolled => {
+                    info!("Agent enrolled, starting normal operation");
+                    
+                    // 确保 CryptoManager 已加载 (如果是刚注册完，上面已经加载了；如果是重启，可能未加载)
+                    if self.crypto_manager.is_none() {
+                         let config_dir = Self::get_config_dir()?;
+                         let credentials_file = config_dir.join("credentials.json");
+                         if credentials_file.exists() {
+                             self.crypto_manager = Some(CryptoManager::from_credentials_file(&credentials_file)?);
+                         } else {
+                             // 状态是 Enrolled 但没有文件？状态不一致
+                             error!("Enrolled state but no credentials file! Resetting status.");
+                             self.state_manager.set_enrollment_status(EnrollmentStatus::NotEnrolled).await?;
+                             continue;
+                         }
                     }
-                } else {
-                    error!("No crypto manager available for heartbeat");
+
+                    // 同步配置
+                    if let Err(e) = self.sync_config().await {
+                        error!("Initial config sync failed: {}", e);
+                    }
+
+                    // 启动心跳循环
+                    if let Some(crypto_manager) = &self.crypto_manager {
+                        info!("Starting heartbeat loop");
+                        let heartbeat_task = {
+                            let heartbeat_client = self.heartbeat_client.clone();
+                            let crypto_manager = crypto_manager.clone();
+                            let state_manager = self.state_manager.clone();
+                            let config_manager = self.config_manager.clone(); // Clone Arc
+
+                            tokio::spawn(async move {
+                                if let Err(e) = heartbeat_client
+                                    .start_heartbeat_loop(&crypto_manager, &state_manager, &config_manager)
+                                    .await
+                                {
+                                    error!("Heartbeat loop failed: {}", e);
+                                }
+                            })
+                        };
+
+                        // 等待心跳任务或关闭信号
+                        tokio::select! {
+                            _ = heartbeat_task => {
+                                error!("Heartbeat loop terminated unexpectedly");
+                                tokio::time::sleep(Duration::from_secs(5)).await;
+                            }
+                            _ = tokio::signal::ctrl_c() => {
+                                info!("Received shutdown signal");
+                                return Ok(());
+                            }
+                        }
+                    } else {
+                        error!("No crypto manager available for heartbeat");
+                        tokio::time::sleep(Duration::from_secs(5)).await;
+                    }
+                }
+                EnrollmentStatus::Enrolling => {
+                    info!("Agent enrollment in progress");
+                    tokio::time::sleep(Duration::from_secs(2)).await;
+                }
+                EnrollmentStatus::EnrollmentFailed(ref error) => {
+                    error!("Agent enrollment failed previously: {}", error);
+                    // Reset to retry
+                     self.state_manager.set_enrollment_status(EnrollmentStatus::NotEnrolled).await?;
+                     tokio::time::sleep(Duration::from_secs(5)).await;
                 }
             }
-            EnrollmentStatus::Enrolling => {
-                info!("Agent enrollment in progress");
-            }
-            EnrollmentStatus::EnrollmentFailed(ref error) => {
-                error!("Agent enrollment failed: {}", error);
-            }
         }
-
-        // 设置基本的调度任务
-        self.setup_scheduled_tasks().await?;
-
-        info!("Ruinos Agent running - core implementation pending");
-
-        // 等待关闭信号
-        tokio::signal::ctrl_c().await?;
-        info!("Received shutdown signal");
-
-        Ok(())
     }
 
     /// 执行设备注册
@@ -288,6 +287,70 @@ impl Agent {
             .await?;
 
         info!("Scheduled tasks configured");
+        Ok(())
+    }
+
+    /// 从服务器同步配置
+    async fn sync_config(&mut self) -> Result<()> {
+        if self.crypto_manager.is_none() {
+            return Err(anyhow::anyhow!("Cannot sync config: No credentials"));
+        }
+        // Scope for read lock to get URL
+        let url = {
+            let cm = self.config_manager.read().await;
+            let base_url = &cm.config().server.base_url;
+            format!("{}/agent/config", base_url.trim_end_matches('/'))
+        };
+        
+        info!("Syncing config from {}", url);
+        
+        // Scope for read lock to get Device ID
+        let device_id = {
+            let cm = self.config_manager.read().await;
+            cm.config().agent.device_id.clone().ok_or(anyhow::anyhow!("No Device ID"))?
+        };
+            
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_millis() as u64;
+            
+        let nonce = CryptoManager::generate_nonce();
+        
+        let payload = json!({
+            "device_id": device_id,
+            "timestamp": timestamp,
+            "nonce": nonce,
+        });
+        
+        // 签名
+        let signature = self.crypto_manager.as_ref().unwrap().sign(payload.to_string().as_bytes());
+        
+        let body = json!({
+            "device_id": device_id,
+            "timestamp": timestamp,
+            "nonce": nonce,
+            "signature": signature,
+        });
+        
+        // 使用 http_client 发送请求
+        let response = self.http_client.post(&url)
+            .json(&body)
+            .send()
+            .await?;
+            
+        if !response.status().is_success() {
+             let error_text = response.text().await?;
+             error!("Config sync failed: {}", error_text);
+             return Ok(());
+        }
+
+        let resp_json: serde_json::Value = response.json().await?;
+        
+        if let Some(config_content) = resp_json.get("config") {
+            self.config_manager.write().await.update_from_json(&config_content.to_string())?;
+            info!("Dynamic config updated via sync");
+        }
+        
         Ok(())
     }
 
