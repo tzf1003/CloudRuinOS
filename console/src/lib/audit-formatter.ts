@@ -23,10 +23,10 @@ export class AuditLogFormatter {
     
     return logs.map(log => ({
       id: log.id,
-      deviceId: log.device_id,
-      sessionId: log.session_id || '-',
-      actionType: this.formatActionType(log.action_type),
-      actionData: this.formatActionData(log.action_data),
+      deviceId: log.deviceId,
+      sessionId: log.sessionId || '-',
+      actionType: this.formatActionType(log.actionType),
+      actionData: this.formatActionData(log.actionData),
       result: this.formatResult(log.result),
       timestamp: log.timestamp.toString(),
       formattedTimestamp: this.formatTimestamp(log.timestamp, dateFormat),
@@ -153,12 +153,12 @@ export class AuditLogFormatter {
     
     // Check action type for potential security concerns
     const securityActions = ['security_event', 'authentication', 'authorization'];
-    if (securityActions.includes(log.action_type)) {
+    if (securityActions.includes(log.actionType)) {
       return log.result === 'success' ? 'warning' : 'error';
     }
     
     // Check for configuration changes
-    if (log.action_type === 'configuration_change') {
+    if (log.actionType === 'configuration_change') {
       return 'warning';
     }
     
@@ -170,8 +170,8 @@ export class AuditLogFormatter {
    */
   static calculateDuration(log: AuditLog): string | undefined {
     try {
-      if (log.action_data) {
-        const data = JSON.parse(log.action_data);
+      if (log.actionData) {
+        const data = JSON.parse(log.actionData);
         if (data.start_time && data.end_time) {
           const duration = data.end_time - data.start_time;
           return this.formatDuration(duration);

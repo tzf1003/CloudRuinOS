@@ -87,11 +87,12 @@ export function useEnhancedMutation<TData, TError = Error, TVariables = void>(
       }
 
       const result = options.onMutate?.(variables);
-      return { ...result, operationId };
+      return { ...(result as any), operationId };
     },
     onSuccess: (data, variables, context) => {
-      if (context?.operationId) {
-        completeOperation(context.operationId, true, options.successMessage);
+      const ctx = context as any;
+      if (ctx?.operationId) {
+        completeOperation(ctx.operationId, true, options.successMessage);
       } else if (options.successMessage) {
         toast.success(options.successMessage);
       }
@@ -99,9 +100,10 @@ export function useEnhancedMutation<TData, TError = Error, TVariables = void>(
       options.onSuccess?.(data, variables, context);
     },
     onError: (error, variables, context) => {
-      if (context?.operationId) {
+      const ctx = context as any;
+      if (ctx?.operationId) {
         completeOperation(
-          context.operationId, 
+          ctx.operationId, 
           false, 
           error instanceof Error ? error.message : '操作失败'
         );

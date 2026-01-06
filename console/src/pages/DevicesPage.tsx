@@ -1,18 +1,17 @@
 import { useState } from 'react';
-import { Plus, Search, Filter, RefreshCw } from 'lucide-react';
+import { Plus, Search, RefreshCw, Server, Wifi, WifiOff, Activity } from 'lucide-react';
 import { useDevices } from '../hooks/useApi';
 import { Device } from '../types/api';
 import { DeviceCard } from '../components/DeviceCard';
 import { EnrollmentTokenDialog } from '../components/EnrollmentTokenDialog';
-import { DeviceDetailsModal } from '../components/DeviceDetailsModal';
+import { Card } from '../components/ui/Card';
 
 export function DevicesPage() {
   const [showTokenDialog, setShowTokenDialog] = useState(false);
-  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  const { data: devices = [], isLoading, error, refetch } = useDevices();
+  const { data: devices = [], isLoading, refetch } = useDevices();
 
   // Filter devices based on search and status
   const filteredDevices = devices.filter(device => {
@@ -31,202 +30,146 @@ export function DevicesPage() {
   };
 
   return (
-    <div>
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-100 tracking-tight">设备管理</h1>
+          <p className="mt-1 text-sm text-slate-400">
+            监控和管理您的设备群
+          </p>
+        </div>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => refetch()}
+            disabled={isLoading}
+            className="inline-flex items-center px-4 py-2 rounded-lg border border-slate-700 bg-slate-800/50 text-slate-300 hover:bg-slate-800 hover:text-white hover:border-slate-600 transition-all shadow-sm backdrop-blur-sm disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            刷新
+          </button>
+          <button
+            onClick={() => setShowTokenDialog(true)}
+            className="inline-flex items-center px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-white font-medium shadow-[0_0_15px_-3px_rgba(6,182,212,0.4)] transition-all hover:shadow-[0_0_20px_-3px_rgba(6,182,212,0.6)]"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            注册设备
+          </button>
+        </div>
+      </div>
+
+      {/* Statistics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card variant="glass" className="p-4 flex items-center space-x-4">
+          <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-200">
+            <Server className="w-6 h-6" />
+          </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">设备管理</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              管理和监控所有注册的设备
-            </p>
+            <p className="text-sm font-medium text-slate-400">设备总数</p>
+            <p className="text-2xl font-bold text-slate-100">{stats.total}</p>
           </div>
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={() => refetch()}
-              disabled={isLoading}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              刷新
-            </button>
-            <button
-              onClick={() => setShowTokenDialog(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              生成注册令牌
-            </button>
-          </div>
-        </div>
+        </Card>
 
-        {/* Statistics */}
-        <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-4">
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                    <span className="text-sm font-medium text-gray-600">{stats.total}</span>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
-                      总设备数
-                    </dt>
-                  </dl>
-                </div>
-              </div>
-            </div>
+        <Card variant="glass" className="p-4 flex items-center space-x-4">
+            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+            <Wifi className="w-6 h-6" />
           </div>
+          <div>
+            <p className="text-sm font-medium text-slate-400">在线</p>
+            <p className="text-2xl font-bold text-slate-100">{stats.online}</p>
+          </div>
+        </Card>
 
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                    <span className="text-sm font-medium text-green-600">{stats.online}</span>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
-                      在线设备
-                    </dt>
-                  </dl>
-                </div>
-              </div>
-            </div>
+        <Card variant="glass" className="p-4 flex items-center space-x-4">
+           <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400">
+            <WifiOff className="w-6 h-6" />
           </div>
+          <div>
+            <p className="text-sm font-medium text-slate-400">离线</p>
+            <p className="text-2xl font-bold text-slate-100">{stats.offline}</p>
+          </div>
+        </Card>
 
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                    <span className="text-sm font-medium text-red-600">{stats.offline}</span>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
-                      离线设备
-                    </dt>
-                  </dl>
-                </div>
-              </div>
-            </div>
+        <Card variant="glass" className="p-4 flex items-center space-x-4">
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+            <Activity className="w-6 h-6" />
           </div>
-
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
-                    <span className="text-sm font-medium text-yellow-600">{stats.busy}</span>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
-                      忙碌设备
-                    </dt>
-                  </dl>
-                </div>
-              </div>
-            </div>
+          <div>
+            <p className="text-sm font-medium text-slate-400">忙碌</p>
+            <p className="text-2xl font-bold text-slate-100">{stats.busy}</p>
           </div>
-        </div>
+        </Card>
       </div>
 
-      {/* Filters */}
-      <div className="mb-6 bg-white rounded-lg shadow p-4">
-        <div className="flex items-center space-x-4">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="搜索设备 ID 或平台..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+      {/* Filters and Search */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-4 w-4 text-slate-500" />
           </div>
-          <div className="flex items-center space-x-2">
-            <Filter className="h-4 w-4 text-gray-400" />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">所有状态</option>
-              <option value="online">在线</option>
-              <option value="offline">离线</option>
-              <option value="busy">忙碌</option>
-            </select>
-          </div>
+          <input
+            type="text"
+            className="block w-full pl-10 pr-3 py-2 border border-slate-700 rounded-lg leading-5 bg-slate-900/50 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 sm:text-sm transition-colors"
+            placeholder="按 ID、IP 或平台搜索..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
-      </div>
-
-      {/* Device List */}
-      <div className="space-y-4">
-        {isLoading ? (
-          <div className="bg-white rounded-lg shadow p-8 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-2 text-sm text-gray-500">加载设备列表...</p>
-          </div>
-        ) : error ? (
-          <div className="bg-white rounded-lg shadow p-8 text-center">
-            <p className="text-sm text-red-600">
-              加载设备列表失败: {(error as any)?.message || '未知错误'}
-            </p>
-            <button
-              onClick={() => refetch()}
-              className="mt-2 text-sm text-blue-600 hover:text-blue-800"
-            >
-              重试
-            </button>
-          </div>
-        ) : filteredDevices.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-8 text-center">
-            <p className="text-sm text-gray-500">
-              {devices.length === 0 ? '暂无注册设备' : '没有找到匹配的设备'}
-            </p>
-            {devices.length === 0 && (
-              <button
-                onClick={() => setShowTokenDialog(true)}
-                className="mt-2 text-sm text-blue-600 hover:text-blue-800"
-              >
-                生成注册令牌
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredDevices.map((device) => (
-              <DeviceCard
-                key={device.id}
-                device={device}
-                onSelect={setSelectedDevice}
-              />
+        <div className="flex gap-2">
+            {[
+              { value: 'all', label: '全部' },
+              { value: 'online', label: '在线' },
+              { value: 'offline', label: '离线' },
+              { value: 'busy', label: '忙碌' }
+            ].map(({ value, label }) => (
+                <button
+                    key={value}
+                    onClick={() => setStatusFilter(value)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        statusFilter === value
+                        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                        : 'bg-slate-800/50 text-slate-400 border border-slate-700 hover:bg-slate-800 hover:text-slate-200'
+                    }`}
+                >
+                    {label}
+                </button>
             ))}
-          </div>
-        )}
+        </div>
       </div>
 
-      {/* Modals */}
-      <EnrollmentTokenDialog
-        isOpen={showTokenDialog}
-        onClose={() => setShowTokenDialog(false)}
-      />
+      {/* Device Grid */}
+      {filteredDevices.length > 0 ? (
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredDevices.map((device) => (
+            <DeviceCard key={device.id} device={device} />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12 bg-slate-900/30 rounded-lg border border-slate-800 border-dashed">
+          <Server className="mx-auto h-12 w-12 text-slate-600" />
+          <h3 className="mt-2 text-sm font-medium text-slate-300">未找到设备</h3>
+          <p className="mt-1 text-sm text-slate-500">
+             {searchTerm || statusFilter !== 'all' ? '尝试调整搜索条件或筛选器' : '开始注册新设备'}
+          </p>
+          {(!searchTerm && statusFilter === 'all') && (
+            <div className="mt-6">
+                <button
+                    onClick={() => setShowTokenDialog(true)}
+                    className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
+                >
+                    <Plus className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+                    注册设备
+                </button>
+            </div>
+          )}
+        </div>
+      )}
 
-      <DeviceDetailsModal
-        device={selectedDevice}
-        isOpen={!!selectedDevice}
-        onClose={() => setSelectedDevice(null)}
-      />
+      {showTokenDialog && (
+        <EnrollmentTokenDialog
+          isOpen={showTokenDialog}
+          onClose={() => setShowTokenDialog(false)}
+        />
+      )}
     </div>
   );
 }

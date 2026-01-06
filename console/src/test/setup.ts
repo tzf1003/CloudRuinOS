@@ -8,7 +8,7 @@ expect.extend(matchers)
 
 // Configure React Testing Library for better React 18 compatibility
 configure({
-  testIdAttribute: 'data-testid',
+  // testIdAttribute: 'data-testid',
 })
 
 // Setup DOM environment for React 18
@@ -46,11 +46,15 @@ afterEach(() => {
 
 // Mock IntersectionObserver
 global.IntersectionObserver = class IntersectionObserver {
+  readonly root: Element | null = null;
+  readonly rootMargin: string = '';
+  readonly thresholds: ReadonlyArray<number> = [];
   constructor() {}
   disconnect() {}
   observe() {}
   unobserve() {}
-}
+  takeRecords() { return []; }
+} as any;
 
 // Mock ResizeObserver
 global.ResizeObserver = class ResizeObserver {
@@ -62,6 +66,15 @@ global.ResizeObserver = class ResizeObserver {
 
 // Mock WebSocket
 global.WebSocket = class WebSocket {
+  static readonly CONNECTING = 0;
+  static readonly OPEN = 1;
+  static readonly CLOSING = 2;
+  static readonly CLOSED = 3;
+  readonly CONNECTING = 0;
+  readonly OPEN = 1;
+  readonly CLOSING = 2;
+  readonly CLOSED = 3;
+
   constructor(url: string) {
     this.url = url
   }
@@ -72,4 +85,4 @@ global.WebSocket = class WebSocket {
   addEventListener() {}
   removeEventListener() {}
   dispatchEvent() { return true }
-}
+} as any;

@@ -345,6 +345,7 @@ export interface AuditFilters {
   offset?: number;
   severity?: 'info' | 'warning' | 'error';
   search?: string;
+  result?: string;
 }
 
 export interface AuditLogEntry {

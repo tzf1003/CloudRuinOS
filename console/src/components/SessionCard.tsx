@@ -1,6 +1,8 @@
+import React from 'react';
 import { Radio, Clock, Monitor, Trash2, CheckSquare, Square, Activity, Wifi, WifiOff, AlertTriangle, Stethoscope } from 'lucide-react';
 import { Session } from '../types/api';
-import { formatRelativeTime, getSessionStatusColor, cn } from '../lib/utils';
+import { formatRelativeTime, cn } from '../lib/utils';
+import { Card } from './ui/Card';
 
 interface SessionCardProps {
   session: Session;
@@ -16,6 +18,23 @@ interface SessionCardProps {
   timeRemaining?: number;
 }
 
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'active':
+      return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+    case 'connected':
+      return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20';
+    case 'inactive':
+      return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+    case 'pending':
+      return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+    case 'expired':
+      return 'bg-red-500/10 text-red-400 border-red-500/20';
+    default:
+      return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+  }
+};
+
 export function SessionCard({ 
   session, 
   onSelect, 
@@ -29,63 +48,46 @@ export function SessionCard({
   isExpired = false,
   timeRemaining = 0
 }: SessionCardProps) {
-  const statusColor = getSessionStatusColor(session.status);
+  const statusClasses = getStatusColor(session.status);
   
-  // 获取会话字段
+  // Get session fields
   const deviceId = session.deviceId || '';
   const createdAt = session.createdAt || 0;
   const expiresAt = session.expiresAt || 0;
   const lastActivity = session.lastActivity;
   
-  // 活动状态颜色
-  const getActivityStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'text-green-500';
-      case 'recent':
-        return 'text-yellow-500';
-      case 'idle':
-        return 'text-gray-400';
-      default:
-        return 'text-gray-300';
-    }
+  // Activity status color and text
+  const activityMetadata = {
+    active: { color: 'text-emerald-400', label: '活跃', icon: Activity },
+    recent: { color: 'text-amber-400', label: '最近活跃', icon: Activity },
+    idle: { color: 'text-slate-500', label: '空闲', icon: Activity },
+    unknown: { color: 'text-slate-600', label: '未知', icon: Activity }
   };
+  
+  const activityMeta = activityMetadata[activityStatus] || activityMetadata.unknown;
+  const ActivityIcon = activityMeta.icon;
 
-  // 活动状态文本
-  const getActivityStatusText = (status: string) => {
-    switch (status) {
-      case 'active':
-        return '活跃中';
-      case 'recent':
-        return '最近活跃';
-      case 'idle':
-        return '空闲';
-      default:
-        return '未知';
-    }
-  };
-
-  // 计算会话剩余时间
-  const getTimeRemaining = () => {
+  // Calculate remaining time text
+  const getTimeRemainingText = () => {
     if (!expiresAt) return null;
-    
+
     const now = Date.now();
     const remaining = expiresAt * 1000 - now;
-    
+
     if (remaining <= 0) return '已过期';
-    
+
     const hours = Math.floor(remaining / (1000 * 60 * 60));
     const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-    
+
     if (hours > 0) {
-      return `${hours}小时${minutes}分钟后过期`;
+      return `剩余 ${hours}小时 ${minutes}分钟`;
     } else {
-      return `${minutes}分钟后过期`;
+      return `剩余 ${minutes}分钟`;
     }
   };
 
   const handleCardClick = (e: React.MouseEvent) => {
-    // 如果点击的是选择框、诊断按钮或删除按钮，不触发卡片选择
+    // If clicking checkbox, diagnose button or delete button, don't trigger card selection
     if ((e.target as HTMLElement).closest('.select-checkbox') || 
         (e.target as HTMLElement).closest('.diagnose-button') ||
         (e.target as HTMLElement).closest('.delete-button')) {
@@ -111,26 +113,29 @@ export function SessionCard({
   };
   
   return (
-    <div 
+    <Card 
+      variant="glass"
       className={cn(
-        "bg-white rounded-lg shadow-sm border p-4 transition-all duration-200",
-        isSelected ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-300",
-        isExpired ? "border-red-300 bg-red-50" : isExpiring ? "border-yellow-300 bg-yellow-50" : "",
-        onSelect && "cursor-pointer hover:shadow-md"
+        "p-4 transition-all duration-200 border-slate-800",
+        isSelected 
+            ? "bg-cyan-900/10 border-cyan-500/50 shadow-[0_0_15px_-3px_rgba(6,182,212,0.15)]" 
+            : "hover:bg-slate-800/40 hover:border-slate-700",
+        (isExpired && !isSelected) ? "border-red-900/30 bg-red-900/5" : (isExpiring && !isSelected) ? "border-amber-900/30 bg-amber-900/5" : "",
+        onSelect && "cursor-pointer"
       )}
       onClick={handleCardClick}
     >
       <div className="flex items-start justify-between">
-        <div className="flex items-center space-x-3 flex-1">
-          {/* 批量选择复选框 */}
+        <div className="flex items-center space-x-3 flex-1 min-w-0">
+          {/* Batch Select Checkbox */}
           {onToggleSelect && (
             <div className="select-checkbox flex-shrink-0">
               <button
                 onClick={handleSelectClick}
-                className="text-gray-400 hover:text-blue-600"
+                className="text-slate-500 hover:text-cyan-400 transition-colors"
               >
                 {isSelected ? (
-                  <CheckSquare className="h-4 w-4 text-blue-600" />
+                  <CheckSquare className="h-4 w-4 text-cyan-400" />
                 ) : (
                   <Square className="h-4 w-4" />
                 )}
@@ -138,83 +143,80 @@ export function SessionCard({
             </div>
           )}
           
-          <div className="flex-shrink-0">
-            <Radio className="h-8 w-8 text-gray-400" />
+          <div className="flex-shrink-0 p-2 bg-slate-800/50 rounded-lg border border-slate-700/50">
+            <Radio className="h-5 w-5 text-cyan-500" />
           </div>
           
           <div className="min-w-0 flex-1">
-            <div className="flex items-center space-x-2">
-              <h3 className="text-sm font-medium text-gray-900 truncate">
-                会话 {session.id.substring(0, 8)}...
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm font-bold text-slate-100 truncate font-mono">
+                {session.id.substring(0, 8)}...
               </h3>
               <span className={cn(
-                "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
-                statusColor
+                "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider border",
+                statusClasses
               )}>
-                {session.status === 'active' ? '活跃' : 
-                 session.status === 'connected' ? '已连接' :
-                 session.status === 'inactive' ? '非活跃' : 
-                 session.status === 'pending' ? '等待中' : '已过期'}
+                {session.status}
               </span>
             </div>
             
-            <div className="flex items-center space-x-4 mt-1 text-xs text-gray-500">
-              <div className="flex items-center space-x-1">
+            <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-500">
+              <div className="flex items-center gap-1.5 min-w-0">
                 <Monitor className="h-3 w-3" />
-                <span>设备: {deviceId.substring(0, 8)}...</span>
+                <span className="truncate" title={deviceId}>设备: {deviceId.substring(0, 8)}...</span>
               </div>
-              
-              {/* 连接状态指示器 */}
+
+              {/* Connection Status Indicator */}
               {session.status === 'connected' || session.status === 'active' ? (
-                <div className="flex items-center space-x-1 text-green-600">
+                <div className="flex items-center gap-1 text-emerald-400">
                   <Wifi className="h-3 w-3" />
-                  <span>在线</span>
+                  <span className="hidden sm:inline">在线</span>
                 </div>
               ) : (
-                <div className="flex items-center space-x-1 text-gray-400">
+                <div className="flex items-center gap-1 text-slate-600">
                   <WifiOff className="h-3 w-3" />
-                  <span>离线</span>
+                  <span className="hidden sm:inline">离线</span>
                 </div>
               )}
             </div>
           </div>
         </div>
         
-        {/* 活动状态和操作按钮 */}
-        <div className="flex items-center space-x-2">
+        {/* Activity Status and Action Buttons */}
+        <div className="flex items-center space-x-1 pl-2">
           {showActivityStatus && (
-            <div className="flex items-center space-x-1" title={getActivityStatusText(activityStatus)}>
-              <Activity className={cn("h-3 w-3", getActivityStatusColor(activityStatus))} />
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-800/50 border border-slate-700/30" title={activityMeta.label}>
+              <ActivityIcon className={cn("h-4 w-4", activityMeta.color)} />
             </div>
           )}
           
-          {/* 过期警告 */}
+          {/* Expiration Warning */}
           {(isExpiring || isExpired) && (
-            <div className="flex items-center space-x-1" title={
-              isExpired ? "会话已过期" : 
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-800/50 border border-slate-700/30" title={
+              isExpired ? "会话已过期" :
               `会话将在 ${Math.floor(timeRemaining / (1000 * 60))} 分钟后过期`
             }>
-              <AlertTriangle className={cn("h-3 w-3", isExpired ? "text-red-500" : "text-yellow-500")} />
+              <AlertTriangle className={cn("h-4 w-4", isExpired ? "text-red-500" : "text-amber-500")} />
             </div>
           )}
-          
+
           {onDiagnose && (
             <div className="diagnose-button">
               <button
                 onClick={handleDiagnoseClick}
-                className="text-gray-400 hover:text-blue-600 p-1"
-                title="诊断会话"
+                className="flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-colors"
+                title="会话诊断"
               >
                 <Stethoscope className="h-4 w-4" />
               </button>
             </div>
           )}
-          
+
           {onDelete && (
             <div className="delete-button">
               <button
                 onClick={handleDeleteClick}
-                className="text-gray-400 hover:text-red-600 p-1"
+                className="flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                 title="终止会话"
               >
                 <Trash2 className="h-4 w-4" />
@@ -224,33 +226,35 @@ export function SessionCard({
         </div>
       </div>
       
-      {/* 详细信息 */}
-      <div className="mt-3 space-y-2">
-        <div className="flex items-center justify-between text-xs text-gray-500">
-          <div className="flex items-center space-x-1">
+      {/* Detail Info */}
+      <div className="mt-3 pt-3 border-t border-slate-800/50 flex flex-col gap-1.5">
+        <div className="flex items-center justify-between text-[10px] text-slate-500">
+          <div className="flex items-center gap-1.5">
             <Clock className="h-3 w-3" />
-            <span>创建于: {formatRelativeTime(createdAt)}</span>
+            <span>创建: {formatRelativeTime(createdAt)}</span>
           </div>
           {lastActivity && (
-            <div>
-              最后活动: {formatRelativeTime(lastActivity)}
+            <div className="text-slate-400">
+              活跃: {formatRelativeTime(lastActivity)}
             </div>
           )}
         </div>
-        
-        <div className="flex items-center justify-between text-xs">
-          <div className="text-gray-500">
-            {isExpired ? '已过期' : 
-             isExpiring ? `${Math.floor(timeRemaining / (1000 * 60))} 分钟后过期` :
-             getTimeRemaining()}
+
+        <div className="flex items-center justify-between text-[10px]">
+          <div className={cn(
+             isExpired ? "text-red-400" : isExpiring ? "text-amber-400" : "text-slate-500"
+          )}>
+            {isExpired ? '已过期' :
+             isExpiring ? `剩余${Math.floor(timeRemaining / (1000 * 60))}分钟` :
+             getTimeRemainingText()}
           </div>
-          {session.device_platform && (
-            <div className="text-gray-400">
-              {session.device_platform}
+          {session.devicePlatform && (
+            <div className="text-slate-600 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 uppercase tracking-wider">
+              {session.devicePlatform}
             </div>
           )}
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

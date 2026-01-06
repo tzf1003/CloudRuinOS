@@ -1,6 +1,7 @@
-import { FileText, Monitor, Terminal, FolderOpen, Radio, AlertTriangle } from 'lucide-react';
+import { FileText, Monitor, Terminal, FolderOpen, Radio, AlertTriangle, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { AuditLog } from '../types/api';
 import { formatTimestamp, cn } from '../lib/utils';
+import { Card } from './ui/Card';
 
 interface AuditLogCardProps {
   log: AuditLog;
@@ -15,114 +16,99 @@ const actionIcons = {
   'session_created': Radio,
   'session_closed': Radio,
   'security_event': AlertTriangle,
+  'login': ShieldCheck,
+  'logout': ShieldAlert
 };
 
 const actionColors = {
-  'device_enrollment': 'text-green-600 bg-green-100',
-  'device_heartbeat': 'text-blue-600 bg-blue-100',
-  'command_execution': 'text-purple-600 bg-purple-100',
-  'file_operation': 'text-yellow-600 bg-yellow-100',
-  'session_created': 'text-indigo-600 bg-indigo-100',
-  'session_closed': 'text-gray-600 bg-gray-100',
-  'security_event': 'text-red-600 bg-red-100',
+  'device_enrollment': 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+  'device_heartbeat': 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+  'command_execution': 'text-violet-400 bg-violet-500/10 border-violet-500/20',
+  'file_operation': 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+  'session_created': 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
+  'session_closed': 'text-slate-400 bg-slate-500/10 border-slate-500/20',
+  'security_event': 'text-red-400 bg-red-500/10 border-red-500/20',
+  'login': 'text-green-400 bg-green-500/10 border-green-500/20',
+  'logout': 'text-orange-400 bg-orange-500/10 border-orange-500/20'
 };
 
 const actionNames = {
   'device_enrollment': '设备注册',
-  'device_heartbeat': '设备心跳',
+  'device_heartbeat': '心跳',
   'command_execution': '命令执行',
   'file_operation': '文件操作',
-  'session_created': '会话创建',
-  'session_closed': '会话关闭',
+  'session_created': '会话开始',
+  'session_closed': '会话结束',
   'security_event': '安全事件',
+  'login': '登录',
+  'logout': '登出'
 };
 
 export function AuditLogCard({ log, onSelect }: AuditLogCardProps) {
-  const IconComponent = actionIcons[log.action_type as keyof typeof actionIcons] || FileText;
-  const actionColor = actionColors[log.action_type as keyof typeof actionColors] || 'text-gray-600 bg-gray-100';
-  const actionName = actionNames[log.action_type as keyof typeof actionNames] || log.action_type;
+  const IconComponent = actionIcons[log.actionType as keyof typeof actionIcons] || FileText;
+  const actionColor = actionColors[log.actionType as keyof typeof actionColors] || 'text-slate-400 bg-slate-500/10 border-slate-500/20';
+  const actionName = actionNames[log.actionType as keyof typeof actionNames] || log.actionType;
 
   let actionData;
   try {
-    actionData = log.action_data ? JSON.parse(log.action_data) : null;
+    actionData = log.actionData ? (typeof log.actionData === 'string' ? JSON.parse(log.actionData) : log.actionData) : null;
   } catch {
-    actionData = null;
+    actionData = {};
   }
 
-  const isSuccess = log.result === 'success' || (!log.result && log.action_type === 'device_heartbeat');
+  const isSuccess = log.result === 'success' || (!log.result && log.actionType === 'device_heartbeat');
   const isError = log.result === 'error' || log.result === 'failed';
 
   return (
-    <div 
+    <Card 
+      variant="glass"
       className={cn(
-        "bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow",
-        onSelect && "cursor-pointer hover:border-blue-300"
+        "group cursor-pointer hover:bg-slate-800/50 transition-all p-4 border-slate-800",
+        onSelect && "active:scale-[0.99]"
       )}
       onClick={() => onSelect?.(log)}
     >
-      <div className="flex items-start space-x-3">
-        <div className="flex-shrink-0">
-          <div className={cn("p-2 rounded-full", actionColor)}>
+      <div className="flex items-start gap-4">
+        <div className="flex-shrink-0 pt-1">
+          <div className={cn("p-2 rounded-lg border", actionColor)}>
             <IconComponent className="h-4 w-4" />
           </div>
         </div>
         
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <h3 className="text-sm font-medium text-gray-900">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-slate-200 group-hover:text-white transition-colors">
                 {actionName}
               </h3>
               {(isSuccess || isError) && (
                 <span className={cn(
-                  "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
-                  isSuccess ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                  "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider border",
+                  isSuccess ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-red-500/10 text-red-400 border-red-500/20"
                 )}>
                   {isSuccess ? '成功' : '失败'}
                 </span>
               )}
             </div>
-            <span className="text-xs text-gray-500">
+            <span className="text-xs font-mono text-slate-500">
               {formatTimestamp(log.timestamp)}
             </span>
           </div>
           
-          <div className="mt-1 text-sm text-gray-600">
-            <div className="flex items-center space-x-4">
-              <span>设备: {log.device_id.substring(0, 8)}...</span>
-              {log.session_id && (
-                <span>会话: {log.session_id.substring(0, 8)}...</span>
-              )}
+          <div className="flex items-center gap-4 text-xs text-slate-400 font-mono">
+            <div className="flex items-center gap-1.5">
+                <Monitor className="w-3 h-3 text-slate-600" />
+                <span className="truncate max-w-[100px]" title={log.deviceId}>{log.deviceId.substring(0, 8)}...</span>
             </div>
+            {log.sessionId && (
+                <div className="flex items-center gap-1.5">
+                    <Radio className="w-3 h-3 text-slate-600" />
+                    <span className="truncate max-w-[100px]" title={log.sessionId}>{log.sessionId.substring(0, 8)}...</span>
+                </div>
+            )}
           </div>
-
-          {actionData && (
-            <div className="mt-2 text-xs text-gray-500">
-              {log.action_type === 'command_execution' && actionData.command && (
-                <div className="font-mono bg-gray-100 px-2 py-1 rounded">
-                  $ {actionData.command}
-                </div>
-              )}
-              {log.action_type === 'file_operation' && actionData.path && (
-                <div className="font-mono bg-gray-100 px-2 py-1 rounded">
-                  {actionData.operation}: {actionData.path}
-                </div>
-              )}
-              {log.action_type === 'device_enrollment' && actionData.platform && (
-                <div>
-                  平台: {actionData.platform} | 版本: {actionData.version}
-                </div>
-              )}
-            </div>
-          )}
-
-          {log.result && log.result !== 'success' && (
-            <div className="mt-2 text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
-              {log.result}
-            </div>
-          )}
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

@@ -6,10 +6,14 @@ import {
   FileText, 
   Image as ImageIcon,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Code
 } from 'lucide-react';
 import { FileInfo } from '../types/api';
 import { apiClient } from '../lib/api-client';
+import { Card } from './ui/Card';
+import { cn } from '../lib/utils';
+import { formatFileSize } from '../lib/utils'; // Assuming this exists or I'll implement locally
 
 interface FilePreviewModalProps {
   isOpen: boolean;
@@ -24,11 +28,26 @@ export function FilePreviewModal({ isOpen, onClose, file, deviceId }: FilePrevie
   const [error, setError] = useState<string | null>(null);
   const [previewType, setPreviewType] = useState<'text' | 'image' | 'unsupported'>('unsupported');
 
-  // Determine preview type based on file extension
+  useEffect(() => {
+    if (file) {
+      const type = getPreviewType(file.name);
+      setPreviewType(type);
+      if (isOpen && type !== 'unsupported') {
+        loadFileContent();
+      }
+    }
+    return () => {
+        // Cleanup object URLs to avoid memory leaks
+        if (content && previewType === 'image') {
+            URL.revokeObjectURL(content);
+        }
+    };
+  }, [file, isOpen]);
+
   const getPreviewType = (fileName: string): 'text' | 'image' | 'unsupported' => {
     const extension = fileName.split('.').pop()?.toLowerCase();
     
-    const textExtensions = ['txt', 'md', 'json', 'xml', 'html', 'css', 'js', 'ts', 'py', 'java', 'c', 'cpp', 'h', 'log', 'cfg', 'conf', 'ini'];
+    const textExtensions = ['txt', 'md', 'json', 'xml', 'html', 'css', 'js', 'ts', 'jsx', 'tsx', 'py', 'java', 'c', 'cpp', 'h', 'log', 'cfg', 'conf', 'ini', 'sh', 'bat', 'yaml', 'yml'];
     const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp'];
     
     if (textExtensions.includes(extension || '')) {
@@ -40,41 +59,40 @@ export function FilePreviewModal({ isOpen, onClose, file, deviceId }: FilePrevie
     return 'unsupported';
   };
 
-  // Load file content for preview
   const loadFileContent = async () => {
     if (!file || file.isDirectory) return;
 
     setLoading(true);
     setError(null);
+    // Cleanup previous image url
+    if (content && previewType === 'image') {
+        URL.revokeObjectURL(content);
+    }
     setContent(null);
 
     try {
+      const type = getPreviewType(file.name);
       const blob = await apiClient.downloadFile(deviceId, file.path);
       
-      if (previewType === 'text') {
-        // For text files, read as text
+      if (type === 'text') {
         const text = await blob.text();
         setContent(text);
-      } else if (previewType === 'image') {
-        // For images, create object URL
+      } else if (type === 'image') {
         const imageUrl = URL.createObjectURL(blob);
         setContent(imageUrl);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '预览失败');
+      setError(err instanceof Error ? err.message : '加载预览失败');
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle file download
   const handleDownload = async () => {
     if (!file || file.isDirectory) return;
 
     try {
       const blob = await apiClient.downloadFile(deviceId, file.path);
-      
-      // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -84,165 +102,124 @@ export function FilePreviewModal({ isOpen, onClose, file, deviceId }: FilePrevie
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '下载失败');
+      console.error(err);
     }
   };
 
-  // Format file size
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 B';
-    
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  const formatSize = (bytes: number) => {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
-
-  // Update preview type when file changes
-  useEffect(() => {
-    if (file && !file.isDirectory) {
-      const type = getPreviewType(file.name);
-      setPreviewType(type);
-    }
-  }, [file]);
-
-  // Load content when modal opens and file is previewable
-  useEffect(() => {
-    if (isOpen && file && !file.isDirectory && previewType !== 'unsupported') {
-      loadFileContent();
-    }
-    
-    // Cleanup image URLs when modal closes
-    return () => {
-      if (content && previewType === 'image' && content.startsWith('blob:')) {
-        URL.revokeObjectURL(content);
-      }
-    };
-  }, [isOpen, file, previewType]);
 
   if (!isOpen || !file) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        {/* Background overlay */}
-        <div 
-          className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
-          onClick={onClose}
-        />
-
-        {/* Modal panel */}
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-          {/* Header */}
-          <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                {previewType === 'text' && <FileText className="h-6 w-6 text-gray-400 mr-3" />}
-                {previewType === 'image' && <ImageIcon className="h-6 w-6 text-gray-400 mr-3" />}
-                {previewType === 'unsupported' && <Eye className="h-6 w-6 text-gray-400 mr-3" />}
-                
-                <div>
-                  <h3 className="text-lg leading-6 font-medium text-gray-900">
+    <div className="fixed inset-0 flex items-center justify-center z-50">
+      <div 
+        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity" 
+        onClick={onClose}
+      />
+      
+      <Card variant="glass" className="relative w-full max-w-4xl max-h-[90vh] flex flex-col p-0 shadow-2xl m-4 border-slate-700/50">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50 bg-slate-900/50">
+          <div className="flex items-center gap-3 min-w-0">
+             <div className="p-2 rounded-lg bg-slate-800 text-slate-300">
+               {previewType === 'image' ? <ImageIcon className="w-5 h-5 text-purple-400" /> : <FileText className="w-5 h-5 text-cyan-400" />}
+             </div>
+             <div className="min-w-0">
+                <h3 className="text-lg font-semibold text-slate-100 truncate pr-4">
                     {file.name}
-                  </h3>
-                  <p className="text-sm text-gray-500">
-                    {formatFileSize(file.size)} • {new Date(file.modified * 1000).toLocaleString('zh-CN')}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={handleDownload}
-                  className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  下载
-                </button>
-                
-                <button
-                  onClick={onClose}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="h-6 w-6" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Content */}
-          <div className="bg-gray-50 px-4 py-5 sm:p-6">
-            {loading && (
-              <div className="flex items-center justify-center py-12">
-                <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
-                <span className="ml-3 text-gray-500">加载预览...</span>
-              </div>
-            )}
-
-            {error && (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <AlertCircle className="mx-auto h-12 w-12 text-red-400" />
-                  <h3 className="mt-2 text-sm font-medium text-gray-900">预览失败</h3>
-                  <p className="mt-1 text-sm text-gray-500">{error}</p>
-                  <button
-                    onClick={loadFileContent}
-                    className="mt-3 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    重试
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {!loading && !error && previewType === 'unsupported' && (
-              <div className="text-center py-12">
-                <Eye className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">无法预览此文件</h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  此文件类型不支持预览，您可以下载文件查看内容
+                </h3>
+                <p className="text-xs text-slate-400 font-mono">
+                    {formatSize(file.size)} • {file.path}
                 </p>
-              </div>
-            )}
-
-            {!loading && !error && content && previewType === 'text' && (
-              <div className="bg-white rounded-lg border">
-                <div className="p-4">
-                  <pre className="text-sm text-gray-900 whitespace-pre-wrap font-mono overflow-auto max-h-96">
-                    {content}
-                  </pre>
-                </div>
-              </div>
-            )}
-
-            {!loading && !error && content && previewType === 'image' && (
-              <div className="bg-white rounded-lg border p-4">
-                <div className="flex justify-center">
-                  <img
-                    src={content}
-                    alt={file.name}
-                    className="max-w-full max-h-96 object-contain"
-                    onError={() => setError('图片加载失败')}
-                  />
-                </div>
-              </div>
-            )}
+             </div>
           </div>
-
-          {/* Footer */}
-          <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+          
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button
-              type="button"
-              onClick={onClose}
-              className="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
+                onClick={loadFileContent}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                title="刷新"
             >
-              关闭
+                <RefreshCw className={cn("w-5 h-5", loading && "animate-spin")} />
+            </button>
+            <button
+                onClick={handleDownload}
+                className="p-2 text-slate-400 hover:text-cyan-300 hover:bg-slate-800 rounded-lg transition-colors"
+                title="下载"
+            >
+                <Download className="w-5 h-5" />
+            </button>
+            <div className="w-px h-6 bg-slate-700 mx-1" />
+            <button
+                onClick={onClose}
+                className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors"
+            >
+                <X className="w-5 h-5" />
             </button>
           </div>
         </div>
-      </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-auto bg-slate-950 p-6 min-h-[400px] relative">
+            {loading ? (
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="space-y-4 text-center">
+                        <div className="w-12 h-12 border-4 border-slate-800 border-t-cyan-500 rounded-full animate-spin mx-auto" />
+                        <p className="text-slate-500 text-sm">正在加载预览...</p>
+                    </div>
+                </div>
+            ) : error ? (
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center max-w-sm px-4">
+                        <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4 opacity-80" />
+                        <h4 className="text-slate-200 font-medium mb-2">预览失败</h4>
+                        <p className="text-slate-500 text-sm">{error}</p>
+                    </div>
+                </div>
+            ) : previewType === 'unsupported' ? (
+                <div className="absolute inset-0 flex items-center justify-center">
+                     <div className="text-center">
+                        <div className="w-20 h-20 bg-slate-900 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-slate-800">
+                             <FileText className="w-10 h-10 text-slate-600" />
+                        </div>
+                        <h4 className="text-slate-200 font-medium mb-2">无可用预览</h4>
+                        <p className="text-slate-500 text-sm mb-6">
+                            此文件类型无法直接预览。
+                        </p>
+                        <button
+                            onClick={handleDownload}
+                            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-sm transition-colors border border-slate-700"
+                        >
+                            下载文件
+                        </button>
+                    </div>
+                </div>
+            ) : (
+                <div className="relative">
+                    {previewType === 'text' && content && (
+                        <pre className="font-mono text-sm text-slate-300 whitespace-pre-wrap break-words bg-slate-900/50 p-4 rounded-lg border border-slate-800/50">
+                            {content}
+                        </pre>
+                    )}
+                    {previewType === 'image' && content && (
+                         <div className="flex justify-center">
+                            <img 
+                                src={content} 
+                                alt={file.name} 
+                                className="max-w-full rounded-lg shadow-2xl border border-slate-800"
+                            />
+                         </div>
+                    )}
+                </div>
+            )}
+        </div>
+      </Card>
     </div>
   );
 }

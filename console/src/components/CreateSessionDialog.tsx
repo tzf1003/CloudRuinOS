@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { X, Monitor } from 'lucide-react';
+import { X, Monitor, Terminal, AlertTriangle } from 'lucide-react';
 import { useDevices, useCreateSession } from '../hooks/useApi';
 import { Device } from '../types/api';
+import { Card } from './ui/Card';
+import { cn } from '../lib/utils';
 
 interface CreateSessionDialogProps {
   isOpen: boolean;
@@ -19,7 +21,7 @@ export function CreateSessionDialog({ isOpen, onClose, preselectedDevice }: Crea
   const handleCreate = () => {
     if (selectedDeviceId) {
       createSession.mutate(
-        { device_id: selectedDeviceId },
+        { deviceId: selectedDeviceId },
         {
           onSuccess: () => {
             onClose();
@@ -38,93 +40,99 @@ export function CreateSessionDialog({ isOpen, onClose, preselectedDevice }: Crea
 
   if (!isOpen) return null;
 
+  const selectedDevice = devices.find(d => d.id === selectedDeviceId);
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">
+    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+      <Card variant="glass" className="w-full max-w-md p-0 border-slate-700/50 shadow-2xl zoom-in-95 animate-in duration-200">
+        <div className="flex items-center justify-between p-6 border-b border-slate-700/50 bg-slate-900/50">
+          <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+            <Terminal className="h-5 w-5 text-cyan-400" />
             创建实时会话
           </h3>
           <button
             onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-slate-400 hover:text-white transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="p-4 space-y-4">
+        <div className="p-6 space-y-6 bg-slate-950/30">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-xs font-semibold text-slate-500 uppercase mb-2">
               选择目标设备
             </label>
             {onlineDevices.length === 0 ? (
-              <div className="text-sm text-gray-500 p-3 bg-gray-50 rounded-md">
-                当前没有在线设备可用于创建会话
+              <div className="text-sm text-slate-400 p-4 bg-slate-900/50 border border-slate-800 rounded-lg text-center italic">
+                没有可用的在线设备来创建会话。
               </div>
             ) : (
               <select
                 value={selectedDeviceId}
                 onChange={(e) => setSelectedDeviceId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-slate-900/80 border border-slate-700 text-slate-200 text-sm rounded-lg p-3 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all"
               >
-                <option value="">请选择设备...</option>
+                <option value="" className="bg-slate-900 text-slate-500">选择设备...</option>
                 {onlineDevices.map((device) => (
-                  <option key={device.id} value={device.id}>
-                    {device.id} ({device.platform})
+                  <option key={device.id} value={device.id} className="bg-slate-900 text-slate-200">
+                    {device.id} ({device.platform}) - 在线
                   </option>
                 ))}
               </select>
             )}
           </div>
 
-          {selectedDeviceId && (
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-              <div className="flex items-center space-x-2">
-                <Monitor className="h-4 w-4 text-blue-600" />
-                <div className="text-sm text-blue-800">
-                  <div className="font-medium">
-                    {devices.find(d => d.id === selectedDeviceId)?.id}
+          {selectedDevice && (
+            <div className="bg-cyan-900/10 border border-cyan-500/20 rounded-lg p-4 animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-start space-x-3">
+                <div className="p-2 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
+                     <Monitor className="h-4 w-4 text-cyan-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold text-cyan-100 truncate">
+                    {selectedDevice.id}
                   </div>
-                  <div>
-                    平台: {devices.find(d => d.id === selectedDeviceId)?.platform}
+                  <div className="text-xs text-cyan-400/80 mt-0.5 uppercase tracking-wide">
+                    平台: {selectedDevice.platform}
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
-            <p className="text-sm text-yellow-800">
-              会话将允许您与设备进行实时通信，包括执行命令和管理文件。会话默认30分钟后过期。
+          <div className="bg-amber-900/10 border border-amber-500/20 rounded-lg p-4 flex gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0" />
+            <p className="text-xs text-amber-200/80 leading-relaxed">
+              会话允许实时通信、命令执行和文件管理。会话在 30 分钟无活动后自动过期。
             </p>
           </div>
 
-          <div className="flex justify-end space-x-3">
+          <div className="flex justify-end space-x-3 pt-2">
             <button
               onClick={handleClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              className="px-4 py-2 text-sm font-medium text-slate-300 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
             >
               取消
             </button>
             <button
               onClick={handleCreate}
               disabled={!selectedDeviceId || createSession.isPending}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-lg shadow-lg shadow-cyan-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {createSession.isPending ? '创建中...' : '创建会话'}
             </button>
           </div>
 
           {createSession.error ? (
-            <div className="bg-red-50 border border-red-200 rounded-md p-3">
-              <p className="text-sm text-red-800">
+            <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 animate-in shake">
+              <p className="text-sm text-red-300">
                 创建会话失败: {(createSession.error as any)?.message || '未知错误'}
               </p>
             </div>
           ) : null}
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

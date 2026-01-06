@@ -1,180 +1,179 @@
 import { useState } from 'react';
-import { X, Clock, Infinity } from 'lucide-react';
-import { useGenerateEnrollmentToken } from '../hooks/useApi';
+import { X, Calendar, Hash, Type, AlertCircle } from 'lucide-react';
+import { EnrollmentToken } from '../types/api';
+
+function generateNewTokenString() {
+  // Simple random string generator for UI preview
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < 16; i++) {
+    if (i > 0 && i % 4 === 0) result += '-';
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
 
 interface CreateTokenDialogProps {
   onClose: () => void;
-  onSuccess: () => void;
+  onConfirm: (data: Partial<EnrollmentToken>) => void;
+  isCreating: boolean;
 }
 
-export function CreateTokenDialog({ onClose, onSuccess }: CreateTokenDialogProps) {
-  const [description, setDescription] = useState('');
-  const [expiresIn, setExpiresIn] = useState<number | 'never' | 'custom'>(3600);
-  const [customExpiry, setCustomExpiry] = useState('');
-  const [maxUsage, setMaxUsage] = useState(1);
-  const [createdBy, setCreatedBy] = useState('console');
+export function CreateTokenDialog({
+  onClose,
+  onConfirm,
+  isCreating
+}: CreateTokenDialogProps) {
+  const [formData, setFormData] = useState({
+    description: '',
+    maxUsage: '10',
+    expiresInDays: '7',
+    tokenString: generateNewTokenString(),
+    isPermanent: false
+  });
 
-  const generateTokenMutation = useGenerateEnrollmentToken();
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    let finalExpiresIn: number | 'never' = expiresIn;
+    // Calculate expiry based on days
+    const days = parseInt(formData.expiresInDays);
+    const expiresAt = formData.isPermanent ? undefined : Date.now() + (days * 24 * 60 * 60 * 1000);
     
-    if (expiresIn === 'custom' && customExpiry) {
-      const customValue = parseInt(customExpiry);
-      if (isNaN(customValue) || customValue < 60) {
-        alert('自定义过期时间必须至少为60秒');
-        return;
-      }
-      finalExpiresIn = customValue;
-    } else if (expiresIn === 'custom') {
-      alert('请输入自定义过期时间');
-      return;
-    }
-
-    try {
-      await generateTokenMutation.mutateAsync({
-        description: description.trim() || undefined,
-        expiresIn: finalExpiresIn,
-        maxUsage,
-        createdBy: createdBy.trim() || 'console',
-      });
-      onSuccess();
-    } catch (error) {
-      console.error('生成令牌失败:', error);
-      alert('生成令牌失败，请重试');
-    }
+    onConfirm({
+      token: formData.tokenString,
+      description: formData.description,
+      maxUsage: parseInt(formData.maxUsage),
+      expiresAt: expiresAt,
+      isPermanent: formData.isPermanent
+    });
   };
 
-  const expiryOptions = [
-    { value: 3600, label: '1小时', icon: Clock },
-    { value: 86400, label: '1天', icon: Clock },
-    { value: 604800, label: '1周', icon: Clock },
-    { value: 2592000, label: '1个月', icon: Clock },
-    { value: 'never', label: '永不过期', icon: Infinity },
-    { value: 'custom', label: '自定义', icon: Clock },
-  ];
+  const handleRegenerateToken = () => {
+    setFormData({ ...formData, tokenString: generateNewTokenString() });
+  };
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium text-gray-900">生成注册令牌</h3>
-          <button
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-lg w-full shadow-2xl overflow-hidden ring-1 ring-white/10">
+        <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-100">创建注册令牌</h2>
+            <p className="text-sm text-slate-400 mt-1">生成新的设备注册令牌。</p>
+          </div>
+          <button 
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded p-1 transition-colors"
           >
-            <X className="h-6 w-6" />
+            <X className="h-5 w-5" />
           </button>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-              描述 (可选)
-            </label>
-            <input
-              type="text"
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="令牌用途描述..."
-              maxLength={200}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              有效期
-            </label>
-            <div className="space-y-2">
-              {expiryOptions.map((option) => {
-                const IconComponent = option.icon;
-                return (
-                  <label key={option.value} className="flex items-center">
-                    <input
-                      type="radio"
-                      name="expiresIn"
-                      value={option.value}
-                      checked={expiresIn === option.value}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (value === 'never') {
-                          setExpiresIn('never');
-                        } else if (value === 'custom') {
-                          setExpiresIn('custom');
-                        } else {
-                          setExpiresIn(parseInt(value));
-                        }
-                      }}
-                      className="mr-2"
-                    />
-                    <IconComponent className="h-4 w-4 mr-2 text-gray-500" />
-                    <span className="text-sm text-gray-700">{option.label}</span>
-                  </label>
-                );
-              })}
-            </div>
+        
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <div className="space-y-4">
             
-            {expiresIn === 'custom' && (
-              <div className="mt-2">
+            {/* Description Field */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-300 flex items-center">
+                <Type className="w-4 h-4 mr-2 text-cyan-500" />
+                描述
+              </label>
+              <input
+                type="text"
+                required
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all placeholder:text-slate-600"
+                placeholder="例如: 销售部门笔记本电脑"
+                value={formData.description}
+                onChange={(e) => setFormData({...formData, description: e.target.value})}
+              />
+            </div>
+
+            {/* Token String Generator */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-300 flex items-center">
+                <Hash className="w-4 h-4 mr-2 text-purple-500" />
+                令牌字符串
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  className="flex-1 font-mono text-sm bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-cyan-400 focus:outline-none cursor-default select-all"
+                  value={formData.tokenString}
+                />
+                <button
+                  type="button"
+                  onClick={handleRegenerateToken}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-lg text-sm font-medium transition-colors border border-slate-700"
+                >
+                  重新生成
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+               {/* Max Usage */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-300">最大使用次数</label>
                 <input
                   type="number"
-                  value={customExpiry}
-                  onChange={(e) => setCustomExpiry(e.target.value)}
-                  className="block w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="秒数 (最少60秒)"
-                  min="60"
+                  min="1"
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
+                  value={formData.maxUsage}
+                  onChange={(e) => setFormData({...formData, maxUsage: e.target.value})}
                 />
               </div>
-            )}
+
+               {/* Expiry Days */}
+              <div className="space-y-2">
+                 <div className="flex justify-between items-center">
+                    <label className={`text-sm font-medium ${formData.isPermanent ? 'text-slate-600' : 'text-slate-300'} transition-colors`}>过期天数</label>
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                           type="checkbox"
+                           checked={formData.isPermanent}
+                           onChange={(e) => setFormData({...formData, isPermanent: e.target.checked})}
+                           className="form-checkbox h-4 w-4 text-cyan-500 rounded border-slate-700 bg-slate-900 focus:ring-cyan-500/50"
+                        />
+                        <span className="text-xs text-slate-400">永不</span>
+                    </label>
+                 </div>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="1"
+                    disabled={formData.isPermanent}
+                    className={`w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all pl-10 disabled:opacity-50 disabled:cursor-not-allowed`}
+                    value={formData.expiresInDays}
+                    onChange={(e) => setFormData({...formData, expiresInDays: e.target.value})}
+                  />
+                  <Calendar className={`absolute left-3 top-2.5 h-4 w-4 ${formData.isPermanent ? 'text-slate-600' : 'text-slate-500'}`} />
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label htmlFor="maxUsage" className="block text-sm font-medium text-gray-700">
-              最大使用次数
-            </label>
-            <input
-              type="number"
-              id="maxUsage"
-              value={maxUsage}
-              onChange={(e) => setMaxUsage(parseInt(e.target.value) || 1)}
-              className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              min="1"
-              max="1000"
-            />
+          <div className="bg-blue-900/10 border border-blue-900/30 rounded-lg p-3 flex gap-3">
+             <AlertCircle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+             <div className="text-xs text-blue-300/80 leading-relaxed">
+               新令牌立即生效。建议通过安全渠道分发，因为令牌提供直接的注册访问权限。
+             </div>
           </div>
 
-          <div>
-            <label htmlFor="createdBy" className="block text-sm font-medium text-gray-700">
-              创建者
-            </label>
-            <input
-              type="text"
-              id="createdBy"
-              value={createdBy}
-              onChange={(e) => setCreatedBy(e.target.value)}
-              className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="创建者标识"
-            />
-          </div>
-
-          <div className="flex justify-end space-x-3 pt-4">
+          <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-lg text-sm font-medium transition-colors border border-slate-800"
             >
               取消
             </button>
             <button
               type="submit"
-              disabled={generateTokenMutation.isPending}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 disabled:opacity-50"
+              disabled={isCreating}
+              className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-lg text-sm font-medium shadow-lg shadow-cyan-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              {generateTokenMutation.isPending ? '生成中...' : '生成令牌'}
+              {isCreating ? '创建中...' : '创建令牌'}
             </button>
           </div>
         </form>

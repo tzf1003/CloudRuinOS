@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { X, Copy, Check, Clock } from 'lucide-react';
+import { X, Copy, Check, Clock, Key } from 'lucide-react';
 import { useGenerateEnrollmentToken } from '../hooks/useApi';
 import { formatTimestamp } from '../lib/utils';
+import { Card } from './ui/Card';
 
 interface EnrollmentTokenDialogProps {
   isOpen: boolean;
@@ -14,7 +15,7 @@ export function EnrollmentTokenDialog({ isOpen, onClose }: EnrollmentTokenDialog
   const generateToken = useGenerateEnrollmentToken();
 
   const handleGenerate = () => {
-    generateToken.mutate({ expires_in: expiresIn });
+    generateToken.mutate({ expiresIn: expiresIn });
   };
 
   const handleCopy = async () => {
@@ -34,123 +35,124 @@ export function EnrollmentTokenDialog({ isOpen, onClose }: EnrollmentTokenDialog
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">
-            生成设备注册令牌
-          </h3>
+    <div className="fixed inset-0 flex items-center justify-center z-50">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm transition-opacity" 
+        onClick={handleClose}
+      />
+      
+      {/* Modal */}
+      <Card variant="glass" className="relative w-full max-w-md mx-4 overflow-hidden z-10 shadow-2xl p-0">
+        <div className="px-6 py-4 border-b border-slate-700/50 flex items-center justify-between bg-slate-900/40">
+          <div className="flex items-center gap-3">
+             <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400">
+                <Key className="w-5 h-5" />
+             </div>
+             <h3 className="text-lg font-semibold text-slate-100">
+               生成注册令牌
+             </h3>
+          </div>
           <button
             onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-slate-400 hover:text-white transition-colors p-1 hover:bg-slate-800 rounded-md"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="p-4 space-y-4">
+        <div className="p-6 space-y-6">
           {!generateToken.data ? (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  令牌有效期（秒）
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  过期时间
                 </label>
-                <select
-                  value={expiresIn}
-                  onChange={(e) => setExpiresIn(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value={300}>5 分钟</option>
-                  <option value={1800}>30 分钟</option>
-                  <option value={3600}>1 小时</option>
-                  <option value={7200}>2 小时</option>
-                  <option value={86400}>24 小时</option>
-                </select>
+                <div className="relative">
+                    <select
+                        value={expiresIn}
+                        onChange={(e) => setExpiresIn(Number(e.target.value))}
+                        className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 appearance-none"
+                    >
+                        <option value={300} className="bg-slate-900 text-slate-200">5 分钟</option>
+                        <option value={1800} className="bg-slate-900 text-slate-200">30 分钟</option>
+                        <option value={3600} className="bg-slate-900 text-slate-200">1 小时</option>
+                        <option value={7200} className="bg-slate-900 text-slate-200">2 小时</option>
+                        <option value={86400} className="bg-slate-900 text-slate-200">24 小时</option>
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-500">
+                        <Clock className="w-4 h-4" />
+                    </div>
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                    令牌将在此时间段后失效
+                </p>
               </div>
 
-              <div className="flex justify-end space-x-3">
+              <div className="flex justify-end space-x-3 pt-2">
                 <button
                   onClick={handleClose}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                  className="px-4 py-2 text-sm font-medium text-slate-300 bg-slate-800/50 border border-slate-700 rounded-lg hover:bg-slate-800 hover:text-white transition-all"
                 >
                   取消
                 </button>
                 <button
                   onClick={handleGenerate}
                   disabled={generateToken.isPending}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-500 hover:shadow-[0_0_15px_-3px_rgba(6,182,212,0.4)] transition-all disabled:opacity-50 disabled:shadow-none"
                 >
                   {generateToken.isPending ? '生成中...' : '生成令牌'}
                 </button>
               </div>
             </>
           ) : (
-            <>
+            <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  注册令牌
+                <label className="block text-sm font-medium text-emerald-400 mb-2 flex items-center gap-2">
+                  <Check className="w-4 h-4" /> 令牌已生成
                 </label>
                 <div className="flex items-center space-x-2">
-                  <input
-                    type="text"
-                    value={generateToken.data.token}
-                    readOnly
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm font-mono"
-                  />
+                  <div className="relative flex-1 group">
+                      <input
+                        type="text"
+                        value={generateToken.data.token}
+                        readOnly
+                        className="w-full px-4 py-3 bg-slate-950/80 border border-slate-700 rounded-lg text-cyan-300 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                      />
+                      <div className="absolute inset-0 rounded-lg ring-1 ring-cyan-500/20 group-hover:ring-cyan-500/40 pointer-events-none transition-all" />
+                  </div>
+                  
                   <button
                     onClick={handleCopy}
-                    className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 flex items-center space-x-1"
+                    className="p-3 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 hover:text-white transition-colors text-slate-400 group relative"
+                    title="Copy to clipboard"
                   >
-                    {copied ? (
-                      <>
-                        <Check className="h-4 w-4 text-green-600" />
-                        <span>已复制</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="h-4 w-4" />
-                        <span>复制</span>
-                      </>
-                    )}
+                    {copied ? <Check className="w-5 h-5 text-emerald-400" /> : <Copy className="w-5 h-5" />}
                   </button>
                 </div>
               </div>
 
-              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
-                <div className="flex items-center space-x-2 text-sm text-yellow-800">
-                  <Clock className="h-4 w-4" />
-                  <span>
-                    令牌将于 {formatTimestamp(generateToken.data.expires_at)} 过期
-                  </span>
-                </div>
+              <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-800">
+                  <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-500">过期时间:</span>
+                      <span className="text-slate-300 font-mono">
+                          {formatTimestamp(generateToken.data.expiresAt || 0)}
+                      </span>
+                  </div>
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                <p className="text-sm text-blue-800">
-                  请将此令牌提供给需要注册的设备。令牌只能使用一次，过期后需要重新生成。
-                </p>
-              </div>
-
-              <div className="flex justify-end">
-                <button
+              <div className="flex justify-end pt-2">
+                 <button
                   onClick={handleClose}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                  className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors"
                 >
-                  完成
+                  关闭
                 </button>
               </div>
-            </>
-          )}
-
-          {generateToken.error ? (
-            <div className="bg-red-50 border border-red-200 rounded-md p-3">
-              <p className="text-sm text-red-800">
-                生成令牌失败: {(generateToken.error as any)?.message || '未知错误'}
-              </p>
             </div>
-          ) : null}
+          )}
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

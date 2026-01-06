@@ -40,13 +40,13 @@ export function formatFileSize(bytes: number): string {
 export function getDeviceStatusColor(status: string): string {
   switch (status) {
     case 'online':
-      return 'text-green-600 bg-green-100';
+      return 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20';
     case 'offline':
-      return 'text-red-600 bg-red-100';
+      return 'text-red-400 bg-red-500/10 border border-red-500/20';
     case 'busy':
-      return 'text-yellow-600 bg-yellow-100';
+      return 'text-amber-400 bg-amber-500/10 border border-amber-500/20';
     default:
-      return 'text-gray-600 bg-gray-100';
+      return 'text-slate-400 bg-slate-500/10 border border-slate-500/20';
   }
 }
 

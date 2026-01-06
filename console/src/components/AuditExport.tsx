@@ -1,6 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Download, FileText, Database, Table, X, CheckCircle, AlertCircle } from 'lucide-react';
 import { AuditFilters, AuditLog } from '../types/api';
+import { cn } from '../lib/utils';
+import { Card } from './ui/Card';
 
 interface AuditExportProps {
   filters: AuditFilters;
@@ -54,21 +56,21 @@ export function AuditExport({
     {
       value: 'csv' as ExportFormat,
       label: 'CSV 文件',
-      description: '逗号分隔值，适合在 Excel 中打开',
+      description: '逗号分隔值，适用于 Excel',
       icon: Table,
       extension: '.csv'
     },
     {
       value: 'json' as ExportFormat,
       label: 'JSON 文件',
-      description: '结构化数据格式，适合程序处理',
+      description: '结构化数据格式，适用于程序处理',
       icon: Database,
       extension: '.json'
     },
     {
       value: 'xlsx' as ExportFormat,
       label: 'Excel 文件',
-      description: 'Microsoft Excel 格式，支持格式化',
+      description: 'Microsoft Excel 格式',
       icon: FileText,
       extension: '.xlsx'
     }
@@ -85,7 +87,7 @@ export function AuditExport({
       setExportProgress({
         status: 'preparing',
         progress: 0,
-        message: '准备导出数据...'
+        message: '准备数据...'
       });
 
       // Simulate progress updates
@@ -157,22 +159,25 @@ export function AuditExport({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <Card variant="glass" className="w-full max-w-2xl max-h-[90vh] overflow-y-auto flex flex-col p-0 border-slate-700/50 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-6 border-b border-slate-700/50 bg-slate-900/50">
           <div className="flex items-center space-x-3">
-            <Download className="h-6 w-6 text-blue-600" />
+            <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
+                <Download className="h-5 w-5 text-cyan-400" />
+            </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">导出审计日志</h2>
-              <p className="text-sm text-gray-500">
-                共 {totalCount} 条记录，当前筛选 {logs.length} 条
+              <h2 className="text-lg font-bold text-slate-100">导出审计日志</h2>
+              <p className="text-sm text-slate-400">
+                共 {totalCount} 条记录，已选 {logs.length} 条
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-slate-400 hover:text-white transition-colors"
             disabled={exportProgress.status === 'exporting'}
           >
             <X className="h-6 w-6" />
@@ -180,47 +185,40 @@ export function AuditExport({
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6 bg-slate-950/30">
           {/* Export Format Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              选择导出格式
+            <label className="block text-sm font-medium text-slate-300 mb-3">
+              导出格式
             </label>
             <div className="grid grid-cols-1 gap-3">
               {formatOptions.map((format) => {
                 const Icon = format.icon;
+                const isSelected = selectedFormat === format.value;
                 return (
-                  <label
+                  <div
                     key={format.value}
-                    className={`relative flex items-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50 ${
-                      selectedFormat === format.value
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-300'
-                    }`}
+                    onClick={() => setSelectedFormat(format.value)}
+                    className={cn(
+                        "relative flex items-center p-4 border rounded-xl cursor-pointer transition-all duration-200",
+                        isSelected 
+                            ? "bg-cyan-500/10 border-cyan-500/50 shadow-[0_0_15px_-3px_rgba(6,182,212,0.15)]" 
+                            : "bg-slate-900/40 border-slate-800 hover:border-slate-700 hover:bg-slate-800/40"
+                    )}
                   >
-                    <input
-                      type="radio"
-                      name="format"
-                      value={format.value}
-                      checked={selectedFormat === format.value}
-                      onChange={(e) => setSelectedFormat(e.target.value as ExportFormat)}
-                      className="sr-only"
-                    />
-                    <Icon className={`h-5 w-5 mr-3 ${
-                      selectedFormat === format.value ? 'text-blue-600' : 'text-gray-400'
-                    }`} />
+                    <Icon className={cn("h-5 w-5 mr-3", isSelected ? "text-cyan-400" : "text-slate-500")} />
                     <div className="flex-1">
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className={cn("text-sm font-medium", isSelected ? "text-cyan-100" : "text-slate-300")}>
                         {format.label}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-slate-500 mt-0.5">
                         {format.description}
                       </div>
                     </div>
-                    {selectedFormat === format.value && (
-                      <CheckCircle className="h-5 w-5 text-blue-600" />
+                    {isSelected && (
+                      <CheckCircle className="h-5 w-5 text-cyan-400" />
                     )}
-                  </label>
+                  </div>
                 );
               })}
             </div>
@@ -228,82 +226,86 @@ export function AuditExport({
 
           {/* Export Options */}
           <div className="space-y-4">
-            <h3 className="text-sm font-medium text-gray-700">导出选项</h3>
+            <h3 className="text-sm font-medium text-slate-300">Options</h3>
             
-            {/* Filename */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                文件名
-              </label>
-              <input
-                type="text"
-                value={exportOptions.filename || ''}
-                onChange={(e) => updateOption('filename', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                placeholder="audit-logs"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                文件扩展名将自动添加
-              </p>
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Filename */}
+                <div className="col-span-1 md:col-span-2">
+                <label className="block text-xs font-medium text-slate-500 mb-1.5 uppercase">
+                    Filename
+                </label>
+                <div className="relative">
+                    <input
+                        type="text"
+                        value={exportOptions.filename || ''}
+                        onChange={(e) => updateOption('filename', e.target.value)}
+                        className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all placeholder:text-slate-600"
+                        placeholder="audit-logs"
+                    />
+                    <div className="absolute right-3 top-2.5 text-xs text-slate-500 pointer-events-none">
+                        {formatOptions.find(f => f.value === selectedFormat)?.extension}
+                    </div>
+                </div>
+                </div>
 
-            {/* Max Records */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                最大记录数
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="50000"
-                value={exportOptions.maxRecords || ''}
-                onChange={(e) => updateOption('maxRecords', Number(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                预计文件大小: {formatFileSize(exportOptions.maxRecords || 0)}
-              </p>
-            </div>
+                {/* Max Records */}
+                <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1.5 uppercase">
+                    最大记录数
+                </label>
+                <input
+                    type="number"
+                    min="1"
+                    max="50000"
+                    value={exportOptions.maxRecords || ''}
+                    onChange={(e) => updateOption('maxRecords', Number(e.target.value))}
+                    className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">
+                    预估大小: {formatFileSize(exportOptions.maxRecords || 0)}
+                </p>
+                </div>
 
-            {/* Date Format */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                日期格式
-              </label>
-              <select
-                value={exportOptions.dateFormat}
-                onChange={(e) => updateOption('dateFormat', e.target.value as any)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              >
-                {dateFormatOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                {/* Date Format */}
+                <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1.5 uppercase">
+                    日期格式
+                </label>
+                <select
+                    value={exportOptions.dateFormat}
+                    onChange={(e) => updateOption('dateFormat', e.target.value as any)}
+                    className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all"
+                >
+                    {dateFormatOptions.map((option) => (
+                    <option key={option.value} value={option.value} className="bg-slate-900 text-slate-200">
+                        {option.label}
+                    </option>
+                    ))}
+                </select>
+                </div>
             </div>
 
             {/* Checkboxes */}
-            <div className="space-y-2">
-              <label className="flex items-center">
+            <div className="flex flex-col gap-3 pt-2">
+              <label className="flex items-center cursor-pointer group">
                 <input
                   type="checkbox"
                   checked={exportOptions.includeHeaders}
                   onChange={(e) => updateOption('includeHeaders', e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-cyan-500 focus:ring-offset-slate-900 focus:ring-cyan-500"
                 />
-                <span className="ml-2 text-sm text-gray-700">包含列标题</span>
+                <span className="ml-2 text-sm text-slate-400 group-hover:text-slate-200 transition-colors">包含列标题</span>
               </label>
 
-              <label className="flex items-center">
+              <label className="flex items-center cursor-pointer group">
                 <input
                   type="checkbox"
                   checked={exportOptions.includeFilters}
                   onChange={(e) => updateOption('includeFilters', e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-cyan-500 focus:ring-offset-slate-900 focus:ring-cyan-500"
                 />
-                <span className="ml-2 text-sm text-gray-700">
-                  包含筛选条件信息 ({getActiveFilterCount()} 个筛选条件)
+                <span className="ml-2 text-sm text-slate-400 group-hover:text-slate-200 transition-colors">
+                  包含筛选条件元数据 ({getActiveFilterCount()} 个生效中)
                 </span>
               </label>
             </div>
@@ -311,21 +313,21 @@ export function AuditExport({
 
           {/* Export Progress */}
           {exportProgress.status !== 'idle' && (
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-slate-900/80 border border-slate-700 rounded-lg p-4 animate-in fade-in slide-in-from-bottom-2">
               <div className="flex items-center space-x-3">
                 {exportProgress.status === 'success' ? (
-                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <CheckCircle className="h-5 w-5 text-emerald-400" />
                 ) : exportProgress.status === 'error' ? (
-                  <AlertCircle className="h-5 w-5 text-red-600" />
+                  <AlertCircle className="h-5 w-5 text-red-400" />
                 ) : (
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600" />
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-slate-600 border-t-cyan-500" />
                 )}
                 <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-900">
+                  <div className="text-sm font-medium text-slate-200">
                     {exportProgress.message}
                   </div>
                   {exportProgress.filename && (
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-slate-500">
                       文件: {exportProgress.filename}
                     </div>
                   )}
@@ -334,14 +336,14 @@ export function AuditExport({
               
               {exportProgress.status === 'preparing' || exportProgress.status === 'exporting' ? (
                 <div className="mt-3">
-                  <div className="bg-gray-200 rounded-full h-2">
+                  <div className="bg-slate-800 rounded-full h-1.5 overflow-hidden">
                     <div
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      className="bg-cyan-500 h-full rounded-full transition-all duration-300 ease-out shadow-[0_0_10px_rgba(6,182,212,0.5)]"
                       style={{ width: `${exportProgress.progress}%` }}
                     />
                   </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {exportProgress.progress}% 完成
+                  <div className="text-xs text-cyan-400 mt-1 text-right">
+                    {exportProgress.progress}%
                   </div>
                 </div>
               ) : null}
@@ -350,15 +352,15 @@ export function AuditExport({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
-          <div className="text-sm text-gray-500">
-            将导出 {Math.min(exportOptions.maxRecords || 0, logs.length)} 条记录
+        <div className="flex items-center justify-between p-6 border-t border-slate-700/50 bg-slate-900/50 mt-auto">
+          <div className="text-xs text-slate-500 hidden sm:block">
+            将导出约 {Math.min(exportOptions.maxRecords || 0, logs.length)} 条记录
           </div>
-          <div className="flex space-x-3">
+          <div className="flex space-x-3 w-full sm:w-auto justify-end">
             <button
               onClick={onClose}
               disabled={exportProgress.status === 'exporting'}
-              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="px-4 py-2 border border-slate-700 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white disabled:opacity-50 transition-colors"
             >
               取消
             </button>
@@ -370,13 +372,13 @@ export function AuditExport({
                 !exportOptions.maxRecords ||
                 exportOptions.maxRecords <= 0
               }
-              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-lg text-sm font-medium shadow-md shadow-cyan-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              {exportProgress.status === 'exporting' ? '导出中...' : '开始导出'}
+              {exportProgress.status === 'exporting' ? '正在导出...' : '开始导出'}
             </button>
           </div>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

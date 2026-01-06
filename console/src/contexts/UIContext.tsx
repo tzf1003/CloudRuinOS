@@ -53,7 +53,7 @@ type UIAction =
   | { type: 'UPDATE_OPERATION'; payload: { id: string; updates: Partial<OperationProgress> } }
   | { type: 'COMPLETE_OPERATION'; payload: { id: string; success: boolean; message?: string } }
   | { type: 'REMOVE_OPERATION'; payload: string }
-  | { type: 'ADD_NOTIFICATION'; payload: Omit<Notification, 'id' | 'timestamp'> }
+  | { type: 'ADD_NOTIFICATION'; payload: Omit<Notification, 'id' | 'timestamp'> & { id?: string } }
   | { type: 'REMOVE_NOTIFICATION'; payload: string }
   | { type: 'CLEAR_NOTIFICATIONS' }
   | { type: 'TOGGLE_MODAL'; payload: { modal: keyof UIState['modals']; open?: boolean } }
@@ -137,7 +137,7 @@ function uiReducer(state: UIState, action: UIAction): UIState {
     case 'ADD_NOTIFICATION':
       const notification: Notification = {
         ...action.payload,
-        id: `notification-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: action.payload.id || `notification-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         timestamp: Date.now(),
       };
       
@@ -267,12 +267,13 @@ export function useNotifications() {
   const { state, dispatch } = useUI();
   
   const addNotification = (notification: Omit<Notification, 'id' | 'timestamp'>) => {
-    dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
+    const id = `notif-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    dispatch({ type: 'ADD_NOTIFICATION', payload: { ...notification, id } });
     
     // 自动移除通知（如果设置了duration）
     if (notification.duration && !notification.persistent) {
       setTimeout(() => {
-        dispatch({ type: 'REMOVE_NOTIFICATION', payload: notification.id || '' });
+        dispatch({ type: 'REMOVE_NOTIFICATION', payload: id });
       }, notification.duration);
     }
   };

@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Activity, AlertTriangle, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { RefreshCw, Activity, AlertTriangle, CheckCircle, XCircle, Clock, Server, Database, HardDrive, Shield, Lock, Play, Pause } from 'lucide-react';
 import { useHealthMonitor } from '../hooks/useHealthMonitor';
 import { apiClient } from '../lib/api-client';
 import { Device, Session } from '../types/api';
+import { Card } from '../components/ui/Card';
+import { cn } from '../lib/utils';
+import clsx from 'clsx';
 
 export function StatusPage() {
   const [devices, setDevices] = useState<Device[]>([]);
@@ -53,26 +56,26 @@ export function StatusPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'healthy':
-        return 'text-green-600';
+        return 'text-emerald-400';
       case 'degraded':
-        return 'text-yellow-600';
+        return 'text-amber-400';
       case 'unhealthy':
-        return 'text-red-600';
+        return 'text-red-400';
       default:
-        return 'text-gray-600';
+        return 'text-slate-400';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'healthy':
-        return <CheckCircle className="w-5 h-5 text-green-600" />;
+        return <CheckCircle className="w-5 h-5 text-emerald-400" />;
       case 'degraded':
-        return <AlertTriangle className="w-5 h-5 text-yellow-600" />;
+        return <AlertTriangle className="w-5 h-5 text-amber-400" />;
       case 'unhealthy':
-        return <XCircle className="w-5 h-5 text-red-600" />;
+        return <XCircle className="w-5 h-5 text-red-400" />;
       default:
-        return <Clock className="w-5 h-5 text-gray-600" />;
+        return <Clock className="w-5 h-5 text-slate-400" />;
     }
   };
 
@@ -82,277 +85,259 @@ export function StatusPage() {
     const minutes = Math.floor((seconds % 3600) / 60);
     
     if (days > 0) {
-      return `${days}天 ${hours}小时`;
+      return `${days}d ${hours}h`;
     } else if (hours > 0) {
-      return `${hours}小时 ${minutes}分钟`;
+      return `${hours}h ${minutes}m`;
     } else {
-      return `${minutes}分钟`;
+      return `${minutes}m`;
     }
   };
 
   const formatLastUpdate = (timestamp: number | null) => {
-    if (!timestamp) return '从未更新';
+    if (!timestamp) return 'Never';
     const now = Date.now();
     const diff = Math.floor((now - timestamp) / 1000);
     
-    if (diff < 60) return `${diff}秒前`;
-    if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
-    return `${Math.floor(diff / 3600)}小时前`;
+    if (diff < 60) return `${diff}s ago`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    return `${Math.floor(diff / 3600)}h ago`;
   };
 
   const onlineDevices = devices.filter(d => d.status === 'online').length;
   const activeSessions = sessions.filter(s => s.status === 'active' || s.status === 'connected').length;
 
+  const componentIcons: Record<string, any> = {
+    database: Database,
+    kv: Server,
+    r2: HardDrive,
+    durableObjects: Server,
+    secrets: Lock,
+    default: Activity
+  };
+
   return (
-    <div>
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">系统状态</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              监控系统健康状态和性能指标
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-500 bg-clip-text text-transparent flex items-center gap-3">
+            <Activity className="h-8 w-8 text-emerald-500" />
+            系统状态
+          </h1>
+          <div className="flex items-center gap-3 mt-1">
+             <p className="text-slate-400 text-sm">
+              实时系统健康与指标
             </p>
+            {lastUpdate && (
+              <span className={cn(
+                "text-xs px-2 py-0.5 rounded-full border flex items-center gap-1",
+                 isConnected ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-red-500/10 border-red-500/20 text-red-400"
+              )}>
+                {isConnected ? <CheckCircle className="w-3 h-3"/> : <XCircle className="w-3 h-3"/>}
+                已更新: {formatLastUpdate(lastUpdate)}
+              </span>
+            )}
           </div>
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <label className="text-sm text-gray-600">自动刷新</label>
-              <button
-                onClick={() => {
-                  setAutoRefresh(!autoRefresh);
-                  toggleAutoRefresh();
-                }}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  autoRefresh ? 'bg-blue-600' : 'bg-gray-200'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    autoRefresh ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-            </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 bg-slate-900/50 p-2 rounded-lg border border-slate-800">
+           <button
+             onClick={() => {
+               setAutoRefresh(!autoRefresh);
+               toggleAutoRefresh();
+             }}
+             className={cn(
+               "p-2 rounded-md transition-all flex items-center gap-2 text-xs font-bold uppercase",
+               autoRefresh ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-slate-800 text-slate-500 border border-slate-700"
+             )}
+             title={autoRefresh ? "暂停自动刷新" : "恢复自动刷新"}
+           >
+             {autoRefresh ? <><Pause className="h-4 w-4" /> 实时</> : <><Play className="h-4 w-4" /> 暂停</>}
+           </button>
+
             <select
               value={refreshInterval}
               onChange={(e) => setRefreshInterval(Number(e.target.value))}
-              className="text-sm border border-gray-300 rounded-md px-3 py-1"
+              className="bg-slate-950 border border-slate-700 text-slate-300 text-xs rounded-md px-2 py-2 focus:ring-1 focus:ring-cyan-500 outline-none"
             >
-              <option value={10000}>10秒</option>
-              <option value={30000}>30秒</option>
-              <option value={60000}>1分钟</option>
-              <option value={300000}>5分钟</option>
+              <option value={10000}>10s</option>
+              <option value={30000}>30s</option>
+              <option value={60000}>1m</option>
+              <option value={300000}>5m</option>
             </select>
+
             <button
               onClick={refresh}
               disabled={loading}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="p-2 bg-cyan-600/20 text-cyan-400 hover:bg-cyan-600/30 border border-cyan-500/30 rounded-md transition-colors disabled:opacity-50"
+              title="立即刷新"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              <span>刷新</span>
+              <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
             </button>
-          </div>
         </div>
-        {lastUpdate && (
-          <p className="mt-2 text-xs text-gray-500">
-            最后更新: {formatLastUpdate(lastUpdate)}
-            {!isConnected && <span className="text-red-500 ml-2">● 连接断开</span>}
-          </p>
-        )}
       </div>
 
       {/* Error Banner */}
       {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
-          <div className="flex">
-            <XCircle className="w-5 h-5 text-red-400" />
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">健康检查失败</h3>
-              <p className="mt-1 text-sm text-red-700">{error}</p>
+        <Card variant="glass" className="bg-red-950/20 border-red-500/30 p-4 animate-in slide-in-from-top-2">
+          <div className="flex gap-3">
+            <XCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+            <div>
+              <h3 className="text-sm font-bold text-red-400">健康检查失败</h3>
+              <p className="mt-1 text-sm text-red-300/80">{error}</p>
             </div>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Main Status Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              {getStatusIcon(health?.status || 'unknown')}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { 
+            label: '系统状态', 
+            val: health?.status === 'healthy' ? '运行正常' : health?.status === 'degraded' ? '性能降级' : health?.status === 'unhealthy' ? '严重错误' : '未知', // Using custom text instead of raw status
+            icon: Shield,
+            color: health?.status === 'healthy' ? 'text-emerald-400' : health?.status === 'degraded' ? 'text-amber-400' : 'text-red-400',
+            sub: '整体健康状况',
+            bg: health?.status === 'healthy' ? 'bg-emerald-500/10' : 'bg-slate-800/50'
+          },
+          { 
+            label: '在线设备', 
+            val: onlineDevices, 
+            icon: Activity,
+            color: 'text-cyan-400',
+             sub: `共 ${devices.length} 台注册设备`,
+             bg: 'bg-cyan-500/10'
+          },
+          { 
+            label: '活跃会话', 
+            val: activeSessions, 
+            icon: Server,
+            color: 'text-purple-400',
+            sub: `共 ${sessions.length} 个会话`,
+            bg: 'bg-purple-500/10'
+          },
+          { 
+            label: '运行时间', 
+            val: metrics?.uptime ? formatUptime(metrics.uptime) : '未知', 
+            icon: Clock,
+            color: 'text-emerald-400',
+            sub: '自上次重启',
+            bg: 'bg-emerald-500/10'
+          }
+        ].map((stat, i) => (
+          <Card key={i} variant="glass" className="p-4 flex flex-col justify-between h-32 relative overflow-hidden group hover:border-slate-600 transition-colors">
+            <div className={`absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity`}>
+               <stat.icon className="h-16 w-16" />
             </div>
-            <div className="ml-3">
-              <div className={`text-lg font-semibold ${getStatusColor(health?.status || 'unknown')}`}>
-                {health?.status === 'healthy' ? '正常' : 
-                 health?.status === 'degraded' ? '降级' : 
-                 health?.status === 'unhealthy' ? '异常' : '未知'}
-              </div>
-              <div className="text-sm text-gray-500">系统状态</div>
+            <div className="flex items-start justify-between relative z-10">
+               <div className={cn("p-2 rounded-lg", stat.bg)}>
+                  <stat.icon className={cn("h-5 w-5", stat.color)} />
+               </div>
             </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <Activity className="w-5 h-5 text-blue-600" />
+            <div className="relative z-10">
+                <div className={cn("text-2xl font-bold", stat.color)}>{stat.val}</div>
+                <div className="text-xs uppercase font-semibold text-slate-500 tracking-wider mb-0.5">{stat.label}</div>
+                <div className="text-xs text-slate-600">{stat.sub}</div>
             </div>
-            <div className="ml-3">
-              <div className="text-lg font-semibold text-blue-600">{onlineDevices}</div>
-              <div className="text-sm text-gray-500">在线设备</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <Activity className="w-5 h-5 text-purple-600" />
-            </div>
-            <div className="ml-3">
-              <div className="text-lg font-semibold text-purple-600">{activeSessions}</div>
-              <div className="text-sm text-gray-500">活跃会话</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <Clock className="w-5 h-5 text-green-600" />
-            </div>
-            <div className="ml-3">
-              <div className="text-lg font-semibold text-green-600">
-                {metrics?.uptime ? formatUptime(metrics.uptime) : '未知'}
-              </div>
-              <div className="text-sm text-gray-500">系统运行时间</div>
-            </div>
-          </div>
-        </div>
+          </Card>
+        ))}
       </div>
 
-      {/* Detailed Health Information */}
-      {health && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* System Components Health */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900">系统组件状态</h3>
-            </div>
-            <div className="p-6">
-              <div className="space-y-4">
-                {Object.entries(health.checks).map(([component, status]) => (
-                  <div key={component} className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      {getStatusIcon(status.status)}
-                      <span className="ml-3 text-sm font-medium text-gray-900 capitalize">
-                        {component === 'database' ? '数据库' :
-                         component === 'kv' ? 'KV存储' :
-                         component === 'r2' ? 'R2存储' :
-                         component === 'durableObjects' ? '持久对象' :
-                         component === 'secrets' ? '密钥管理' : component}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <div className={`text-sm font-medium ${getStatusColor(status.status)}`}>
-                        {status.status === 'healthy' ? '正常' : 
-                         status.status === 'degraded' ? '降级' : '异常'}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Component Health */}
+        <Card variant="glass" className="flex flex-col h-full">
+           <div className="p-4 border-b border-slate-800 bg-slate-900/30 flex justify-between items-center">
+             <h3 className="font-bold text-slate-200 flex items-center gap-2">
+               <Server className="h-4 w-4 text-cyan-400" /> 组件状态
+             </h3>
+           </div>
+           
+           <div className="p-4 flex-1">
+             {health ? (
+                <div className="space-y-3">
+                  {Object.entries(health.checks).map(([component, status]) => {
+                     const Icon = componentIcons[component] || componentIcons.default;
+                     return (
+                      <div key={component} className="flex items-center justify-between p-3 rounded-lg bg-slate-900/50 border border-slate-800 hover:border-slate-700 transition-colors">
+                        <div className="flex items-center gap-3">
+                           <div className={cn("p-2 rounded bg-slate-950 border border-slate-800", getStatusColor(status.status))}>
+                             <Icon className="h-4 w-4" />
+                           </div>
+                           <div>
+                              <span className="text-sm font-medium text-slate-200 capitalize block">
+                                  {component.replace(/([A-Z])/g, ' $1').trim()}
+                              </span>
+                              {status.error && (
+                                <span className="text-xs text-red-400 block max-w-xs truncate">{status.error}</span>
+                              )}
+                           </div>
+                        </div>
+                        <div className="text-right">
+                           <div className={cn("text-xs font-bold px-2 py-1 rounded bg-black/20 uppercase tracking-wide inline-block", getStatusColor(status.status))}>
+                              {status.status}
+                           </div>
+                           {status.responseTime && (
+                             <div className="text-xs text-slate-500 mt-1 font-mono">
+                                {status.responseTime.toFixed(0)}ms
+                             </div>
+                           )}
+                        </div>
                       </div>
-                      {status.responseTime && (
-                        <div className="text-xs text-gray-500">
-                          {status.responseTime}ms
-                        </div>
-                      )}
-                      {status.error && (
-                        <div className="text-xs text-red-500 max-w-xs truncate">
-                          {status.error}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+                     );
+                  })}
+                </div>
+             ) : (
+                <div className="h-full flex items-center justify-center text-slate-500 italic">
+                   暂无健康数据
+                </div>
+             )}
+           </div>
+        </Card>
 
-          {/* System Metrics */}
-          {metrics && (
-            <div className="bg-white rounded-lg shadow">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900">性能指标</h3>
-              </div>
-              <div className="p-6">
-                <div className="space-y-4">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">请求总数</span>
-                    <span className="text-sm font-medium">{(metrics.requestCount ?? 0).toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">错误率</span>
-                    <span className="text-sm font-medium">
-                      {((metrics.errorRate ?? 0) * 100).toFixed(2)}%
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">平均响应时间</span>
-                    <span className="text-sm font-medium">
-                      {(metrics.averageResponseTime ?? 0).toFixed(0)}ms
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">活跃连接</span>
-                    <span className="text-sm font-medium">{metrics.activeConnections ?? 0}</span>
-                  </div>
-                  {metrics.memoryUsage && (
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">内存使用</span>
-                      <span className="text-sm font-medium">
-                        {(metrics.memoryUsage / 1024 / 1024).toFixed(1)} MB
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+        {/* System Metrics */}
+        {metrics && (
+           <Card variant="glass" className="flex flex-col h-full">
+             <div className="p-4 border-b border-slate-800 bg-slate-900/30 flex justify-between items-center">
+               <h3 className="font-bold text-slate-200 flex items-center gap-2">
+                 <Activity className="h-4 w-4 text-emerald-400" /> 性能指标
+               </h3>
+             </div>
+             <div className="p-4 flex-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                   <div className="p-4 rounded-lg bg-slate-900/50 border border-slate-800 flex flex-col items-center justify-center text-center">
+                      <div className="text-3xl font-bold text-slate-200 mb-1 font-mono">
+                         {(metrics.requestCount ?? 0).toLocaleString()}
+                      </div>
+                      <div className="text-xs text-slate-500 uppercase font-semibold">总请求数</div>
+                   </div>
 
-      {/* Readiness and Liveness Status */}
-      {(readiness || liveness) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {readiness && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  {getStatusIcon(readiness.status === 'ready' ? 'healthy' : 'unhealthy')}
-                </div>
-                <div className="ml-3">
-                  <div className="text-lg font-medium text-gray-900">就绪检查</div>
-                  <div className={`text-sm ${readiness.status === 'ready' ? 'text-green-600' : 'text-red-600'}`}>
-                    {readiness.status === 'ready' ? '服务就绪' : '服务未就绪'}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+                    <div className="p-4 rounded-lg bg-slate-900/50 border border-slate-800 flex flex-col items-center justify-center text-center">
+                      <div className="text-3xl font-bold text-slate-200 mb-1 font-mono">
+                         {(metrics.averageResponseTime ?? 0).toFixed(0)}<span className="text-sm text-slate-500 ml-1">ms</span>
+                      </div>
+                      <div className="text-xs text-slate-500 uppercase font-semibold">平均响应时间</div>
+                   </div>
 
-          {liveness && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  {getStatusIcon(liveness.status === 'alive' ? 'healthy' : 'unhealthy')}
+                    <div className="p-4 rounded-lg bg-slate-900/50 border border-slate-800 flex flex-col items-center justify-center text-center">
+                      <div className={cn("text-3xl font-bold mb-1 font-mono", (metrics.errorRate || 0) > 0.05 ? "text-red-400" : "text-emerald-400")}>
+                         {((metrics.errorRate ?? 0) * 100).toFixed(2)}<span className="text-sm opacity-50 ml-1">%</span>
+                      </div>
+                      <div className="text-xs text-slate-500 uppercase font-semibold">错误率</div>
+                   </div>
+                   
+                   {/* Placeholder for future metric */}
+                    <div className="p-4 rounded-lg bg-slate-900/50 border border-slate-800 flex flex-col items-center justify-center text-center opacity-50">
+                      <div className="text-3xl font-bold text-slate-600 mb-1 font-mono">
+                         --
+                      </div>
+                      <div className="text-xs text-slate-600 uppercase font-semibold">CPU 负载</div>
+                   </div>
                 </div>
-                <div className="ml-3">
-                  <div className="text-lg font-medium text-gray-900">存活检查</div>
-                  <div className={`text-sm ${liveness.status === 'alive' ? 'text-green-600' : 'text-red-600'}`}>
-                    {liveness.status === 'alive' ? '服务存活' : '服务异常'}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+             </div>
+           </Card>
+        )}
+      </div>
     </div>
   );
 }

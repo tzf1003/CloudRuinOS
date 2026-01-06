@@ -266,7 +266,7 @@ class ApiClient {
     return response.data;
   }
 
-  async uploadFile(deviceId: string, path: string, file: File): Promise<void> {
+  async uploadFile(deviceId: string, path: string, file: File, onProgress?: (progress: number) => void): Promise<void> {
     const formData = new FormData();
     formData.append('device_id', deviceId);
     formData.append('path', path);
@@ -276,6 +276,11 @@ class ApiClient {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+            onProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total));
+        }
+      }
     });
   }
 

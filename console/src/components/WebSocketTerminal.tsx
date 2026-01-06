@@ -1,76 +1,48 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Terminal, Play, Square, RotateCcw, Trash2, Copy, Download } from 'lucide-react';
+import { Terminal, Play, Square, RotateCcw, Trash2, Copy, Download, Radio } from 'lucide-react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useNotifications } from '../contexts/UIContext';
 import { TerminalMessage, CommandExecution } from '../types/api';
+import { Card } from './ui/Card';
+import { cn } from '../lib/utils';
 
-// 常用命令列表（用于自动补全）
 const COMMON_COMMANDS = [
   'ls', 'cd', 'pwd', 'cat', 'echo', 'grep', 'find', 'ps', 'top', 'kill',
   'mkdir', 'rm', 'cp', 'mv', 'chmod', 'chown', 'df', 'du', 'head', 'tail',
   'whoami', 'hostname', 'uname', 'date', 'uptime', 'free', 'netstat', 'ping',
   'curl', 'wget', 'tar', 'gzip', 'unzip', 'ssh', 'scp', 'systemctl', 'service',
-  // Windows 命令
   'dir', 'type', 'copy', 'move', 'del', 'rd', 'md', 'cls', 'tasklist', 'taskkill',
   'ipconfig', 'netsh', 'sc', 'net', 'reg', 'wmic', 'powershell', 'cmd'
 ];
 
-// Terminal 组件配置
+interface TerminalCommandEvent {
+  command: string;
+  timestamp: number;
+  status: 'pending' | 'success' | 'error';
+  output: string;
+}
+
 interface WebSocketTerminalProps {
   deviceId: string;
   sessionId?: string;
   autoConnect?: boolean;
-  theme?: 'dark' | 'light';
+  theme?: 'glass' | 'dark' | 'light';
   fontSize?: number;
   className?: string;
   onConnectionChange?: (connected: boolean) => void;
-  onCommandExecuted?: (execution: CommandExecution) => void;
+  onCommandExecuted?: (execution: TerminalCommandEvent) => void;
 }
 
-// Terminal 主题配置
-interface TerminalTheme {
-  background: string;
-  foreground: string;
-  cursor: string;
-  selection: string;
-  border: string;
-  scrollbar: string;
-}
-
-const themes: Record<'dark' | 'light', TerminalTheme> = {
-  dark: {
-    background: 'bg-gray-900',
-    foreground: 'text-green-400',
-    cursor: 'bg-green-400',
-    selection: 'bg-blue-600/30',
-    border: 'border-gray-700',
-    scrollbar: 'scrollbar-dark'
-  },
-  light: {
-    background: 'bg-white',
-    foreground: 'text-gray-800',
-    cursor: 'bg-gray-800',
-    selection: 'bg-blue-200/50',
-    border: 'border-gray-300',
-    scrollbar: 'scrollbar-light'
-  }
-};
-
-/**
- * WebSocket 实时终端组件
- * 实现终端界面和命令输入输出显示、命令历史和自动补全功能、集成 WebSocket 消息处理
- */
 export function WebSocketTerminal({
   deviceId,
   sessionId = `terminal-${Date.now()}`,
   autoConnect = true,
-  theme = 'dark',
+  theme = 'glass',
   fontSize = 14,
   className = '',
   onConnectionChange,
   onCommandExecuted
 }: WebSocketTerminalProps) {
-  // WebSocket 连接管理
   const {
     isConnected,
     isConnecting,
@@ -84,7 +56,6 @@ export function WebSocketTerminal({
     error
   } = useWebSocket(deviceId, sessionId, { autoConnect });
 
-  // 组件状态
   const [currentCommand, setCurrentCommand] = useState('');
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -95,506 +66,261 @@ export function WebSocketTerminal({
   const [showAutoComplete, setShowAutoComplete] = useState(false);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
 
-  // 通知系统
   const { addNotification } = useNotifications();
 
-  // 引用管理
   const terminalRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  // 主题配置
-  const currentTheme = themes[theme];
-
-  // 连接状态变化回调
   useEffect(() => {
-    onConnectionChange?.(isConnected);
+    if (onConnectionChange) {
+      onConnectionChange(isConnected);
+    }
   }, [isConnected, onConnectionChange]);
 
-  // 自动滚动到底部
   useEffect(() => {
-    if (autoScroll && messagesEndRef.current && typeof messagesEndRef.current.scrollIntoView === 'function') {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (autoScroll && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, autoScroll]);
+  }, [messages, currentCommand, autoScroll]);
 
-  // 焦点管理
-  useEffect(() => {
-    if (isConnected && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [isConnected]);
+  const handleCommandSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    
+    if (!currentCommand.trim() || !isConnected) return;
 
-  // 处理命令执行
-  const handleCommandSubmit = useCallback(async () => {
-    if (!currentCommand.trim() || !isConnected || isCommandRunning) {
+    if (currentCommand.trim().toLowerCase() === 'clear' || currentCommand.trim().toLowerCase() === 'cls') {
+      clearMessages();
+      setCurrentCommand('');
       return;
     }
 
-    const command = currentCommand.trim();
-    
-    // 添加到命令历史
-    setCommandHistory(prev => {
-      const newHistory = [command, ...prev.filter(cmd => cmd !== command)];
-      return newHistory.slice(0, 100); // 限制历史记录数量
-    });
-    
-    // 重置历史索引
+    setCommandHistory(prev => [currentCommand, ...prev]);
     setHistoryIndex(-1);
-    
-    // 清空输入
-    setCurrentCommand('');
-    
-    // 设置命令运行状态
     setIsCommandRunning(true);
-    
+
     try {
-      // 发送命令
-      const commandId = sendCommand(command);
-      
-      // 这里可以添加命令执行的额外逻辑
-      console.log(`Command sent: ${command} (ID: ${commandId})`);
-      
-    } catch (error) {
-      console.error('Failed to send command:', error);
+      sendCommand(currentCommand);
+      onCommandExecuted?.({
+        command: currentCommand,
+        timestamp: Date.now(),
+        status: 'pending',
+        output: ''
+      });
+    } catch (err) {
+      console.error('Command failed', err);
     } finally {
-      // 命令发送后立即重置状态，实际执行状态由消息处理
+      setCurrentCommand('');
       setIsCommandRunning(false);
     }
-  }, [currentCommand, isConnected, isCommandRunning, sendCommand]);
+  };
 
-  // 处理键盘事件
-  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
-    switch (event.key) {
-      case 'Enter':
-        event.preventDefault();
-        handleCommandSubmit();
-        break;
-        
-      case 'ArrowUp':
-        event.preventDefault();
-        if (commandHistory.length > 0) {
-          const newIndex = Math.min(historyIndex + 1, commandHistory.length - 1);
-          setHistoryIndex(newIndex);
-          setCurrentCommand(commandHistory[newIndex] || '');
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (showAutoComplete) {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setSelectedSuggestionIndex(prev => (prev + 1) % autoCompleteSuggestions.length);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setSelectedSuggestionIndex(prev => (prev - 1 + autoCompleteSuggestions.length) % autoCompleteSuggestions.length);
+        } else if (e.key === 'Tab' || e.key === 'Enter') {
+            e.preventDefault();
+            applySuggestion(autoCompleteSuggestions[selectedSuggestionIndex]);
+        } else if (e.key === 'Escape') {
+            setShowAutoComplete(false);
         }
-        break;
-        
-      case 'ArrowDown':
-        event.preventDefault();
-        if (historyIndex > 0) {
-          const newIndex = historyIndex - 1;
-          setHistoryIndex(newIndex);
-          setCurrentCommand(commandHistory[newIndex] || '');
-        } else if (historyIndex === 0) {
-          setHistoryIndex(-1);
-          setCurrentCommand('');
-        }
-        break;
-        
-      case 'Tab':
-        event.preventDefault();
-        if (showAutoComplete && autoCompleteSuggestions.length > 0) {
-          // 如果已显示补全列表，选择当前项
-          const selectedCommand = autoCompleteSuggestions[selectedSuggestionIndex];
-          applyAutoComplete(selectedCommand);
-        } else {
-          // 触发自动补全
-          triggerAutoComplete();
-        }
-        break;
-        
-      case 'c':
-        if (event.ctrlKey) {
-          event.preventDefault();
-          // 发送中断信号
-          if (isCommandRunning) {
-            sendInterruptSignal();
-            addNotification({
-              type: 'info',
-              title: '中断信号已发送',
-              message: '已发送 SIGINT 中断信号到远程设备',
-              duration: 2000
-            });
+        return;
+    }
+
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (historyIndex < commandHistory.length - 1) {
+        const newIndex = historyIndex + 1;
+        setHistoryIndex(newIndex);
+        setCurrentCommand(commandHistory[newIndex]);
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (historyIndex > -1) {
+        const newIndex = historyIndex - 1;
+        setHistoryIndex(newIndex);
+        setCurrentCommand(newIndex >= 0 ? commandHistory[newIndex] : '');
+      }
+    } else if (e.key === 'Tab') {
+        e.preventDefault();
+        // Simple autocomplete logic could go here
+    } else if (e.key === 'c' && e.ctrlKey) {
+       // Ctrl+C handling simulation
+        setCurrentCommand(prev => prev + '^C');
+        setTimeout(() => setCurrentCommand(''), 200);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      setCurrentCommand(value);
+
+      // Simple autocomplete logic
+      if (value.trim()) {
+          const suggestions = COMMON_COMMANDS.filter(cmd => cmd.startsWith(value.toLowerCase()) && cmd !== value.toLowerCase());
+          if (suggestions.length > 0) {
+              setAutoCompleteSuggestions(suggestions);
+              setShowAutoComplete(true);
+              setSelectedSuggestionIndex(0);
           } else {
-            // 没有运行中的命令时，清空当前输入
-            setCurrentCommand('');
+              setShowAutoComplete(false);
           }
-        }
-        break;
-        
-      case 'Escape':
-        // 关闭自动补全菜单
-        setShowAutoComplete(false);
-        setAutoCompleteSuggestions([]);
-        break;
-        
-      case 'ArrowDown':
-        if (showAutoComplete) {
-          event.preventDefault();
-          setSelectedSuggestionIndex(prev => 
-            Math.min(prev + 1, autoCompleteSuggestions.length - 1)
-          );
-          return;
-        }
-        // 原有的历史记录导航逻辑在下面处理
-        break;
-        
-      case 'ArrowUp':
-        if (showAutoComplete) {
-          event.preventDefault();
-          setSelectedSuggestionIndex(prev => Math.max(prev - 1, 0));
-          return;
-        }
-        // 原有的历史记录导航逻辑在上面已处理
-        break;
-    }
-  }, [commandHistory, historyIndex, handleCommandSubmit, showAutoComplete, autoCompleteSuggestions, selectedSuggestionIndex, isCommandRunning]);
+      } else {
+          setShowAutoComplete(false);
+      }
+  };
 
-  // 自动补全触发
-  const triggerAutoComplete = useCallback(() => {
-    const input = currentCommand.trim().toLowerCase();
-    if (!input) {
+  const applySuggestion = (suggestion: string) => {
+      setCurrentCommand(suggestion);
       setShowAutoComplete(false);
-      return;
-    }
+      inputRef.current?.focus();
+  };
 
-    // 从历史记录和常用命令中搜索匹配项
-    const historyMatches = commandHistory
-      .filter(cmd => cmd.toLowerCase().startsWith(input))
-      .slice(0, 5);
-    
-    const commandMatches = COMMON_COMMANDS
-      .filter(cmd => cmd.startsWith(input) && !historyMatches.includes(cmd))
-      .slice(0, 5);
-
-    const suggestions = [...historyMatches, ...commandMatches];
-    
-    if (suggestions.length > 0) {
-      setAutoCompleteSuggestions(suggestions);
-      setSelectedSuggestionIndex(0);
-      setShowAutoComplete(true);
-    } else {
-      setShowAutoComplete(false);
-    }
-  }, [currentCommand, commandHistory]);
-
-  // 应用自动补全
-  const applyAutoComplete = useCallback((command: string) => {
-    setCurrentCommand(command);
-    setShowAutoComplete(false);
-    setAutoCompleteSuggestions([]);
-    inputRef.current?.focus();
-  }, []);
-
-  // 发送中断信号
-  const sendInterruptSignal = useCallback(() => {
-    // 发送特殊的中断消息
-    sendMessage({
-      type: 'interrupt',
-      signal: 'SIGINT',
-      timestamp: Date.now()
-    } as any);
-    setIsCommandRunning(false);
-  }, [sendMessage]);
-
-  // 连接/断开连接
-  const handleConnect = useCallback(async () => {
-    try {
-      await connect();
-    } catch (error) {
-      console.error('Connection failed:', error);
-    }
-  }, [connect]);
-
-  const handleDisconnect = useCallback(() => {
-    disconnect();
-  }, [disconnect]);
-
-  // 清空终端
-  const handleClear = useCallback(() => {
-    clearMessages();
-  }, [clearMessages]);
-
-  // 复制终端内容
-  const handleCopy = useCallback(() => {
-    const content = messages.map(msg => {
-      const timestamp = new Date(msg.timestamp).toLocaleTimeString();
-      return `[${timestamp}] ${msg.content}`;
-    }).join('\n');
-    
-    navigator.clipboard.writeText(content).then(() => {
-      // 显示复制成功提示
-      setShowCopySuccess(true);
-      setTimeout(() => setShowCopySuccess(false), 2000);
-      
-      addNotification({
+  const handleCopy = () => {
+    if (!scrollRef.current) return;
+    const text = scrollRef.current.innerText;
+    navigator.clipboard.writeText(text);
+    setShowCopySuccess(true);
+    setTimeout(() => setShowCopySuccess(false), 2000);
+    addNotification({
         type: 'success',
-        title: '复制成功',
-        message: `已复制 ${messages.length} 条终端消息到剪贴板`,
-        duration: 2000
-      });
-    }).catch(error => {
-      console.error('Failed to copy terminal content:', error);
-      addNotification({
-        type: 'error',
-        title: '复制失败',
-        message: '无法访问剪贴板，请检查浏览器权限',
-        duration: 3000
-      });
+        title: 'Copied',
+        message: 'Terminal output copied to clipboard'
     });
-  }, [messages, addNotification]);
+  };
 
-  // 导出终端日志
-  const handleExport = useCallback(() => {
-    const content = messages.map(msg => {
-      const timestamp = new Date(msg.timestamp).toISOString();
-      return `[${timestamp}] [${msg.type.toUpperCase()}] ${msg.content}`;
-    }).join('\n');
-    
-    const blob = new Blob([content], { type: 'text/plain' });
+  const handleDownload = () => {
+    if (!scrollRef.current) return;
+    const text = scrollRef.current.innerText;
+    const blob = new Blob([text], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `terminal-${deviceId}-${sessionId}-${Date.now()}.log`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `terminal-log-${sessionId}.txt`;
+    link.click();
     URL.revokeObjectURL(url);
-  }, [messages, deviceId, sessionId]);
-
-  // 渲染消息
-  const renderMessage = useCallback((message: TerminalMessage) => {
-    const timestamp = new Date(message.timestamp).toLocaleTimeString();
-    
-    let messageClass = '';
-    let prefix = '';
-    
-    switch (message.type) {
-      case 'command':
-        messageClass = 'text-blue-400 font-semibold';
-        prefix = '$ ';
-        break;
-      case 'output':
-        messageClass = currentTheme.foreground;
-        prefix = '';
-        break;
-      case 'error':
-        messageClass = 'text-red-400';
-        prefix = '';
-        break;
-      case 'system':
-        messageClass = 'text-yellow-400 italic';
-        prefix = '# ';
-        break;
-    }
-    
-    return (
-      <div key={message.id} className="flex flex-col py-1">
-        <div className="flex items-start space-x-2">
-          <span className="text-gray-500 text-xs font-mono min-w-[60px]">
-            {timestamp}
-          </span>
-          <div className={`font-mono text-sm flex-1 ${messageClass}`}>
-            <span className="select-none">{prefix}</span>
-            <span className="whitespace-pre-wrap break-words">
-              {message.content}
-            </span>
-            {message.exitCode !== undefined && (
-              <span className={`ml-2 text-xs ${message.exitCode === 0 ? 'text-green-400' : 'text-red-400'}`}>
-                [exit: {message.exitCode}]
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }, [currentTheme.foreground]);
-
-  // 渲染连接状态指示器
-  const renderConnectionStatus = () => {
-    if (isConnecting) {
-      return (
-        <div className="flex items-center space-x-2 text-yellow-400">
-          <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-          <span className="text-sm">Connecting...</span>
-        </div>
-      );
-    }
-    
-    if (isConnected) {
-      return (
-        <div className="flex items-center space-x-2 text-green-400">
-          <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-          <span className="text-sm">Connected</span>
-        </div>
-      );
-    }
-    
-    if (hasError) {
-      return (
-        <div className="flex items-center space-x-2 text-red-400">
-          <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-          <span className="text-sm">Error: {error}</span>
-        </div>
-      );
-    }
-    
-    return (
-      <div className="flex items-center space-x-2 text-gray-400">
-        <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-        <span className="text-sm">Disconnected</span>
-      </div>
-    );
   };
 
   return (
-    <div className={`flex flex-col h-full ${currentTheme.background} ${currentTheme.border} border rounded-lg ${className}`}>
-      {/* 终端头部 */}
-      <div className={`flex items-center justify-between p-3 ${currentTheme.border} border-b`}>
-        <div className="flex items-center space-x-3">
-          <Terminal className="w-5 h-5 text-gray-400" />
-          <span className="text-sm font-medium text-gray-300">
-            Terminal - {deviceId}
-          </span>
-          {renderConnectionStatus()}
+    <Card 
+        variant={theme === 'glass' ? 'glass' : 'default'} 
+        className={cn(
+            "flex flex-col h-full overflow-hidden p-0 border", 
+            theme === 'glass' ? "border-slate-800/60" : "border-slate-800",
+            className
+        )}
+    >
+      {/* Terminal Toolbar */}
+      <div className="flex items-center justify-between px-4 py-2 bg-slate-900/80 border-b border-slate-800">
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1.5">
+            <div className="w-3 h-3 rounded-full bg-red-500/80" />
+            <div className="w-3 h-3 rounded-full bg-amber-500/80" />
+            <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
+          </div>
+          <div className="h-4 w-px bg-slate-700 mx-2" />
+          <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+             <Terminal className="w-3.5 h-3.5" />
+             <span>{sessionId}</span>
+             {isConnected ? (
+                 <span className="flex items-center text-emerald-400 gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Connected
+                 </span>
+             ) : (
+                 <span className="flex items-center text-red-400 gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                    Disconnected
+                 </span>
+             )}
+          </div>
         </div>
-        
-        <div className="flex items-center space-x-2">
-          {/* 连接控制按钮 */}
-          {!isConnected ? (
-            <button
-              onClick={handleConnect}
-              disabled={isConnecting}
-              className="flex items-center space-x-1 px-2 py-1 text-xs bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded transition-colors"
-            >
-              <Play className="w-3 h-3" />
-              <span>Connect</span>
-            </button>
-          ) : (
-            <button
-              onClick={handleDisconnect}
-              className="flex items-center space-x-1 px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
-            >
-              <Square className="w-3 h-3" />
-              <span>Disconnect</span>
-            </button>
-          )}
-          
-          {/* 工具按钮 */}
-          <button
-            onClick={handleClear}
-            className="p-1 text-gray-400 hover:text-gray-300 transition-colors"
-            title="Clear terminal"
-          >
-            <Trash2 className="w-4 h-4" />
+
+        <div className="flex items-center gap-1">
+          <button onClick={isConnected ? disconnect : connect} className={cn("p-1.5 rounded hover:bg-slate-800 transition-colors", isConnected ? "text-red-400" : "text-emerald-400")} title={isConnected ? "Disconnect" : "Connect"}>
+             {isConnected ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />}
           </button>
-          
-          <button
-            onClick={handleCopy}
-            className="p-1 text-gray-400 hover:text-gray-300 transition-colors"
-            title="Copy terminal content"
-          >
-            <Copy className="w-4 h-4" />
+          <button onClick={clearMessages} className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors" title="Clear">
+             <Trash2 className="w-4 h-4" />
           </button>
-          
-          <button
-            onClick={handleExport}
-            className="p-1 text-gray-400 hover:text-gray-300 transition-colors"
-            title="Export terminal log"
-          >
-            <Download className="w-4 h-4" />
+          <button onClick={handleCopy} className={cn("p-1.5 rounded hover:bg-slate-800 transition-colors", showCopySuccess ? "text-emerald-400" : "text-slate-400 hover:text-white")} title="Copy All">
+             <Copy className="w-4 h-4" />
           </button>
-          
-          <button
-            onClick={() => setAutoScroll(!autoScroll)}
-            className={`p-1 transition-colors ${autoScroll ? 'text-blue-400' : 'text-gray-400 hover:text-gray-300'}`}
-            title="Toggle auto-scroll"
-          >
-            <RotateCcw className="w-4 h-4" />
+           <button onClick={handleDownload} className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors" title="Download Log">
+             <Download className="w-4 h-4" />
           </button>
         </div>
       </div>
-      
-      {/* 终端内容区域 */}
+
+      {/* Terminal Output */}
       <div 
-        ref={terminalRef}
-        className={`flex-1 overflow-y-auto p-3 ${currentTheme.scrollbar}`}
-        style={{ fontSize: `${fontSize}px` }}
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto p-4 font-mono bg-[#0c0c0c] text-slate-300 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"
+        style={{ fontSize: `${fontSize}px`, fontFamily: "'JetBrains Mono', 'Fira Code', monospace" }}
+        onClick={() => inputRef.current?.focus()}
       >
-        {messages.length === 0 ? (
-          <div className="text-gray-500 text-sm italic">
-            {isConnected ? 'Terminal ready. Type a command and press Enter.' : 'Connect to start using the terminal.'}
-          </div>
-        ) : (
-          <div className="space-y-1">
-            {messages.map(renderMessage)}
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-      
-      {/* 命令输入区域 */}
-      <div className={`p-3 ${currentTheme.border} border-t relative`}>
-        <div className="flex items-center space-x-2">
-          <span className={`text-sm font-mono ${currentTheme.foreground} select-none`}>
-            $
-          </span>
-          <input
-            ref={inputRef}
-            type="text"
-            value={currentCommand}
-            onChange={(e) => {
-              setCurrentCommand(e.target.value);
-              setShowAutoComplete(false); // 输入时关闭自动补全
-            }}
-            onKeyDown={handleKeyDown}
-            disabled={!isConnected || isCommandRunning}
-            placeholder={isConnected ? "Enter command... (Tab for autocomplete, Ctrl+C to interrupt)" : "Connect to enable input"}
-            className={`flex-1 bg-transparent ${currentTheme.foreground} font-mono text-sm outline-none placeholder-gray-500 disabled:opacity-50`}
-            style={{ fontSize: `${fontSize}px` }}
-          />
-          {isCommandRunning && (
-            <div className="flex items-center space-x-1 text-yellow-400">
-              <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-              <span className="text-xs">Running... (Ctrl+C to stop)</span>
+        <div className="pb-2">
+            <div className="text-slate-500 mb-2">CloudRuinOS Terminal v1.0.0 [Secure Connection]</div>
+            <div className="text-slate-500 mb-4">Type 'help' for available commands.</div>
+            
+            {messages.map((msg, index) => (
+            <div key={index} className="mb-0.5 break-all whitespace-pre-wrap">
+                {msg.type === 'command' ? (
+                 <div className="flex items-center">
+                    <span className="text-cyan-500 mr-2">➜</span>
+                    <span className="text-slate-100 font-bold opacity-90">{msg.content}</span>
+                 </div>
+                ) : msg.type === 'error' ? (
+                <span className="text-red-400">{msg.content}</span>
+                ) : (
+                <span className="text-slate-300">{msg.content}</span>
+                )}
             </div>
-          )}
+            ))}
         </div>
-        
-        {/* 自动补全下拉菜单 */}
-        {showAutoComplete && autoCompleteSuggestions.length > 0 && (
-          <div className="absolute bottom-full left-0 right-0 mb-1 mx-3 bg-gray-800 border border-gray-600 rounded-lg shadow-lg overflow-hidden z-10">
-            <div className="text-xs text-gray-400 px-3 py-1 border-b border-gray-700">
-              命令补全 (↑↓ 选择, Tab 确认, Esc 取消)
-            </div>
-            <div className="max-h-40 overflow-y-auto">
-              {autoCompleteSuggestions.map((suggestion, index) => (
-                <button
-                  key={suggestion}
-                  onClick={() => applyAutoComplete(suggestion)}
-                  className={`w-full text-left px-3 py-2 font-mono text-sm transition-colors ${
-                    index === selectedSuggestionIndex
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-300 hover:bg-gray-700'
-                  }`}
-                >
-                  {suggestion}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {/* 命令历史提示 */}
-        {commandHistory.length > 0 && !showAutoComplete && (
-          <div className="mt-2 text-xs text-gray-500">
-            Use ↑/↓ arrows to navigate command history ({commandHistory.length} commands)
-          </div>
-        )}
+
+        {/* Input Line */}
+        <div className="flex items-center relative group">
+          <span className="text-cyan-500 mr-2 animate-pulse">➜</span>
+          <form onSubmit={handleCommandSubmit} className="flex-1 relative">
+            <input
+                ref={inputRef}
+                type="text"
+                value={currentCommand}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                className="w-full bg-transparent border-none outline-none text-slate-100 placeholder-slate-600 focus:ring-0 p-0"
+                placeholder={isConnected ? "Enter command..." : "Terminal disconnected"}
+                autoComplete="off"
+                disabled={!isConnected}
+            />
+            
+            {/* Autocomplete Popup */}
+            {showAutoComplete && (
+                <div className="absolute bottom-full left-0 mb-2 w-48 bg-slate-800 border border-slate-700 rounded-md shadow-lg overflow-hidden z-20">
+                    <div className="text-xs text-slate-500 px-2 py-1 border-b border-slate-700 bg-slate-900/50">Suggestions</div>
+                    {autoCompleteSuggestions.map((suggestion, idx) => (
+                        <div 
+                            key={suggestion}
+                            className={cn(
+                                "px-3 py-1.5 cursor-pointer text-sm font-mono transition-colors",
+                                idx === selectedSuggestionIndex ? "bg-cyan-500/20 text-cyan-300" : "text-slate-300 hover:bg-slate-700"
+                            )}
+                            onClick={() => applySuggestion(suggestion)}
+                        >
+                            {suggestion}
+                        </div>
+                    ))}
+                </div>
+            )}
+          </form>
+        </div>
       </div>
-    </div>
+    </Card>
   );
 }
-
-export default WebSocketTerminal;
