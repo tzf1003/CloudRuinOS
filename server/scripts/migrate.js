@@ -45,8 +45,9 @@ for (const file of migrationFiles) {
         console.log(sql);
         console.log('─'.repeat(50));
     } else {
+        const dbName = environment === 'production' ? 'ruinos-db-prod' : environment === 'test' ? 'ruinos-db-test' : 'ruinos-db-local';
         console.log('💡 提示: 请使用以下命令执行此迁移:');
-        console.log(`   wrangler d1 execute rmm-db${environment === 'production' ? '-prod' : environment === 'test' ? '-test' : ''} --file=${filePath}${environment !== 'development' ? ` --env=${environment}` : ''}`);
+        console.log(`   wrangler d1 execute ${dbName} --file=${filePath}${environment !== 'development' ? ` --env=${environment}` : ''}`);
     }
 }
 

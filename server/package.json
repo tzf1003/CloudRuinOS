@@ -17,9 +17,9 @@
     "db:migrate:test": "node scripts/migrate.js --env=test",
     "db:migrate:prod": "node scripts/migrate.js --env=production",
     "db:migrate:dry-run": "node scripts/migrate.js --dry-run",
-    "db:apply": "wrangler d1 execute rmm-db --file=migrations/0001_initial_schema.sql",
-    "db:apply:test": "wrangler d1 execute rmm-db-test --file=migrations/0001_initial_schema.sql --env=test",
-    "db:apply:prod": "wrangler d1 execute rmm-db-prod --file=migrations/0001_initial_schema.sql --env=production",
+    "db:apply": "wrangler d1 execute ruinos-db-local --file=migrations/0001_initial_schema.sql",
+    "db:apply:test": "wrangler d1 execute ruinos-db-test --file=migrations/0001_initial_schema.sql --env=test",
+    "db:apply:prod": "wrangler d1 execute ruinos-db-prod --file=migrations/0001_initial_schema.sql --env=production",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {

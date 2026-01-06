@@ -286,16 +286,40 @@ class ApiClient {
 
   // Configuration Management
   async getConfigurations(scope?: ConfigurationScope, target?: string): Promise<Configuration[]> {
-    const response = await this.client.get<Configuration[]>('/admin/config', {
+    const response = await this.client.get<any>('/admin/config', {
       params: { scope, target }
     });
-    return response.data;
+    
+    // Handle { data: [...] } wrapper returned by backend
+    if (response.data && Array.isArray(response.data.data)) {
+      return response.data.data;
+    }
+    
+    // Fallback if it's directly an array
+    if (Array.isArray(response.data)) {
+      return response.data;
+    }
+
+    // Default to empty array to prevent map errors
+    console.warn('Unexpected response format for getConfigurations:', response.data);
+    return [];
   }
 
   async getConfiguration(scope: ConfigurationScope, target = 'default'): Promise<Configuration | null> {
     try {
-      const response = await this.client.get<Configuration>(`/admin/config/${scope}/${encodeURIComponent(target)}`);
-      return response.data;
+      const response = await this.client.get<any>('/admin/config', {
+        params: { scope, target }
+      });
+      
+      let data = response.data;
+      if (data && data.data && Array.isArray(data.data)) {
+        data = data.data;
+      }
+
+      if (Array.isArray(data) && data.length > 0) {
+        return data[0];
+      }
+      return null;
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 404) {
         return null; // Return null if not found
