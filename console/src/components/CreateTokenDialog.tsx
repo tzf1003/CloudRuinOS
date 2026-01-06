@@ -2,23 +2,6 @@ import { useState } from 'react';
 import { X, Calendar, Hash, Type, AlertCircle } from 'lucide-react';
 import { EnrollmentToken } from '../types/api';
 
-function generateNewTokenString() {
-  // Simple random string generator for UI preview
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < 16; i++) {
-    if (i > 0 && i % 4 === 0) result += '-';
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-}
-
-interface CreateTokenDialogProps {
-  onClose: () => void;
-  onConfirm: (data: Partial<EnrollmentToken>) => void;
-  isCreating: boolean;
-}
-
 export function CreateTokenDialog({
   onClose,
   onConfirm,
@@ -28,7 +11,6 @@ export function CreateTokenDialog({
     description: '',
     maxUsage: '10',
     expiresInDays: '7',
-    tokenString: generateNewTokenString(),
     isPermanent: false
   });
 
@@ -40,16 +22,11 @@ export function CreateTokenDialog({
     const expiresAt = formData.isPermanent ? undefined : Date.now() + (days * 24 * 60 * 60 * 1000);
     
     onConfirm({
-      token: formData.tokenString,
       description: formData.description,
       maxUsage: parseInt(formData.maxUsage),
       expiresAt: expiresAt,
       isPermanent: formData.isPermanent
     });
-  };
-
-  const handleRegenerateToken = () => {
-    setFormData({ ...formData, tokenString: generateNewTokenString() });
   };
 
   return (
@@ -85,29 +62,6 @@ export function CreateTokenDialog({
                 value={formData.description}
                 onChange={(e) => setFormData({...formData, description: e.target.value})}
               />
-            </div>
-
-            {/* Token String Generator */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300 flex items-center">
-                <Hash className="w-4 h-4 mr-2 text-purple-500" />
-                令牌字符串
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  className="flex-1 font-mono text-sm bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-cyan-400 focus:outline-none cursor-default select-all"
-                  value={formData.tokenString}
-                />
-                <button
-                  type="button"
-                  onClick={handleRegenerateToken}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-lg text-sm font-medium transition-colors border border-slate-700"
-                >
-                  重新生成
-                </button>
-              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

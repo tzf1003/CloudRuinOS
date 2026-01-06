@@ -116,7 +116,7 @@ export interface AuditLog {
 
 export enum ConfigurationScope {
   GLOBAL = 'global',
-  GROUP = 'group',
+  GROUP = 'token',
   DEVICE = 'device'
 }
 

@@ -112,7 +112,9 @@ export async function syncConfig(request: Request, env: Env): Promise<Response> 
 
 export async function getConfigs(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    const scope = url.searchParams.get('scope');
+    let scope = url.searchParams.get('scope');
+    if (scope === 'group') scope = 'token';
+
     // Support target as alias for target_id
     const targetId = url.searchParams.get('target_id') || url.searchParams.get('target');
 
@@ -147,8 +149,10 @@ export async function getConfigs(request: Request, env: Env): Promise<Response> 
 export async function updateConfig(request: Request, env: Env): Promise<Response> {
     try {
         const body = await request.json() as any;
-        // Support aliases: target->target_id, config->content
-        const scope = body.scope;
+        // Support aliases: target->target_id, config->content, group->token
+        let scope = body.scope;
+        if (scope === 'group') scope = 'token';
+        
         const target_id = body.target_id || body.target;
         const content = body.content || body.config;
 
