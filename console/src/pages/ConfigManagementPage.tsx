@@ -4,7 +4,6 @@ import {
   Save, 
   Trash2, 
   Plus, 
-  Search,
   RefreshCw,
   AlertTriangle,
   FileJson,
@@ -14,6 +13,7 @@ import {
 import { apiClient } from '../lib/api-client';
 import { Configuration, ConfigurationScope } from '../types/api';
 import { useGlobalLoading } from '../contexts/UIContext';
+import { VisualConfigEditor } from '../components/VisualConfigEditor';
 
 // Simple JSON Editor Component
 const JsonEditor = ({ 
@@ -75,7 +75,9 @@ const JsonEditor = ({
 
 export function ConfigManagementPage() {
   const [configs, setConfigs] = useState<Configuration[]>([]);
-  const { startLoading, stopLoading } = useGlobalLoading();
+  const { setGlobalLoading } = useGlobalLoading();
+  const startLoading = () => setGlobalLoading(true);
+  const stopLoading = () => setGlobalLoading(false);
   const [selectedConfig, setSelectedConfig] = useState<Configuration | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -85,6 +87,7 @@ export function ConfigManagementPage() {
   const [target, setTarget] = useState('default');
   const [configContent, setConfigContent] = useState('{}');
   const [isValidJson, setIsValidJson] = useState(true);
+  const [editMode, setEditMode] = useState<'visual' | 'json'>('visual');
 
   const fetchConfigs = async () => {
     startLoading();
@@ -113,6 +116,7 @@ export function ConfigManagementPage() {
     }, null, 2));
     setIsCreating(true);
     setIsEditing(true);
+    setEditMode('visual');
   };
 
   const handleEdit = (config: Configuration) => {
@@ -122,6 +126,7 @@ export function ConfigManagementPage() {
     setConfigContent(JSON.stringify(config.config, null, 2));
     setIsCreating(false);
     setIsEditing(true);
+    setEditMode('visual');
   };
 
   const handleSave = async () => {
@@ -303,20 +308,61 @@ export function ConfigManagementPage() {
                  </div>
                </div>
 
-               <div className="flex-1 mb-4">
-                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                   JSON Configuration 
-                   <span className="ml-2 text-xs text-gray-500 font-normal">
-                     (Merged fields only, e.g., heartbeat.interval)
-                   </span>
-                 </label>
-                 <JsonEditor 
-                  initialValue={configContent}
-                  onChange={(val, valid) => {
-                    setConfigContent(val);
-                    setIsValidJson(valid);
-                  }}
-                 />
+               <div className="flex-1 mb-4 flex flex-col min-h-0">
+                 <div className="flex justify-between items-end mb-2">
+                   <label className="block text-sm font-medium text-gray-700">
+                     配置内容
+                     <span className="ml-2 text-xs text-gray-500 font-normal">
+                       ({editMode === 'visual' ? '可视化编辑' : '原生 JSON'})
+                     </span>
+                   </label>
+                   <div className="flex bg-gray-100 p-1 rounded-md">
+                      <button
+                        onClick={() => setEditMode('visual')}
+                        className={`px-3 py-1 text-xs font-medium rounded-md ${
+                          editMode === 'visual' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-900'
+                        }`}
+                      >
+                        可视化
+                      </button>
+                      <button
+                        onClick={() => setEditMode('json')}
+                        className={`px-3 py-1 text-xs font-medium rounded-md ${
+                          editMode === 'json' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-900'
+                        }`}
+                      >
+                        JSON
+                      </button>
+                    </div>
+                 </div>
+                 
+                 <div className="flex-1 min-h-0 relative h-96">
+                   {editMode === 'visual' ? (
+                     <div className="absolute inset-0 overflow-hidden">
+                       <VisualConfigEditor 
+                         initialConfig={(() => {
+                            try {
+                              return JSON.parse(configContent);
+                            } catch {
+                              return {};
+                            }
+                         })()}
+                         onChange={(newConfig) => {
+                            setConfigContent(JSON.stringify(newConfig, null, 2));
+                            setIsValidJson(true);
+                         }}
+                       />
+                     </div>
+                   ) : (
+                    <JsonEditor 
+                      initialValue={configContent}
+                      onChange={(val, valid) => {
+                        setConfigContent(val);
+                        setIsValidJson(valid);
+                      }}
+                    />
+                   )}
+                 </div>
                </div>
 
                <div className="flex justify-end space-x-3">
