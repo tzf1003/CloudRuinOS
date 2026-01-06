@@ -332,6 +332,7 @@ impl ConfigManager {
                 retry_delay: 5,
             },
             security: SecuritySection {
+                certificate: None,
                 tls_verify: true,
                 certificate_pinning: false,
                 certificate_pins: None,

@@ -113,7 +113,8 @@ export async function syncConfig(request: Request, env: Env): Promise<Response> 
 export async function getConfigs(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const scope = url.searchParams.get('scope');
-    const targetId = url.searchParams.get('target_id');
+    // Support target as alias for target_id
+    const targetId = url.searchParams.get('target_id') || url.searchParams.get('target');
 
     let query = 'SELECT * FROM configurations';
     const params: any[] = [];
@@ -146,7 +147,10 @@ export async function getConfigs(request: Request, env: Env): Promise<Response> 
 export async function updateConfig(request: Request, env: Env): Promise<Response> {
     try {
         const body = await request.json() as any;
-        const { scope, target_id, content } = body;
+        // Support aliases: target->target_id, config->content
+        const scope = body.scope;
+        const target_id = body.target_id || body.target;
+        const content = body.content || body.config;
 
         if (!scope || !content) {
              return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });

@@ -93,6 +93,7 @@ export function createRouter() {
   // 配置管理 API (管理员)
   router.get('/admin/config', withAdminAuth(getConfigs));
   router.put('/admin/config', withAdminAuth(updateConfig));
+  router.post('/admin/config', withAdminAuth(updateConfig)); // Alias for PUT
   router.delete('/admin/config/:id', withAdminAuth(deleteConfig));
 
   // 

@@ -25,6 +25,14 @@ export default {
       
       const router = createRouter();
       
+      // Handle /api prefix removal to support both proxied and direct access
+      let url = new URL(request.url);
+      if (url.pathname.startsWith('/api/')) {
+        url.pathname = url.pathname.replace(/^\/api/, '');
+        // Create new request with modified URL, preserving other properties
+        request = new Request(url.toString(), request);
+      }
+
       // 使用路由处理请求
       const response = await router.handle(request, env, ctx);
 

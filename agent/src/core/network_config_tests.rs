@@ -28,6 +28,7 @@ fn arb_security_config() -> impl Strategy<Value = SecuritySection> {
                 ech_enabled,
             )| {
                 SecuritySection {
+                    certificate: None,
                     tls_verify,
                     certificate_pinning,
                     certificate_pins,
