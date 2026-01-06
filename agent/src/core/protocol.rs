@@ -25,8 +25,8 @@ pub struct HeartbeatResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SystemInfo {
     pub platform: String,
-    pub version: String,
     pub uptime: u64,
+    pub version: String,
 }
 
 /// 心跳状态

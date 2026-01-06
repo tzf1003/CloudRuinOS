@@ -179,16 +179,28 @@ export async function updateConfig(request: Request, env: Env): Promise<Response
             return new Response(JSON.stringify({ error: 'Invalid JSON content' }), { status: 400 });
         }
 
-        // Upsert
+        // Check for existing config to avoid duplicate global configs (where target_id is NULL)
+        let existing: { id: number } | null = null;
+        if (scope === 'global') {
+            existing = await env.DB.prepare('SELECT id FROM configurations WHERE scope = ? AND target_id IS NULL').bind(scope).first();
+        } else {
+            existing = await env.DB.prepare('SELECT id FROM configurations WHERE scope = ? AND target_id = ?').bind(scope, targetId).first();
+        }
+
         const now = Math.floor(Date.now() / 1000);
-        await env.DB.prepare(`
-            INSERT INTO configurations (scope, target_id, content, created_at, updated_at, updated_by)
-            VALUES (?, ?, ?, ?, ?, 'admin')
-            ON CONFLICT(scope, target_id) DO UPDATE SET
-                content = excluded.content,
-                updated_at = excluded.updated_at,
-                updated_by = excluded.updated_by
-        `).bind(scope, targetId, contentStr, now, now).run();
+
+        if (existing) {
+            await env.DB.prepare(`
+                UPDATE configurations 
+                SET content = ?, updated_at = ?, updated_by = 'admin'
+                WHERE id = ?
+            `).bind(contentStr, now, existing.id).run();
+        } else {
+            await env.DB.prepare(`
+                INSERT INTO configurations (scope, target_id, content, created_at, updated_at, updated_by)
+                VALUES (?, ?, ?, ?, ?, 'admin')
+            `).bind(scope, targetId, contentStr, now, now).run();
+        }
 
         return new Response(JSON.stringify({ status: 'ok' }), { headers: { 'Content-Type': 'application/json' } });
     } catch (e: any) {

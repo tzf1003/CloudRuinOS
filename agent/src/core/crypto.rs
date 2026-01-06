@@ -84,9 +84,25 @@ impl CryptoManager {
         Ok(())
     }
 
-    /// 获取公钥（Base64 编码）
+    /// 获取公钥（Base64 编码，SPKI 格式）
     pub fn public_key_base64(&self) -> String {
-        base64::engine::general_purpose::STANDARD.encode(self.verifying_key.to_bytes())
+        // Ed25519 SPKI Header (ASN.1)
+        // OID: 1.3.101.112 (Ed25519)
+        // 30 2a (Sequence 42 bytes)
+        //   30 05 (Sequence 5 bytes)
+        //     06 03 (OID 3 bytes)
+        //       2b 65 70 (Ed25519)
+        //   03 21 (Bit String 33 bytes)
+        //     00 (Padding 0)
+        const SPKI_HEADER: [u8; 12] = [
+            0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00,
+        ];
+
+        let mut key_bytes = Vec::with_capacity(SPKI_HEADER.len() + 32);
+        key_bytes.extend_from_slice(&SPKI_HEADER);
+        key_bytes.extend_from_slice(self.verifying_key.as_bytes());
+
+        base64::engine::general_purpose::STANDARD.encode(key_bytes)
     }
 
     /// 获取私钥（Base64 编码）
@@ -123,7 +139,11 @@ impl CryptoManager {
         use rand::Rng;
         let mut rng = OsRng {};
         let nonce: [u8; 16] = rng.gen();
+        // Server compatible nonce (no +, /, =)
         base64::engine::general_purpose::STANDARD.encode(nonce)
+            .replace("+", "")
+            .replace("/", "")
+            .replace("=", "")
     }
 
     /// 设置设备 ID

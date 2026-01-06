@@ -85,7 +85,9 @@ pub struct PathsSection {
 pub struct FileOperationsSection {
     pub max_file_size: String,
     pub allow_hidden_files: bool,
+    #[serde(default)]
     pub allowed_paths: Vec<String>,
+    #[serde(default)]
     pub blocked_paths: Vec<String>,
 }
 
@@ -93,6 +95,7 @@ pub struct FileOperationsSection {
 pub struct CommandsSection {
     pub default_timeout: u64,
     pub max_concurrent: u32,
+    #[serde(default)]
     pub blocked_commands: Vec<String>,
 }
 
@@ -276,26 +279,13 @@ impl ConfigManager {
 
     /// 获取默认配置目录
     fn get_default_config_dir() -> Result<String> {
-        #[cfg(target_os = "windows")]
-        return Ok("C:\\ProgramData\\Ruinos Agent".to_string());
-
-        #[cfg(target_os = "linux")]
-        return Ok("/etc/ruinos-agent".to_string());
-
-        #[cfg(target_os = "macos")]
-        return Ok("/etc/ruinos-agent".to_string());
+        // Use local directory for development/debugging to avoid permission issues and ensure clean state
+        return Ok("data_v5".to_string());
     }
 
     /// 获取默认数据目录
     fn get_default_data_dir() -> Result<String> {
-        #[cfg(target_os = "windows")]
-        return Ok("C:\\ProgramData\\Ruinos Agent\\Data".to_string());
-
-        #[cfg(target_os = "linux")]
-        return Ok("/var/lib/ruinos-agent".to_string());
-
-        #[cfg(target_os = "macos")]
-        return Ok("/var/lib/ruinos-agent".to_string());
+        return Ok("data_v5".to_string());
     }
 
     /// 获取默认日志目录

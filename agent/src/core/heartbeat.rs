@@ -73,19 +73,31 @@ impl HeartbeatClient {
         // 获取系统信息
         let system_info = SystemInfo::current();
 
-        // 创建签名数据
-        let signable_data = SignableData {
-            device_id: device_id.to_string(),
+        // 构造用于签名的 Struct - 必须匹配 Server 端的 verifyRequestIntegrity 构造顺序
+        // verifyRequestIntegrity 顺序: device_id, timestamp, nonce, protocol_version, system_info
+        #[derive(serde::Serialize)]
+        struct HeartbeatSignData<'a> {
+            device_id: &'a str,
+            timestamp: u64,
+            nonce: &'a str,
+            protocol_version: &'a str,
+            system_info: &'a SystemInfo,
+        }
+
+        let sign_data = HeartbeatSignData {
+            device_id: &device_id,
             timestamp,
-            nonce: nonce.clone(),
-            data: json!({
-                "protocol_version": "1.0",
-                "system_info": system_info
-            }),
+            nonce: &nonce,
+            protocol_version: "1.0",
+            system_info: &system_info,
         };
 
+        // 序列化，serde struct 序列化保持字段顺序
+        let payload_str = serde_json::to_string(&sign_data)?;
+        info!("Helper Payload for signing: {}", payload_str);
+
         // 签名请求
-        let signature = crypto_manager.sign(&signable_data.to_bytes()?);
+        let signature = crypto_manager.sign(payload_str.as_bytes());
 
         // 构建心跳请求
         let heartbeat_request =

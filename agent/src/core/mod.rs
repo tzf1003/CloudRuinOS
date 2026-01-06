@@ -149,8 +149,8 @@ impl Agent {
         }
 
         // 检查现有凭证
-        let config_dir = Self::get_config_dir()?;
-        let credentials_file = config_dir.join("credentials.json");
+        let config = self.config_manager.read().await.config().clone();
+        let credentials_file = config.credentials_path();
 
         if self
             .enrollment_client
@@ -189,8 +189,8 @@ impl Agent {
                         Ok(device_id) => {
                             info!("Enrollment successful. Device ID: {}", device_id);
                             // Reload crypto manager
-                            let config_dir = Self::get_config_dir()?;
-                            let credentials_file = config_dir.join("credentials.json");
+                            let config = self.config_manager.read().await.config().clone();
+                            let credentials_file = config.credentials_path();
                             self.crypto_manager =
                                 Some(CryptoManager::from_credentials_file(&credentials_file)?);
                             self.config_manager
@@ -211,8 +211,8 @@ impl Agent {
 
                     // 确保 CryptoManager 已加载 (如果是刚注册完，上面已经加载了；如果是重启，可能未加载)
                     if self.crypto_manager.is_none() {
-                        let config_dir = Self::get_config_dir()?;
-                        let credentials_file = config_dir.join("credentials.json");
+                        let config = self.config_manager.read().await.config().clone();
+                        let credentials_file = config.credentials_path();
                         if credentials_file.exists() {
                             self.crypto_manager =
                                 Some(CryptoManager::from_credentials_file(&credentials_file)?);
@@ -316,8 +316,12 @@ impl Agent {
 
     /// 执行设备注册
     pub async fn enroll_with_token(&self, enrollment_token: String) -> Result<String> {
-        let config_dir = Self::get_config_dir()?;
-        let credentials_file = config_dir.join("credentials.json");
+        let config = self.config_manager.read().await.config().clone();
+        let credentials_file = config.credentials_path();
+
+        if let Some(parent) = credentials_file.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
 
         info!("Starting device enrollment with provided token");
 
@@ -382,18 +386,31 @@ impl Agent {
 
         let nonce = CryptoManager::generate_nonce();
 
-        let payload = json!({
-            "device_id": device_id,
-            "timestamp": timestamp,
-            "nonce": nonce,
-        });
+        // Server expects signature over JSON string with keys in specific order:
+        // device_id, timestamp, nonce
+        // Note: serde_json::to_string(&struct) preserves field order, but json!({}) sorts keys.
+        #[derive(serde::Serialize)]
+        struct ConfigSyncSignData<'a> {
+            device_id: &'a str,
+            timestamp: u64,
+            nonce: &'a str,
+        }
+
+        let sign_data = ConfigSyncSignData {
+            device_id: &device_id,
+            timestamp,
+            nonce: &nonce,
+        };
+
+        let payload_str = serde_json::to_string(&sign_data)?;
+        info!("Config Sync Payload for signing: {}", payload_str);
 
         // 签名
         let signature = self
             .crypto_manager
             .as_ref()
             .unwrap()
-            .sign(payload.to_string().as_bytes());
+            .sign(payload_str.as_bytes());
 
         let body = json!({
             "device_id": device_id,
