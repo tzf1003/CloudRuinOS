@@ -6,7 +6,6 @@ import {
 import { apiClient } from '../lib/api-client';
 import { SystemMetrics, HealthData } from '../types/api';
 import { HistoryTrendChart } from './HistoryTrendChart';
-import { AuditStatsChart } from './AuditStatsChart';
 import { clsx } from 'clsx';
 import { StatsOverview } from './dashboard/StatsOverview';
 import { DeviceCharts } from './dashboard/DeviceCharts';
@@ -196,12 +195,6 @@ export function Dashboard({
         </CardContent>
       </Card>
 
-      {/* Audit Stats */}
-      <Card>
-         <CardContent className="pt-6">
-           <AuditStatsChart />
-        </CardContent>
-      </Card>
       {/* System Metrics */}
       {showMetrics && (
         <SystemMetricsPanel metrics={overview.metrics} />

@@ -54,7 +54,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </div>
             <div>
               <h1 className="text-lg font-bold tracking-tight text-white">
-                Ruinos<span className="text-primary">OS</span>
+                Ruin<span className="text-primary">OS</span>
               </h1>
               <p className="text-xs text-slate-400">云控制台</p>
             </div>

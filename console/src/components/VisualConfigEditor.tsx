@@ -31,6 +31,7 @@ interface SecuritySection {
   doh_enabled: boolean;
   ech_enabled: boolean;
   certificate_pinning: boolean;
+  certificate?: string;
 }
 
 interface LoggingSection {
@@ -209,6 +210,21 @@ export const VisualConfigEditor: React.FC<VisualConfigEditorProps> = ({
                   onChange={(e) => updateSection('security', 'certificate_pinning', e.target.checked)}
                   className="h-5 w-5 bg-slate-900 border-slate-600 rounded text-cyan-500 focus:ring-cyan-500 focus:ring-offset-slate-900"
                 />
+              </div>
+
+              {/* Certificate Field */}
+              <div className="space-y-4 pt-4 border-t border-slate-700/50">
+                <div>
+                  <label className="block text-sm font-medium text-slate-200 mb-1.5 break-all">服务器证书 / CA 根证书 (PEM 格式)</label>
+                  <p className="text-xs text-slate-500 mb-2">用于验证服务器身份或进行证书固定。仅包含 -----BEGIN CERTIFICATE----- 部分。</p>
+                  <textarea
+                    value={config.security?.certificate ?? ''}
+                    onChange={(e) => updateSection('security', 'certificate', e.target.value)}
+                    placeholder="-----BEGIN CERTIFICATE-----..."
+                    className="w-full h-32 bg-slate-900/50 border border-slate-700 text-slate-200 text-xs font-mono rounded-lg p-3 focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none resize-y"
+                    spellCheck={false}
+                  />
+                </div>
               </div>
             </div>
           </div>

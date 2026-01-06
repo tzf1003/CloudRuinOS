@@ -4,7 +4,6 @@ import { useAuditLogs } from '../hooks/useApi';
 import { AuditLog, AuditFilters } from '../types/api';
 import { AuditLogCard } from '../components/AuditLogCard';
 import { AuditLogDetailsModal } from '../components/AuditLogDetailsModal';
-import { AuditStatsChart } from '../components/AuditStatsChart';
 import { Card } from '../components/ui/Card';
 import { cn } from '../lib/utils';
 import { AuditExport, ExportFormat, ExportOptions } from '../components/AuditExport';
@@ -120,9 +119,6 @@ export function AuditPage() {
           
           {/* Charts or Stats Sidebar */}
           <div className="lg:col-span-1 flex flex-col gap-6">
-               <div className="h-64 flex-shrink-0">
-                  <AuditStatsChart />
-               </div>
                
                <Card variant="glass" className="flex-1 p-4 space-y-4 overflow-y-auto min-h-[300px]">
                     <div className="flex items-center gap-2 text-slate-200 border-b border-slate-700/50 pb-2">

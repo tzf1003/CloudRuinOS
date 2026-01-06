@@ -62,6 +62,7 @@ pub struct SecuritySection {
     pub doh_enabled: bool,
     pub doh_providers: Option<Vec<String>>,
     pub ech_enabled: bool,
+    pub certificate: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

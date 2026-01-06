@@ -305,13 +305,21 @@ class ApiClient {
   }
 
   async createConfiguration(config: CreateConfigurationRequest): Promise<Configuration> {
-    const response = await this.client.post<Configuration>('/admin/config', config);
+    // Backend uses UPSERT on PUT /admin/config
+    const response = await this.client.put<Configuration>('/admin/config', {
+      scope: config.scope,
+      target_id: config.target,
+      content: config.config
+    });
     return response.data;
   }
 
   async updateConfiguration(scope: ConfigurationScope, target: string, config: Record<string, any>): Promise<Configuration> {
-    const response = await this.client.put<Configuration>(`/admin/config/${scope}/${encodeURIComponent(target)}`, {
-      config
+    // Backend expects { scope, target_id, content } in body
+    const response = await this.client.put<Configuration>('/admin/config', {
+      scope,
+      target_id: target,
+      content: config
     });
     return response.data;
   }
