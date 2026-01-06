@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use base64::Engine;
 use reqwest::Client;
 use std::path::Path;
 use std::time::Duration;
@@ -64,45 +65,50 @@ impl EnrollmentClient {
         // 发送注册请求
         let response = self.send_enrollment_request(&enrollment_request).await?;
 
-        match response.status {
-            EnrollmentStatus::Success => {
-                info!(
-                    "Device enrollment successful, device_id: {}",
-                    response.device_id
-                );
+        if response.success {
+            let device_id = response
+                .device_id
+                .ok_or_else(|| anyhow!("Enrollment successful but no device ID returned"))?;
 
-                // 设置设备 ID
-                crypto_manager.set_device_id(response.device_id.clone());
+            info!("Device enrollment successful, device_id: {}", device_id);
 
-                // 保存凭证到文件
-                crypto_manager.save_credentials(credentials_path, response.device_id.clone())?;
-                info!("Device credentials saved to: {:?}", credentials_path);
-
-                // 更新状态管理器
-                state_manager
-                    .set_device_id(response.device_id.clone())
-                    .await?;
-                state_manager
-                    .set_enrollment_status(StateEnrollmentStatus::Enrolled)
-                    .await?;
-
-                Ok(response.device_id)
+            // 如果服务器返回了私钥，使用服务器生成的密钥对
+            if let Some(private_key) = response.private_key {
+                debug!("Using server-provided keypair");
+                let private_key_bytes = base64::engine::general_purpose::STANDARD
+                    .decode(&private_key)
+                    .map_err(|e| anyhow!("Failed to decode server provided private key: {}", e))?;
+                crypto_manager = CryptoManager::from_private_key(&private_key_bytes)?;
             }
-            EnrollmentStatus::Error => {
-                let error_msg = response
-                    .message
-                    .unwrap_or_else(|| "Unknown enrollment error".to_string());
-                error!("Device enrollment failed: {}", error_msg);
 
-                // 设置注册失败状态
-                state_manager
-                    .set_enrollment_status(StateEnrollmentStatus::EnrollmentFailed(
-                        error_msg.clone(),
-                    ))
-                    .await?;
+            // 设置设备 ID
+            crypto_manager.set_device_id(device_id.clone());
 
-                Err(anyhow!("Enrollment failed: {}", error_msg))
-            }
+            // 保存凭证到文件
+            crypto_manager.save_credentials(credentials_path, device_id.clone())?;
+            info!("Device credentials saved to: {:?}", credentials_path);
+
+            // 更新状态管理器
+            state_manager
+                .set_device_id(device_id.clone())
+                .await?;
+            state_manager
+                .set_enrollment_status(StateEnrollmentStatus::Enrolled)
+                .await?;
+
+            Ok(device_id)
+        } else {
+            let error_msg = response
+                .error
+                .unwrap_or_else(|| "Unknown enrollment error".to_string());
+            error!("Device enrollment failed: {}", error_msg);
+
+            // 设置注册失败状态
+            state_manager
+                .set_enrollment_status(StateEnrollmentStatus::EnrollmentFailed(error_msg.clone()))
+                .await?;
+
+            Err(anyhow!("Enrollment failed: {}", error_msg))
         }
     }
 

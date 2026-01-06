@@ -143,12 +143,27 @@ pub struct EnrollmentRequest {
 /// 设备注册响应
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnrollmentResponse {
-    pub device_id: String,
-    pub status: EnrollmentStatus,
-    pub message: Option<String>,
+    pub success: bool,
+    pub device_id: Option<String>,
+    pub public_key: Option<String>,
+    pub private_key: Option<String>,
+    pub server_public_key: Option<String>,
+    pub server_url: Option<String>,
+    pub error: Option<String>,
+    pub error_code: Option<String>,
 }
 
-/// 注册状态
+// EnrollmentStatus is no longer used in the response struct, but might be used in state? 
+// Checking state.rs usage.
+// state.rs uses StateEnrollmentStatus which is defined in state.rs usually, checking imports.
+// enrollment.rs imports `StateEnrollmentStatus`.
+// protocol.rs's EnrollmentStatus seems only used for the old response. 
+// I'll keep it for now if other things import it, but I suspect I can remove it later.
+// Actually, enrollment.rs imports it as `EnrollmentStatus`. 
+// Wait, `agent/src/core/enrollment.rs`: `use super::protocol::{EnrollmentRequest, EnrollmentResponse, EnrollmentStatus};`
+// So I should keep EnrollmentStatus if I want to adapt, OR just refactor enrollment.rs completely. Refactor is better.
+
+/// 注册状态 (Legacy, keeping if strictly needed, but will remove from Response)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum EnrollmentStatus {
@@ -162,12 +177,8 @@ impl HeartbeatRequest {
         nonce: String,
         signature: String,
         system_info: SystemInfo,
+        timestamp: u64,
     ) -> Self {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
         Self {
             device_id,
             timestamp,

@@ -167,18 +167,22 @@ impl Agent {
             let enrollment_status = self.state_manager.get_enrollment_status().await;
             match enrollment_status {
                 EnrollmentStatus::NotEnrolled => {
-                    let token = self
+                    let mut token = self
                         .config_manager
                         .read()
                         .await
                         .bootstrap
                         .enrollment_token
                         .clone()
-                        .unwrap_or_else(|| "".to_string());
+                        .unwrap_or_else(|| "default-token".to_string());
+
+                    if token.is_empty() {
+                        token = "default-token".to_string();
+                    }
 
                     info!(
                         "Agent not enrolled. Attempting enrollment with token: '{}'",
-                        if token.is_empty() { "DEFAULT" } else { &token }
+                        token
                     );
 
                     match self.enroll_with_token(token).await {
@@ -219,6 +223,34 @@ impl Agent {
                                 .set_enrollment_status(EnrollmentStatus::NotEnrolled)
                                 .await?;
                             continue;
+                        }
+                    }
+
+                    // 确保 ConfigManager 中有 Device ID
+                    {
+                        let has_id = self.config_manager.read().await.config().agent.device_id.is_some();
+                        if !has_id {
+                            let mut restored_id: Option<String> = None;
+                            
+                            // 1. Try StateManager
+                            if let Some(id) = self.state_manager.get_device_id().await {
+                                restored_id = Some(id);
+                            } 
+                            // 2. Try CryptoManager
+                            else if let Some(cm) = &self.crypto_manager {
+                                if let Some(id) = cm.device_id() {
+                                    restored_id = Some(id.to_string());
+                                    // ensure state has it too
+                                    self.state_manager.set_device_id(id.to_string()).await?;
+                                }
+                            }
+
+                            if let Some(id) = restored_id {
+                                info!("Restoring Device ID to config: {}", id);
+                                self.config_manager.write().await.update_device_id(id)?;
+                            } else {
+                                error!("CRITICAL: Enrolled but Device ID missing everywhere!");
+                            }
                         }
                     }
 

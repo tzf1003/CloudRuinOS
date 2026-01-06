@@ -68,7 +68,7 @@ impl HeartbeatClient {
 
         // 生成 nonce
         let nonce = CryptoManager::generate_nonce();
-        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64;
 
         // 获取系统信息
         let system_info = SystemInfo::current();
@@ -89,7 +89,7 @@ impl HeartbeatClient {
 
         // 构建心跳请求
         let heartbeat_request =
-            HeartbeatRequest::new(device_id.to_string(), nonce, signature, system_info);
+            HeartbeatRequest::new(device_id.to_string(), nonce, signature, system_info, timestamp);
 
         debug!("Sending heartbeat for device: {}", device_id);
 
