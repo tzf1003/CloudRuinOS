@@ -175,10 +175,21 @@ impl ConfigManager {
         Self { config, bootstrap }
     }
 
-    /// 从 JSON 更新动态配置 (内存中)
+    /// 从 JSON 更新动态配置 (内存中) - 支持部分更新（合并）
     pub fn update_from_json(&mut self, json_content: &str) -> Result<()> {
-        let new_config: AgentConfig =
+        // 1. 将当前配置转换为 JSON Value
+        let mut current_config_value = serde_json::to_value(&self.config)?;
+        
+        // 2. 将远程 JSON 解析为 Value
+        let remote_config_value: serde_json::Value = 
             serde_json::from_str(json_content).map_err(|e| anyhow!("解析服务器配置失败: {}", e))?;
+
+        // 3. 执行合并
+        Self::merge_json_value(&mut current_config_value, remote_config_value);
+
+        // 4. 将合并后的 Value 反序列化回 AgentConfig
+        let new_config: AgentConfig = serde_json::from_value(current_config_value)
+            .map_err(|e| anyhow!("应用合并后的配置失败: {}", e))?;
 
         // 验证新配置
         // 注意：我们可能需要保留某些本地状态 (如 device_id)
@@ -196,6 +207,18 @@ impl ConfigManager {
 
         info!("已更新内存配置");
         Ok(())
+    }
+
+    /// 递归合并 JSON Value
+    fn merge_json_value(a: &mut serde_json::Value, b: serde_json::Value) {
+        match (a, b) {
+            (serde_json::Value::Object(a), serde_json::Value::Object(b)) => {
+                for (k, v) in b {
+                    Self::merge_json_value(a.entry(k).or_insert(serde_json::Value::Null), v);
+                }
+            }
+            (a, b) => *a = b,
+        }
     }
 
     // Legacy methods placeholders or removed

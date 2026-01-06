@@ -55,6 +55,7 @@ hex = "0.4"
 # 可选依赖
 trust-dns-resolver = { workspace = true, optional = true }
 rustls-native-certs = { workspace = true, optional = true }
+mac_address = "1.1.8"
 
 # 平台特定依赖
 [target.'cfg(windows)'.dependencies]

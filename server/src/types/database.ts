@@ -30,6 +30,9 @@ export interface UpdateDeviceInput {
   last_seen?: number;
   status?: Device['status'];
   version?: string;
+  public_key?: string;
+  enrollment_token?: string;
+  platform?: Device['platform'];
 }
 
 // 会话表类型

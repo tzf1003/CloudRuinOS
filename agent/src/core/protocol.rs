@@ -41,7 +41,9 @@ pub enum HeartbeatStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Command {
     pub id: String,
+    #[serde(rename = "type")]
     pub command_type: CommandType,
+    #[serde(rename = "data")]
     pub payload: serde_json::Value,
 }
 
@@ -138,6 +140,8 @@ pub struct EnrollmentRequest {
     pub public_key: String,
     pub platform: String,
     pub version: String,
+    // 可选的 device_id (MAC 地址)
+    pub device_id: Option<String>,
 }
 
 /// 设备注册响应

@@ -96,6 +96,21 @@ export async function updateDevice(
       values.push(input.version);
     }
 
+    if (input.public_key !== undefined) {
+      updates.push('public_key = ?');
+      values.push(input.public_key);
+    }
+
+    if (input.enrollment_token !== undefined) {
+      updates.push('enrollment_token = ?');
+      values.push(input.enrollment_token);
+    }
+
+    if (input.platform !== undefined) {
+      updates.push('platform = ?');
+      values.push(input.platform);
+    }
+
     if (updates.length === 0) {
       return true; // 没有更新
     }

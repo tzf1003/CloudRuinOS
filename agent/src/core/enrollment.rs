@@ -9,6 +9,9 @@ use super::crypto::CryptoManager;
 use super::protocol::{EnrollmentRequest, EnrollmentResponse, EnrollmentStatus};
 use super::state::{EnrollmentStatus as StateEnrollmentStatus, StateManager};
 
+use mac_address::get_mac_address;
+
+
 /// 设备注册客户端
 #[derive(Debug)]
 pub struct EnrollmentClient {
@@ -53,22 +56,44 @@ impl EnrollmentClient {
         // 生成新的密钥对
         let mut crypto_manager = CryptoManager::generate()?;
         debug!("Generated new Ed25519 keypair for device");
+        
+        // 获取 MAC 地址作为主要身份标识
+        let mac_addr = get_mac_address()
+            .map_err(|e| anyhow!("Failed to get MAC address: {}", e))?
+            .ok_or_else(|| anyhow!("No MAC address found"))?
+            .to_string()
+            .to_lowercase()
+            .replace(":", "-"); // Format: 00-11-22-33-44-55
+            
+        info!("Using MAC address as identity: {}", mac_addr);
+        crypto_manager.set_device_id(mac_addr.clone());
 
-        // 创建注册请求
+        // 创建注册请求 - 注意：我们现在将 MAC 地址作为 device_id 发送给服务器(如果协议允许)
+        // 或者我们继续使用目前的 EnrollmentRequest 结构，但服务器需要知道我们的 MAC
+        // 假设 EnrollmentRequest 还没有 device_id 字段，我们可能需要修改协议， 或者让服务器返回这个 ID
+        // 根据需求： "客户端应当使用MAC... 如果启动时遇到相同MAC地址，则获取配置"
+        // 这意味着客户端声称 "我是 MAC X"，服务器说 "好的，你已经注册了，这是你的 ID (还是 X)"
+        
+        // 实际上，我们应该把 device_id 预先请求带上，或者修改 EnrollmentRequest
+        // 让我们看看 EnrollmentRequest 的定义 (protocol.rs)
+        
+        // 目前 EnrollmentRequest 没有 device_id 字段。我们需要添加它。
         let enrollment_request = EnrollmentRequest {
             token: enrollment_token,
             public_key: crypto_manager.public_key_base64(),
             platform: std::env::consts::OS.to_string(),
             version: env!("CARGO_PKG_VERSION").to_string(),
+            device_id: Some(mac_addr.clone()), // 添加 device_id 字段
         };
 
         // 发送注册请求
         let response = self.send_enrollment_request(&enrollment_request).await?;
 
         if response.success {
+            // 服务器应该返回相同的 device_id (即 MAC)
             let device_id = response
                 .device_id
-                .ok_or_else(|| anyhow!("Enrollment successful but no device ID returned"))?;
+                .unwrap_or(mac_addr); // Fallback to local MAC if server doesn't return (though it should)
 
             info!("Device enrollment successful, device_id: {}", device_id);
 

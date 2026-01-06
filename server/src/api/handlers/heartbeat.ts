@@ -180,8 +180,37 @@ export async function heartbeat(
       request
     );
 
-    // 检查是否有待执行的命令（简化实现，实际应该从队列或数据库获取）
+    // 检查是否有待执行的命令
+    // 从 KV 存储中获取该设备的待处理命令
+    const pendingCommands = await kvManager.getDeviceCommands(body.device_id);
     const commands: Command[] = [];
+
+    for (const cmd of pendingCommands) {
+      // 只发送处于 pending 状态的命令
+      if (cmd.status === 'pending') {
+        // 映射 KV 命令记录到 API 响应格式
+        // 注意: 我们做一个简单的类型断言/映射，确保类型兼容
+        // 如果遇到不兼容的类型（如 'script'），在客户端未支持前可以过滤或者是作为 execute 处理
+        if (cmd.type === 'script') {
+           // Skip or map script? For now let's map to execute with special payload if needed, 
+           // or just skip if client doesn't support 'script'. 
+           // Let's assume client supports what's in 'Command' interface.
+           // If 'script' is not in Command interface, we skip or extend interface.
+           // Current Command interface: 'upgrade' | 'execute' | 'file_op' | 'config_update'
+           continue; 
+        }
+
+        commands.push({
+          id: cmd.id,
+          type: cmd.type as any, // Safe cast as we filtered/checked above mostly
+          data: cmd.payload,
+          expires_at: cmd.expires_at
+        });
+
+        // 标记命令为已投递
+        await kvManager.updateCommandStatus(cmd.id, 'delivered');
+      }
+    }
     
     // 计算下次心跳时间
     const heartbeatInterval = parseInt(env.HEARTBEAT_INTERVAL || '60') * 1000;

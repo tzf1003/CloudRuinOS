@@ -8,7 +8,7 @@ import { Env } from '../../index';
 import { createKVManager } from '../../storage/kv-manager';
 import { CreateDeviceInput } from '../../types/database';
 import { generateDeviceId, generateEd25519KeyPair, validateEnrollmentToken } from '../utils/crypto';
-import { createDevice } from '../utils/database';
+import { createDevice, getDeviceById, updateDevice } from '../utils/database';
 import { createAuditService } from '../utils/audit';
 
 /**
@@ -42,6 +42,7 @@ function getServerUrl(request: Request, env: any): string {
 // 设备注册请求类型
 export interface EnrollDeviceRequest {
   enrollment_token: string;
+  device_id?: string; // Optional client-provided device ID (e.g. MAC address)
   public_key?: string; // Optional client-provided public key
   platform: 'windows' | 'linux' | 'macos';
   version: string;
@@ -112,8 +113,11 @@ export async function enrollDevice(
       );
     }
 
-    // 生成设备 ID
-    const deviceId = generateDeviceId();
+    // Determine Device ID (Use provided ID or generate new one)
+    let deviceId = body.device_id;
+    if (!deviceId) {
+      deviceId = generateDeviceId();
+    }
     
     let publicKey = '';
     let privateKey = '';
@@ -132,25 +136,44 @@ export async function enrollDevice(
       publicKey = keyPair.publicKey;
       privateKey = keyPair.privateKey;
     }
-    
-    // 创建设备记录
-    const deviceInput: CreateDeviceInput = {
-      id: deviceId,
-      enrollment_token: body.enrollment_token,
-      public_key: publicKey,
-      platform: body.platform,
-      version: body.version,
-    };
 
-    const deviceCreated = await createDevice(env.DB, deviceInput);
-    if (!deviceCreated) {
-      return createErrorResponse('Failed to create device record', 'DATABASE_ERROR', 500);
+    // Check if device already exists
+    const existingDevice = await getDeviceById(env.DB, deviceId);
+    
+    if (existingDevice) {
+       // Update existing device
+       const updated = await updateDevice(env.DB, deviceId, {
+         version: body.version,
+         platform: body.platform,
+         public_key: publicKey,
+         enrollment_token: body.enrollment_token,
+         last_seen: Date.now(),
+         status: 'online'
+       });
+
+       if (!updated) {
+         return createErrorResponse('Failed to update device record', 'DATABASE_ERROR', 500);
+       }
+    } else {
+      // Create device record
+      const deviceInput: CreateDeviceInput = {
+        id: deviceId,
+        enrollment_token: body.enrollment_token,
+        public_key: publicKey,
+        platform: body.platform,
+        version: body.version,
+      };
+
+      const deviceCreated = await createDevice(env.DB, deviceInput);
+      if (!deviceCreated) {
+        return createErrorResponse('Failed to create device record', 'DATABASE_ERROR', 500);
+      }
+      
+      // Mark enrollment token as used (only for new devices or re-enrollments)
+      await kvManager.markTokenUsed(tokenToValidate, deviceId);
     }
 
-    // 标记 enrollment token 为已使用
-    await kvManager.markTokenUsed(tokenToValidate, deviceId);
-
-    // 记录成功的注册事件
+    // 记录注册事件
     const auditService = createAuditService(env);
     await auditService.logDeviceRegistration(
       deviceId,
@@ -158,7 +181,7 @@ export async function enrollDevice(
       body.platform,
       body.version,
       publicKey,
-      'success',
+      existingDevice ? 're-enrolled' : 'success', // Distinguish re-enrollment
       undefined,
       request
     );
