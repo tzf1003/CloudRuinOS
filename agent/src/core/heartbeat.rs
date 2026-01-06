@@ -199,28 +199,27 @@ impl HeartbeatClient {
             interval_duration
         );
 
-        let mut interval = tokio::time::interval(interval_duration);
-        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-
-        // Consume first tick
-        interval.tick().await;
+        // 使用 tokio::time::sleep 替代 interval 以支持动态间隔
+        let mut next_wait = interval_duration;
 
         loop {
+            // Wait for the interval
+            tokio::time::sleep(next_wait).await;
+
             // Check for config updates
             {
                 let cm = config_manager.read().await;
-                let new_interval = cm.config().heartbeat_interval();
+                let config_interval = cm.config().heartbeat_interval();
                 let new_url = cm.config().heartbeat_url();
 
-                if new_interval != interval_duration {
+                if config_interval != interval_duration {
                     info!(
-                        "Heartbeat interval updated: {:?} -> {:?}",
-                        interval_duration, new_interval
+                        "Configured heartbeat interval updated: {:?} -> {:?}",
+                        interval_duration, config_interval
                     );
-                    interval_duration = new_interval;
-                    interval = tokio::time::interval(interval_duration);
-                    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-                    interval.tick().await; // Reset tick
+                    interval_duration = config_interval;
+                    // 注意：这里不更新 next_wait，因为我们刚刚完成了等待
+                    // 新的配置将应用于后续的默认回退行为
                 }
 
                 if new_url != server_url {
@@ -228,9 +227,6 @@ impl HeartbeatClient {
                     server_url = new_url;
                 }
             }
-
-            // Wait for next tick
-            interval.tick().await;
 
             match self
                 .send_heartbeat(crypto_manager, state_manager, &server_url)
@@ -252,24 +248,30 @@ impl HeartbeatClient {
                         }
                     }
 
-                    // 更新下次心跳时间（如果服务端指定）
+                    // 更新下次心跳时间
                     if response.next_heartbeat > 0 {
-                        let next_heartbeat_duration = Duration::from_millis(
-                            response.next_heartbeat.saturating_sub(response.server_time),
-                        );
+                        let delay_millis = response.next_heartbeat.saturating_sub(response.server_time);
+                        // 确保最小延迟为 1 秒，防止类似 DDOS 的行为
+                        let delay = if delay_millis < 1000 {
+                            Duration::from_millis(1000)
+                        } else {
+                            Duration::from_millis(delay_millis)
+                        };
 
-                        if next_heartbeat_duration != self.heartbeat_interval {
-                            debug!(
-                                "Server suggested next heartbeat in: {:?}",
-                                next_heartbeat_duration
-                            );
-                            // 可以考虑动态调整心跳间隔
-                        }
+                        debug!(
+                            "Server suggested next heartbeat in: {:?}",
+                            delay
+                        );
+                        next_wait = delay;
+                    } else {
+                        // 如果服务端未指定，使用配置的间隔
+                        next_wait = interval_duration;
                     }
                 }
                 Err(e) => {
                     error!("Heartbeat failed: {}", e);
-                    // 继续循环，不退出
+                    // 失败时回退到配置间隔
+                    next_wait = interval_duration;
                 }
             }
         }
