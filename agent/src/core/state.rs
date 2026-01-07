@@ -7,16 +7,10 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
 use tracing::{debug, info};
+use crate::config::AgentConfig;
+use crate::core::protocol::EnrollmentStatus;
 
-/// Agent 状态管理器
 #[derive(Debug, Clone)]
-pub struct StateManager {
-    state: Arc<RwLock<AgentState>>,
-    state_file_path: PathBuf,
-}
-
-/// Agent 状态
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentState {
     pub device_id: Option<String>,
     pub enrollment_status: EnrollmentStatus,
@@ -30,40 +24,15 @@ pub struct AgentState {
     pub metadata: HashMap<String, serde_json::Value>,
 }
 
-/// 注册状态
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum EnrollmentStatus {
-    NotEnrolled,
-    Enrolling,
-    Enrolled,
-    EnrollmentFailed(String),
-}
-
-/// 连接状态
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
 pub enum ConnectionStatus {
+    Connected,
     Disconnected,
     Connecting,
-    Connected,
-    Reconnecting,
-    Failed(String),
+    Reconnecting
 }
 
-/// Agent 配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentConfig {
-    pub server_url: String,
-    pub heartbeat_interval: u64, // 秒
-    pub reconnect_interval: u64, // 秒
-    pub max_reconnect_attempts: Option<u32>,
-    pub request_timeout: u64, // 秒
-    pub tls_verify: bool,
-    pub doh_enabled: bool,
-    pub ech_enabled: bool,
-    pub log_level: String,
-}
-
-/// 运行时统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RuntimeStats {
     pub start_time: u64,
@@ -76,55 +45,33 @@ pub struct RuntimeStats {
     pub last_error_time: Option<u64>,
 }
 
+/// Agent 状态管理器
+#[derive(Debug, Clone)]
+pub struct StateManager {
+    state: Arc<RwLock<AgentState>>,
+}
+
 impl StateManager {
-    /// 创建新的状态管理器
-    pub fn new<P: AsRef<Path>>(state_file_path: P) -> Result<Self> {
-        let state_file_path = state_file_path.as_ref().to_path_buf();
-
-        // 确保状态文件目录存在
-        if let Some(parent) = state_file_path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-
-        let state = if state_file_path.exists() {
-            Self::load_state(&state_file_path)?
-        } else {
-            AgentState::default()
-        };
-
-        Ok(Self {
+    /// 创建新的状态管理器 (In-Memory Only)
+    pub fn new() -> Self {
+        let state = AgentState::default();
+        Self {
             state: Arc::new(RwLock::new(state)),
-            state_file_path,
-        })
-    }
-
-    /// 加载状态文件
-    fn load_state<P: AsRef<Path>>(path: P) -> Result<AgentState> {
-        let content = fs::read_to_string(path)?;
-
-        // 处理空文件的情况
-        if content.trim().is_empty() {
-            info!("State file is empty, using default state");
-            return Ok(AgentState::default());
         }
-
-        let state: AgentState = serde_json::from_str(&content)?;
-        info!("Loaded agent state from file");
-        Ok(state)
     }
 
-    /// 保存状态到文件
-    pub async fn save_state(&self) -> Result<()> {
-        let state = self.state.read().await;
-        let content = serde_json::to_string_pretty(&*state)?;
-        fs::write(&self.state_file_path, content)?;
-        debug!("Saved agent state to file");
-        Ok(())
-    }
-
-    /// 获取状态的只读副本
+    /// 获取当前状态的一个副本
     pub async fn get_state(&self) -> AgentState {
         self.state.read().await.clone()
+    }
+
+    // Removed load_state and save_state logic
+
+
+    /// 保存状态 (No-op)
+    pub async fn save_state(&self) -> Result<()> {
+        debug!("State updated (memory only)");
+        Ok(())
     }
 
     /// 设置设备 ID
@@ -304,22 +251,6 @@ impl Default for AgentState {
             config: AgentConfig::default(),
             runtime_stats: RuntimeStats::default(),
             metadata: HashMap::new(),
-        }
-    }
-}
-
-impl Default for AgentConfig {
-    fn default() -> Self {
-        Self {
-            server_url: "https://rmm-server.example.com".to_string(),
-            heartbeat_interval: 30, // 30 秒
-            reconnect_interval: 5,  // 5 秒
-            max_reconnect_attempts: Some(10),
-            request_timeout: 30, // 30 秒
-            tls_verify: true,
-            doh_enabled: false,
-            ech_enabled: false,
-            log_level: "info".to_string(),
         }
     }
 }

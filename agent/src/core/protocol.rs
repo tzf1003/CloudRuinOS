@@ -8,8 +8,34 @@ pub struct HeartbeatRequest {
     pub timestamp: u64,
     pub nonce: String,
     pub protocol_version: String,
-    pub signature: String, // Ed25519 签名
+    pub signature: String,
     pub system_info: SystemInfo,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reports: Option<Vec<TaskReport>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskReport {
+    pub task_id: String,
+    pub state: TaskState,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub progress: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_chunk: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_cursor: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum TaskState {
+    Received,
+    Running,
+    Succeeded,
+    Failed,
+    Canceled,
 }
 
 /// 心跳响应协议
@@ -18,7 +44,44 @@ pub struct HeartbeatResponse {
     pub status: HeartbeatStatus,
     pub server_time: u64,
     pub next_heartbeat: u64,
-    pub commands: Option<Vec<Command>>,
+    #[serde(default)]
+    pub tasks: Vec<TaskItem>,
+    #[serde(default)]
+    pub cancels: Vec<CancelItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskItem {
+    pub task_id: String,
+    pub revision: u64,
+    #[serde(rename = "type")]
+    pub task_type: TaskType,
+    pub desired_state: DesiredState,
+    pub payload: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CancelItem {
+    pub task_id: String,
+    pub revision: u64,
+    pub desired_state: DesiredState,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskType {
+    ConfigUpdate,
+    CmdExec,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum DesiredState {
+    Pending,
+    Running,
+    Succeeded,
+    Failed,
+    Canceled,
 }
 
 /// 系统信息
@@ -29,6 +92,7 @@ pub struct SystemInfo {
     pub version: String,
 }
 
+
 /// 心跳状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -37,27 +101,8 @@ pub enum HeartbeatStatus {
     Error,
 }
 
-/// 命令定义
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Command {
-    pub id: String,
-    #[serde(rename = "type")]
-    pub command_type: CommandType,
-    #[serde(rename = "data")]
-    pub payload: serde_json::Value,
-}
+// Removed Command and CommandType
 
-/// 命令类型
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum CommandType {
-    Upgrade,
-    Execute,
-    FileList,
-    FileGet,
-    FilePut,
-    ConfigUpdate,
-}
 
 /// WebSocket 消息类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -155,6 +200,7 @@ pub struct EnrollmentResponse {
     pub server_url: Option<String>,
     pub error: Option<String>,
     pub error_code: Option<String>,
+    pub config: Option<serde_json::Value>,
 }
 
 // EnrollmentStatus is no longer used in the response struct, but might be used in state? 
@@ -167,12 +213,14 @@ pub struct EnrollmentResponse {
 // Wait, `agent/src/core/enrollment.rs`: `use super::protocol::{EnrollmentRequest, EnrollmentResponse, EnrollmentStatus};`
 // So I should keep EnrollmentStatus if I want to adapt, OR just refactor enrollment.rs completely. Refactor is better.
 
-/// 注册状态 (Legacy, keeping if strictly needed, but will remove from Response)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// 注册状态
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum EnrollmentStatus {
-    Success,
-    Error,
+    NotEnrolled,
+    Enrolling,
+    Enrolled,
+    EnrollmentFailed(String),
 }
 
 impl HeartbeatRequest {
@@ -190,6 +238,7 @@ impl HeartbeatRequest {
             protocol_version: "1.0".to_string(),
             signature,
             system_info,
+            reports: None,
         }
     }
 }

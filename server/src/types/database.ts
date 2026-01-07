@@ -14,6 +14,7 @@ export interface Device {
   status: 'online' | 'offline' | 'error';
   created_at: number;
   updated_at: number;
+  mac_address?: string;
 }
 
 // 设备创建输入类型
@@ -23,6 +24,7 @@ export interface CreateDeviceInput {
   public_key: string;
   platform: Device['platform'];
   version: string;
+  mac_address?: string;
 }
 
 // 设备更新输入类型
@@ -157,4 +159,54 @@ export interface PaginatedResult<T> {
   page: number;
   limit: number;
   has_more: boolean;
+}
+
+// ============= Task System Types (Migration 0003) =============
+
+export interface Task {
+    id: string;
+    device_id: string;
+    type: 'config_update' | 'cmd_exec';
+    revision: number;
+    desired_state: 'pending' | 'running' | 'succeeded' | 'failed' | 'canceled';
+    payload: string; // JSON content
+    timeout_s?: number;
+    created_at: number;
+    updated_at: number;
+}
+
+export interface CreateTaskInput {
+    id: string; // UUID provided by caller
+    device_id: string;
+    type: Task['type'];
+    revision?: number;
+    desired_state?: Task['desired_state'];
+    payload: string;
+    timeout_s?: number;
+}
+
+export interface TaskState {
+    task_id: string;
+    device_id: string;
+    state: 'received' | 'running' | 'succeeded' | 'failed' | 'canceled';
+    progress: number;
+    output_cursor: number;
+    error?: string;
+    updated_at: number;
+}
+
+export interface UpdateTaskStateInput {
+    task_id: string;
+    device_id: string;
+    state: TaskState['state'];
+    progress?: number;
+    output_cursor?: number;
+    error?: string;
+}
+
+export interface TaskLog {
+    id?: number;
+    task_id: string;
+    content: string;
+    created_at: number;
 }

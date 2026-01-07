@@ -30,6 +30,8 @@ export interface DeviceRow {
   platform: DevicePlatform;
   /** Agent 版本号 */
   version: string;
+  /** MAC Address (new field) */
+  mac_address: string | null;
   /** 最后心跳时间戳 (Unix timestamp) */
   last_seen: number;
   /** 设备状态 (online/offline/error) */
@@ -456,3 +458,35 @@ export type SessionApi = RowToApi<SessionRow>;
  * AuditLog 行转 API 格式
  */
 export type AuditLogApi = RowToApi<AuditLogRow>;
+
+// ============= Task System Rows (Migration 0003) =============
+
+export interface TaskRow {
+  id: string;
+  device_id: string;
+  type: 'config_update' | 'cmd_exec';
+  revision: number;
+  desired_state: 'pending' | 'running' | 'succeeded' | 'failed' | 'canceled';
+  payload: string;
+  timeout_s: number | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface TaskStateRow {
+  task_id: string;
+  device_id: string;
+  state: 'received' | 'running' | 'succeeded' | 'failed' | 'canceled';
+  progress: number;
+  output_cursor: number;
+  error: string | null;
+  updated_at: number;
+}
+
+export interface TaskLogRow {
+  id: number;
+  task_id: string;
+  content: string;
+  created_at: number;
+}
+

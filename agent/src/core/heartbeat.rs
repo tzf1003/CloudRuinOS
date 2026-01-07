@@ -8,7 +8,8 @@ use tracing::{debug, error, info, warn};
 use crate::config::ConfigManager;
 use crate::core::crypto::{CryptoManager, SignableData};
 use crate::core::protocol::{
-    Command, CommandType, HeartbeatRequest, HeartbeatResponse, SystemInfo,
+    HeartbeatRequest, HeartbeatResponse, SystemInfo, TaskReport,
+    TaskItem, TaskType, DesiredState, TaskState,
 };
 use crate::core::state::StateManager;
 use crate::transport::HttpClient;
@@ -61,6 +62,7 @@ impl HeartbeatClient {
         crypto_manager: &CryptoManager,
         _state_manager: &StateManager,
         server_url: &str,
+        reports: Option<Vec<TaskReport>>,
     ) -> Result<HeartbeatResponse> {
         let device_id = crypto_manager
             .device_id()
@@ -100,8 +102,9 @@ impl HeartbeatClient {
         let signature = crypto_manager.sign(payload_str.as_bytes());
 
         // 构建心跳请求
-        let heartbeat_request =
+        let mut heartbeat_request =
             HeartbeatRequest::new(device_id.to_string(), nonce, signature, system_info, timestamp);
+        heartbeat_request.reports = reports;
 
         debug!("Sending heartbeat for device: {}", device_id);
 
@@ -199,8 +202,8 @@ impl HeartbeatClient {
             interval_duration
         );
 
-        // 使用 tokio::time::sleep 替代 interval 以支持动态间隔
         let mut next_wait = interval_duration;
+        let mut pending_reports: Vec<TaskReport> = Vec::new();
 
         loop {
             // Wait for the interval
@@ -218,8 +221,6 @@ impl HeartbeatClient {
                         interval_duration, config_interval
                     );
                     interval_duration = config_interval;
-                    // 注意：这里不更新 next_wait，因为我们刚刚完成了等待
-                    // 新的配置将应用于后续的默认回退行为
                 }
 
                 if new_url != server_url {
@@ -227,50 +228,66 @@ impl HeartbeatClient {
                     server_url = new_url;
                 }
             }
+            
+            // Prepare reports to send (move out of pending)
+            let reports_to_send = if pending_reports.is_empty() {
+                None
+            } else {
+                Some(pending_reports.clone())
+            };
 
             match self
-                .send_heartbeat(crypto_manager, state_manager, &server_url)
+                .send_heartbeat(crypto_manager, state_manager, &server_url, reports_to_send.clone())
                 .await
             {
                 Ok(response) => {
-                    debug!("Heartbeat successful: {:?}", response);
-
-                    // 处理服务端命令（如果有）
-                    if let Some(commands) = response.commands {
-                        info!("Received {} commands from server", commands.len());
-                        for cmd in commands {
-                            if let Err(e) = self
-                                .process_command(&cmd, state_manager, config_manager)
-                                .await
-                            {
-                                error!("Failed to process command {}: {}", cmd.id, e);
-                            }
-                        }
+                    debug!("Heartbeat successful");
+                    
+                    // Clear sent reports
+                    if let Some(_) = reports_to_send {
+                         pending_reports.clear();
                     }
 
-                    // 更新下次心跳时间
+                    if let Err(e) = state_manager.update_heartbeat().await {
+                         error!("Failed to update local heartbeat state: {}", e);
+                    }
+
+                    // Process Tasks
+                    for task in response.tasks {
+                        info!("Received Task: {} type={:?}", task.task_id, task.task_type);
+                        
+                        let report = self.process_task(&task, state_manager, config_manager).await;
+                        pending_reports.push(report);
+                    }
+                    
+                    // Process Cancels
+                    for cancel in response.cancels {
+                         info!("Received Cancel: {} rev={}", cancel.task_id, cancel.revision);
+                         let report = TaskReport {
+                            task_id: cancel.task_id,
+                            state: TaskState::Canceled,
+                            progress: None,
+                            output_chunk: Some("Task canceled by server".to_string()),
+                            output_cursor: None,
+                            error: None,
+                        };
+                        pending_reports.push(report);
+                    }
+
                     if response.next_heartbeat > 0 {
                         let delay_millis = response.next_heartbeat.saturating_sub(response.server_time);
-                        // 确保最小延迟为 1 秒，防止类似 DDOS 的行为
                         let delay = if delay_millis < 1000 {
                             Duration::from_millis(1000)
                         } else {
                             Duration::from_millis(delay_millis)
                         };
-
-                        debug!(
-                            "Server suggested next heartbeat in: {:?}",
-                            delay
-                        );
                         next_wait = delay;
                     } else {
-                        // 如果服务端未指定，使用配置的间隔
                         next_wait = interval_duration;
                     }
                 }
                 Err(e) => {
                     error!("Heartbeat failed: {}", e);
-                    // 失败时回退到配置间隔
                     next_wait = interval_duration;
                 }
             }
@@ -288,140 +305,58 @@ impl HeartbeatClient {
         info!("Heartbeat interval updated to: {:?}", interval);
     }
 
-    /// 处理服务端下发的命令
-    async fn process_command(
+    async fn process_task(
         &self,
-        cmd: &Command,
+        task: &TaskItem,
         _state_manager: &StateManager,
         config_manager: &Arc<RwLock<ConfigManager>>,
-    ) -> Result<()> {
-        info!(
-            "Processing command: {} (type: {:?})",
-            cmd.id, cmd.command_type
-        );
-
-        match cmd.command_type {
-            CommandType::ConfigUpdate => {
-                info!("Received config update command");
-                if let Some(config_content) = cmd.payload.get("config") {
-                    config_manager
-                        .write()
-                        .await
-                        .update_from_json(&config_content.to_string())?;
-                    info!("Configuration updated successfully via heartbeat");
-                } else {
-                    warn!(
-                        "ConfigUpdate command missing 'config' payload payload: {:?}",
-                        cmd.payload
-                    );
+    ) -> TaskReport {
+        match task.task_type {
+            TaskType::ConfigUpdate => {
+                if let Some(config_content) = task.payload.get("config") {
+                     match config_manager.write().await.update_from_json(&config_content.to_string()) {
+                         Ok(_) => {
+                             return TaskReport {
+                                 task_id: task.task_id.clone(),
+                                 state: TaskState::Succeeded,
+                                 progress: Some(100),
+                                 output_chunk: Some("Config updated".to_string()),
+                                 output_cursor: None,
+                                 error: None,
+                             };
+                         }
+                         Err(e) => {
+                             return TaskReport {
+                                 task_id: task.task_id.clone(),
+                                 state: TaskState::Failed,
+                                 progress: None,
+                                 output_chunk: None,
+                                 output_cursor: None,
+                                 error: Some(e.to_string()),
+                             };
+                         }
+                     }
                 }
-                return Ok(());
-            }
-            CommandType::Upgrade => {
-                // 处理升级命令
-                info!("Received upgrade command");
-                if let Some(version) = cmd.payload.get("version").and_then(|v| v.as_str()) {
-                    info!("Upgrade to version: {}", version);
-
-                    // 获取下载 URL 和签名
-                    let download_url = cmd
-                        .payload
-                        .get("download_url")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| anyhow!("Missing download_url in upgrade command"))?;
-
-                    let signature = cmd
-                        .payload
-                        .get("signature")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| anyhow!("Missing signature in upgrade command"))?;
-
-                    let checksum = cmd
-                        .payload
-                        .get("checksum")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| anyhow!("Missing checksum in upgrade command"))?;
-
-                    // 执行升级
-                    match self
-                        .perform_upgrade(version, download_url, signature, checksum)
-                        .await
-                    {
-                        Ok(_) => {
-                            info!("Upgrade to version {} completed successfully", version);
-                            // 升级成功后需要重启，这里返回让调用者处理
-                        }
-                        Err(e) => {
-                            error!("Upgrade failed: {}", e);
-                            return Err(e);
-                        }
-                    }
+                TaskReport {
+                    task_id: task.task_id.clone(),
+                     state: TaskState::Failed,
+                     progress: None,
+                     output_chunk: None,
+                     output_cursor: None,
+                     error: Some("Missing config payload".to_string()),
                 }
             }
-            CommandType::Execute => {
-                // 处理执行命令
-                if let (Some(command), Some(args)) = (
-                    cmd.payload.get("command").and_then(|v| v.as_str()),
-                    cmd.payload.get("args").and_then(|v| v.as_array()),
-                ) {
-                    let args: Vec<String> = args
-                        .iter()
-                        .filter_map(|a| a.as_str().map(String::from))
-                        .collect();
-                    info!("Execute command: {} {:?}", command, args);
-
-                    // 使用平台特定的命令执行器
-                    #[cfg(target_os = "windows")]
-                    {
-                        use tokio::process::Command as TokioCommand;
-                        let output = TokioCommand::new("cmd")
-                            .arg("/C")
-                            .arg(command)
-                            .args(&args)
-                            .output()
-                            .await?;
-                        debug!("Command output: {:?}", output);
-                    }
-                    #[cfg(not(target_os = "windows"))]
-                    {
-                        use tokio::process::Command as TokioCommand;
-                        let output = TokioCommand::new("sh")
-                            .arg("-c")
-                            .arg(format!("{} {}", command, args.join(" ")))
-                            .output()
-                            .await?;
-                        debug!("Command output: {:?}", output);
-                    }
-                }
-            }
-            CommandType::FileList => {
-                // 处理文件列表请求
-                if let Some(path) = cmd.payload.get("path").and_then(|v| v.as_str()) {
-                    info!("File list request for: {}", path);
-                    // 文件操作通常通过 WebSocket 实时会话处理
-                    // 这里只记录日志
-                }
-            }
-            CommandType::FileGet => {
-                // 处理文件获取请求
-                if let Some(path) = cmd.payload.get("path").and_then(|v| v.as_str()) {
-                    info!("File get request for: {}", path);
-                    // 文件操作通常通过 WebSocket 实时会话处理
-                }
-            }
-            CommandType::FilePut => {
-                // 处理文件上传请求
-                if let Some(path) = cmd.payload.get("path").and_then(|v| v.as_str()) {
-                    info!("File put request for: {}", path);
-                    // 文件操作通常通过 WebSocket 实时会话处理
+            TaskType::CmdExec => {
+                 TaskReport {
+                    task_id: task.task_id.clone(),
+                     state: TaskState::Failed,
+                     progress: None,
+                     output_chunk: None,
+                     output_cursor: None,
+                     error: Some("CmdExec not implemented in memory mode".to_string()),
                 }
             }
         }
-
-        // 发送命令确认到服务端
-        self.ack_command(&cmd.id).await?;
-
-        Ok(())
     }
 
     /// 执行 Agent 升级
@@ -715,35 +650,7 @@ del "%~f0"
         Ok(())
     }
 
-    /// 向服务端确认命令已处理
-    async fn ack_command(&self, command_id: &str) -> Result<()> {
-        let url = format!("{}/agent/command/{}/ack", self.server_url, command_id);
 
-        let response = self
-            .http_client
-            .post(&url)
-            .json(&json!({
-                "status": "completed",
-                "timestamp": SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs()
-            }))
-            .send()
-            .await?;
-
-        if response.status().is_success() {
-            debug!("Command {} acknowledged", command_id);
-            Ok(())
-        } else {
-            warn!(
-                "Failed to acknowledge command {}: {}",
-                command_id,
-                response.status()
-            );
-            Ok(()) // 不阻塞，即使确认失败也继续
-        }
-    }
 }
 
 #[cfg(test)]

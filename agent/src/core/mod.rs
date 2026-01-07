@@ -33,7 +33,8 @@ use self::enrollment::{EnrollmentClient, EnrollmentConfig};
 use self::heartbeat::{HeartbeatClient, HeartbeatConfig};
 use self::reconnect::ReconnectManager;
 use self::scheduler::{Scheduler, TaskType};
-use self::state::{EnrollmentStatus, StateManager};
+use self::state::StateManager;
+use crate::core::protocol::EnrollmentStatus;
 
 #[allow(dead_code)]
 pub struct Agent {
@@ -65,27 +66,10 @@ impl Agent {
         let data_dir = PathBuf::from(&config.paths.data_dir);
 
         // 确保目录存在 - Memory Mode: Avoid creating directories if using "." or empty
-        if config.paths.config_dir != "." && !config.paths.config_dir.is_empty() {
-             std::fs::create_dir_all(&config_dir)?;
-        }
-        if config.paths.data_dir != "." && !config.paths.data_dir.is_empty() {
-            std::fs::create_dir_all(&data_dir)?;
-        }
-
-        let state_file = if config.paths.data_dir == "." {
-             // In current directory mode, maybe use a temp file or just "agent_state.json" in CWD if unavoidable?
-             // Or better, modify StateManager to support memory-only mode.
-             // For now, let's point it to a temporary location if we strictly want NO files in project root,
-             // OR just accept it in CWD but ensure we clean it up or ignore it.
-             // User requirement: "Need memory from remote config, so no need to create data_v5"
-             // Using std::env::temp_dir() might be cleaner than polluting CWD.
-             std::env::temp_dir().join("ruinos_agent_state.json")
-        } else {
-             data_dir.join("agent_state.json")
-        };
+        // Removed directory creation logic for non-existent implementation
 
         // 初始化状态管理器
-        let state_manager = StateManager::new(state_file)?;
+        let state_manager = StateManager::new();
 
         // 初始化注册客户端
         let enrollment_config = EnrollmentConfig {
@@ -162,19 +146,9 @@ impl Agent {
                 .await?;
         }
 
-        // 检查现有凭证
-        let config = self.config_manager.read().await.config().clone();
-        let credentials_file = config.credentials_path();
-
-        if self
-            .enrollment_client
-            .verify_existing_credentials(&credentials_file, &self.state_manager)
-            .await?
-        {
-            info!("Using existing device credentials");
-        } else {
-            info!("No valid credentials found, enrollment required");
-        }
+        // Memory-only mode: Skip credentials file check.
+        // We will perform enrollment on every startup.
+        info!("Running in stateless mode, proceeding to enrollment/handshake");
 
         loop {
             // 检查注册状态
@@ -200,13 +174,12 @@ impl Agent {
                     );
 
                     match self.enroll_with_token(token).await {
-                        Ok(device_id) => {
+                        Ok((device_id, _config_opt, crypto_manager)) => {
                             info!("Enrollment successful. Device ID: {}", device_id);
-                            // Reload crypto manager
-                            let config = self.config_manager.read().await.config().clone();
-                            let credentials_file = config.credentials_path();
-                            self.crypto_manager =
-                                Some(CryptoManager::from_credentials_file(&credentials_file)?);
+                            
+                            // Use the crypto manager instance form enrollment
+                            self.crypto_manager = Some(crypto_manager);
+
                             self.config_manager
                                 .write()
                                 .await
@@ -329,29 +302,26 @@ impl Agent {
     }
 
     /// 执行设备注册
-    pub async fn enroll_with_token(&self, enrollment_token: String) -> Result<String> {
+    pub async fn enroll_with_token(
+        &self, 
+        enrollment_token: String
+    ) -> Result<(String, Option<serde_json::Value>, CryptoManager)> {
         let config = self.config_manager.read().await.config().clone();
-        let credentials_file = config.credentials_path();
-
-        if let Some(parent) = credentials_file.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
+        // Removed credentials_file logic
 
         info!("Starting device enrollment with provided token");
 
-        let device_id = self
+        let result = self
             .enrollment_client
             .enroll_device_with_retry(
                 enrollment_token,
                 &self.state_manager,
-                &credentials_file,
-                3,                      // max attempts
-                Duration::from_secs(5), // retry delay
+                3,
+                Duration::from_secs(5),
             )
             .await?;
 
-        info!("Device enrollment completed successfully: {}", device_id);
-        Ok(device_id)
+        Ok(result)
     }
 
     async fn setup_scheduled_tasks(&self) -> Result<()> {
@@ -362,7 +332,7 @@ impl Agent {
             .add_task(
                 "heartbeat".to_string(),
                 TaskType::Heartbeat,
-                Duration::from_secs(config.heartbeat_interval),
+                Duration::from_secs(config.heartbeat.interval),
             )
             .await?;
 

@@ -32,8 +32,8 @@ export async function createDevice(db: D1Database, input: CreateDeviceInput): Pr
     const stmt = db.prepare(`
       INSERT INTO devices (
         id, enrollment_token, public_key, platform, version, 
-        last_seen, status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        last_seen, status, created_at, updated_at, mac_address
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = await stmt.bind(
@@ -45,7 +45,8 @@ export async function createDevice(db: D1Database, input: CreateDeviceInput): Pr
       now, // last_seen
       'online', // status
       now, // created_at
-      now  // updated_at
+      now, // updated_at
+      input.mac_address || null
     ).run();
 
     return result.success;
@@ -65,6 +66,20 @@ export async function getDeviceById(db: D1Database, deviceId: string): Promise<D
     return result || null;
   } catch (error) {
     console.error('Failed to get device by ID:', error);
+    return null;
+  }
+}
+
+/**
+ * 根据 MAC Address 获取设备
+ */
+export async function getDeviceByMacAddress(db: D1Database, macAddress: string): Promise<Device | null> {
+  try {
+    const stmt = db.prepare('SELECT * FROM devices WHERE mac_address = ?');
+    const result = await stmt.bind(macAddress).first<Device>();
+    return result || null;
+  } catch (error) {
+    console.error('Failed to get device by MAC:', error);
     return null;
   }
 }

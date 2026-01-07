@@ -501,3 +501,82 @@ impl AgentConfig {
         Self::parse_file_size(&self.file_operations.max_file_size)
     }
 }
+
+impl Default for AgentConfig {
+    fn default() -> Self {
+        Self {
+            agent: AgentSection {
+                name: "rmm-agent".to_string(),
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                device_id: None,
+            },
+            server: ServerSection {
+                base_url: "https://your-rmm-server.example.com".to_string(),
+                enrollment_endpoint: "/agent/enroll".to_string(),
+                heartbeat_endpoint: "/agent/heartbeat".to_string(),
+                websocket_endpoint: "/sessions".to_string(),
+                connect_timeout: 30,
+                request_timeout: 60,
+            },
+            heartbeat: HeartbeatSection {
+                interval: 30,
+                retry_attempts: 3,
+                retry_delay: 5,
+            },
+            security: SecuritySection {
+                certificate: None,
+                tls_verify: true,
+                certificate_pinning: false,
+                certificate_pins: None,
+                doh_enabled: false,
+                doh_providers: Some(vec![
+                    "https://cloudflare-dns.com/dns-query".to_string(),
+                    "https://dns.google/dns-query".to_string(),
+                    "https://dns.quad9.net/dns-query".to_string(),
+                ]),
+                ech_enabled: false,
+            },
+            logging: LoggingSection {
+                level: "info".to_string(),
+                file_path: None,
+                max_file_size: "10MB".to_string(),
+                max_files: 5,
+            },
+            paths: PathsSection {
+                config_dir: ".".to_string(),
+                data_dir: ".".to_string(),
+                log_dir: ".".to_string(),
+                credentials_file: "credentials.json".to_string(),
+            },
+            file_operations: FileOperationsSection {
+                max_file_size: "100MB".to_string(),
+                allow_hidden_files: false,
+                allowed_paths: vec![],
+                blocked_paths: vec![
+                    "/etc/passwd".to_string(),
+                    "/etc/shadow".to_string(),
+                    "/root/.ssh".to_string(),
+                    "C:\\Windows\\System32".to_string(),
+                ],
+            },
+            commands: CommandsSection {
+                default_timeout: 300,
+                max_concurrent: 5,
+                blocked_commands: vec![
+                    "rm -rf /".to_string(),
+                    "del /f /s /q C:\\*".to_string(),
+                    "format".to_string(),
+                    "fdisk".to_string(),
+                ],
+            },
+            reconnect: ReconnectSection {
+                initial_delay: 1,
+                max_delay: 300,
+                backoff_factor: 2.0,
+                max_attempts: 0,
+                jitter: true,
+            },
+            service: None, 
+        }
+    }
+}

@@ -25,6 +25,16 @@ export interface HeartbeatRequest {
     memory_usage?: number;
     disk_usage?: number;
   };
+  reports?: TaskReport[];
+}
+
+export interface TaskReport {
+  task_id: string;
+  state: 'received' | 'running' | 'succeeded' | 'failed' | 'canceled';
+  progress?: number;
+  output_chunk?: string;
+  output_cursor?: number;
+  error?: string;
 }
 
 // 心跳响应类型
@@ -32,20 +42,30 @@ export interface HeartbeatResponse {
   status: 'ok' | 'error';
   server_time: number;
   next_heartbeat: number;
-  commands?: Command[];
+  tasks?: TaskItem[];
+  cancels?: CancelItem[];
   error?: string;
   error_code?: string;
 }
 
-// 命令类型
-export interface Command {
-  id: string;
-  type: 'upgrade' | 'execute' | 'file_op' | 'config_update';
-  data: any;
-  expires_at: number;
+export interface TaskItem {
+  task_id: string;
+  revision: number;
+  type: 'config_update' | 'cmd_exec';
+  desired_state: 'pending' | 'running' | 'succeeded' | 'failed' | 'canceled';
+  payload: any;
 }
 
-import { ConfigurationRow } from '../../database/schema';
+export interface CancelItem {
+  task_id: string;
+  revision: number;
+  desired_state: 'canceled';
+}
+
+// Old Command Interface (Deprecated)
+// export interface Command { ... }
+
+import { ConfigurationRow, TaskRow } from '../../database/schema';
 
 // Helper: Deep Merge (Simple version for config)
 function deepMerge(target: any, source: any): any {
@@ -200,37 +220,76 @@ export async function heartbeat(
       request
     );
 
-    // 检查是否有待执行的命令
-    // 从 KV 存储中获取该设备的待处理命令
-    const pendingCommands = await kvManager.getDeviceCommands(body.device_id);
-    const commands: Command[] = [];
+    // Process Reports from Agent
+    if (body.reports && body.reports.length > 0) {
+      for (const report of body.reports) {
+        try {
+            await env.DB.prepare(`
+                INSERT INTO task_states (task_id, device_id, state, progress, output_cursor, error, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(task_id, device_id) DO UPDATE SET
+                state=excluded.state, progress=excluded.progress, output_cursor=excluded.output_cursor, error=excluded.error, updated_at=excluded.updated_at
+            `).bind(
+                report.task_id,
+                body.device_id,
+                report.state,
+                report.progress || 0,
+                report.output_cursor || 0,
+                report.error || null,
+                now
+            ).run();
 
-    for (const cmd of pendingCommands) {
-      // 只发送处于 pending 状态的命令
-      if (cmd.status === 'pending') {
-        // 映射 KV 命令记录到 API 响应格式
-        // 注意: 我们做一个简单的类型断言/映射，确保类型兼容
-        // 如果遇到不兼容的类型（如 'script'），在客户端未支持前可以过滤或者是作为 execute 处理
-        if (cmd.type === 'script') {
-           // Skip or map script? For now let's map to execute with special payload if needed, 
-           // or just skip if client doesn't support 'script'. 
-           // Let's assume client supports what's in 'Command' interface.
-           // If 'script' is not in Command interface, we skip or extend interface.
-           // Current Command interface: 'upgrade' | 'execute' | 'file_op' | 'config_update'
-           continue; 
+            if (report.output_chunk) {
+                await env.DB.prepare(`
+                    INSERT INTO task_logs (task_id, content, created_at)
+                    VALUES (?, ?, ?)
+                `).bind(
+                    report.task_id,
+                    report.output_chunk,
+                    now
+                ).run();
+            }
+        } catch (e) {
+            console.error(`Failed to process report for task ${report.task_id}`, e);
         }
-
-        commands.push({
-          id: cmd.id,
-          type: cmd.type as any, // Safe cast as we filtered/checked above mostly
-          data: cmd.payload,
-          expires_at: cmd.expires_at
-        });
-
-        // 标记命令为已投递
-        await kvManager.updateCommandStatus(cmd.id, 'delivered');
       }
     }
+
+    // Retrieve Tasks (Pending or Running)
+    const { results: pendingTasks } = await env.DB.prepare(`
+        SELECT * FROM tasks 
+        WHERE device_id = ? 
+        AND desired_state != 'canceled'
+        AND id NOT IN (
+            SELECT task_id FROM task_states 
+            WHERE device_id = ? AND state IN ('succeeded', 'failed', 'canceled')
+        )
+    `).bind(body.device_id, body.device_id).all<TaskRow>();
+
+    const tasks = (pendingTasks || []).map(t => ({
+        task_id: t.id,
+        revision: t.revision,
+        type: t.type,
+        desired_state: t.desired_state,
+        payload: JSON.parse(t.payload)
+    }));
+    
+    // Retrieve Cancels
+    const { results: cancelledTasks } = await env.DB.prepare(`
+        SELECT * FROM tasks 
+        WHERE device_id = ? 
+        AND desired_state = 'canceled'
+        AND id NOT IN (
+            SELECT task_id FROM task_states 
+            WHERE device_id = ? AND state = 'canceled'
+        )
+    `).bind(body.device_id, body.device_id).all<TaskRow>();
+
+    const cancels = (cancelledTasks || []).map(t => ({
+        task_id: t.id,
+        revision: t.revision,
+        desired_state: 'canceled' as const
+    }));
     
     // 计算下次心跳时间
     // Fetch effective configuration to determine heartbeat interval
@@ -278,7 +337,8 @@ export async function heartbeat(
       status: 'ok',
       server_time: now,
       next_heartbeat: nextHeartbeat,
-      commands: commands.length > 0 ? commands : undefined,
+      tasks: tasks.length > 0 ? tasks : undefined,
+      cancels: cancels.length > 0 ? cancels : undefined,
     };
 
     return new Response(JSON.stringify(response), {

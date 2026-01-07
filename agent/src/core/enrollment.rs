@@ -7,7 +7,7 @@ use tracing::{debug, error, info};
 
 use super::crypto::CryptoManager;
 use super::protocol::{EnrollmentRequest, EnrollmentResponse, EnrollmentStatus};
-use super::state::{EnrollmentStatus as StateEnrollmentStatus, StateManager};
+use super::state::StateManager;
 
 use mac_address::get_mac_address;
 
@@ -44,13 +44,17 @@ impl EnrollmentClient {
         &self,
         enrollment_token: String,
         state_manager: &StateManager,
-        credentials_path: &Path,
-    ) -> Result<String> {
+    ) -> Result<(String, Option<serde_json::Value>, CryptoManager)> {
         info!("Starting device enrollment process");
+        
+        // ... (lines)
+        
+        // Return device_id and config
+
 
         // 设置注册状态为进行中
         state_manager
-            .set_enrollment_status(StateEnrollmentStatus::Enrolling)
+            .set_enrollment_status(EnrollmentStatus::Enrolling)
             .await?;
 
         // 生成新的密钥对
@@ -109,37 +113,21 @@ impl EnrollmentClient {
             // 设置设备 ID
             crypto_manager.set_device_id(device_id.clone());
 
-            // 仅当配置路径非空时保存凭证（避免 data_v5 创建）
-            // 在内存模式下，我们通过每次启动时重新注册（使用 MAC 地址身份）来获取会话和确认身份
-            // 只要 MAC 地址不变，Agent ID 就不变
-            let save_path_str = credentials_path.to_string_lossy();
-            if !save_path_str.contains("data_v5") && !save_path_str.is_empty() {
-                crypto_manager.save_credentials(credentials_path, device_id.clone())?;
-                info!("Device credentials saved to: {:?}", credentials_path);
-            } else {
-                 info!("Skipping credential persistence (Memory-only mode or data_v5 avoidance)");
-            }
-
             // 更新状态管理器
             state_manager
                 .set_device_id(device_id.clone())
                 .await?;
             state_manager
-                .set_enrollment_status(StateEnrollmentStatus::Enrolled)
+                .set_enrollment_status(EnrollmentStatus::Enrolled)
                 .await?;
 
-            Ok(device_id)
+            info!("Enrollment completed");
+            Ok((device_id, response.config, crypto_manager))
         } else {
-            let error_msg = response
-                .error
-                .unwrap_or_else(|| "Unknown enrollment error".to_string());
-            error!("Device enrollment failed: {}", error_msg);
-
-            // 设置注册失败状态
+            let error_msg = response.error.unwrap_or_else(|| "Unknown error".to_string());
             state_manager
-                .set_enrollment_status(StateEnrollmentStatus::EnrollmentFailed(error_msg.clone()))
+                .set_enrollment_status(EnrollmentStatus::EnrollmentFailed(error_msg.clone()))
                 .await?;
-
             Err(anyhow!("Enrollment failed: {}", error_msg))
         }
     }
@@ -173,22 +161,21 @@ impl EnrollmentClient {
         &self,
         enrollment_token: String,
         state_manager: &StateManager,
-        credentials_path: &Path,
         max_attempts: u32,
         retry_delay: Duration,
-    ) -> Result<String> {
+    ) -> Result<(String, Option<serde_json::Value>, CryptoManager)> {
         let mut last_error = None;
 
         for attempt in 1..=max_attempts {
             info!("Enrollment attempt {} of {}", attempt, max_attempts);
 
             match self
-                .enroll_device(enrollment_token.clone(), state_manager, credentials_path)
+                .enroll_device(enrollment_token.clone(), state_manager)
                 .await
             {
-                Ok(device_id) => {
+                Ok(result) => {
                     info!("Enrollment successful on attempt {}", attempt);
-                    return Ok(device_id);
+                    return Ok(result);
                 }
                 Err(e) => {
                     error!("Enrollment attempt {} failed: {}", attempt, e);
@@ -224,7 +211,7 @@ impl EnrollmentClient {
                     // 更新状态管理器
                     state_manager.set_device_id(device_id.to_string()).await?;
                     state_manager
-                        .set_enrollment_status(StateEnrollmentStatus::Enrolled)
+                        .set_enrollment_status(EnrollmentStatus::Enrolled)
                         .await?;
 
                     Ok(true)
