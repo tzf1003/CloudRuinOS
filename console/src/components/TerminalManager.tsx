@@ -1,7 +1,7 @@
 // console/src/components/TerminalManager.tsx
-// 终端管理器（创建、列表、切换）
+// 终端管理器（标签式多终端 + 侧边栏会话列表）
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Terminal } from './Terminal';
 
 interface Session {
@@ -9,32 +9,55 @@ interface Session {
   agent_id: string;
   shell_type: string;
   state: string;
+  output_cursor: number;
   created_at: string;
 }
 
+interface OpenTab {
+  session_id: string;
+  agent_id: string;
+  shell_type: string;
+  title: string;
+  isConnected: boolean;
+}
+
 export const TerminalManager: React.FC = () => {
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [allSessions, setAllSessions] = useState<Session[]>([]);
+  const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+
+  // 加载所有会话
+  const loadSessions = useCallback(async () => {
+    try {
+      const response = await fetch('/api/terminal/sessions');
+      if (response.ok) {
+        const data = await response.json();
+        setAllSessions(data);
+
+        // 更新已打开标签的连接状态
+        setOpenTabs((prevTabs) =>
+          prevTabs.map((tab) => {
+            const session = data.find((s: Session) => s.session_id === tab.session_id);
+            return {
+              ...tab,
+              isConnected: session ? ['opened', 'running'].includes(session.state) : false,
+            };
+          })
+        );
+      }
+    } catch (error) {
+      console.error('Failed to load sessions:', error);
+    }
+  }, []);
 
   useEffect(() => {
     loadSessions();
     const interval = setInterval(loadSessions, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [loadSessions]);
 
-  const loadSessions = async () => {
-    try {
-      const response = await fetch('/api/terminal/sessions');
-      if (response.ok) {
-        const data = await response.json();
-        setSessions(data);
-      }
-    } catch (error) {
-      console.error('Failed to load sessions:', error);
-    }
-  };
-
+  // 创建新会话
   const createSession = async (agentId: string, shellType: string) => {
     try {
       const response = await fetch('/api/terminal/create', {
@@ -50,7 +73,19 @@ export const TerminalManager: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setActiveSessionId(data.session_id);
+        const sessionId = data.session_id;
+
+        // 添加到标签栏
+        const newTab: OpenTab = {
+          session_id: sessionId,
+          agent_id: agentId,
+          shell_type: shellType,
+          title: `${shellType}-${sessionId.substring(0, 8)}`,
+          isConnected: true,
+        };
+
+        setOpenTabs((prev) => [...prev, newTab]);
+        setActiveTabId(sessionId);
         setShowCreateDialog(false);
         loadSessions();
       }
@@ -59,89 +94,299 @@ export const TerminalManager: React.FC = () => {
     }
   };
 
-  const activeSession = sessions.find((s) => s.session_id === activeSessionId);
+  // 从侧边栏打开会话
+  const openSessionInTab = (session: Session) => {
+    // 检查是否已经打开
+    const existingTab = openTabs.find((tab) => tab.session_id === session.session_id);
+    if (existingTab) {
+      setActiveTabId(session.session_id);
+      return;
+    }
+
+    // 添加新标签
+    const newTab: OpenTab = {
+      session_id: session.session_id,
+      agent_id: session.agent_id,
+      shell_type: session.shell_type,
+      title: `${session.shell_type}-${session.session_id.substring(0, 8)}`,
+      isConnected: ['opened', 'running'].includes(session.state),
+    };
+
+    setOpenTabs((prev) => [...prev, newTab]);
+    setActiveTabId(session.session_id);
+  };
+
+  // 关闭标签
+  const closeTab = async (sessionId: string, shouldCloseRemote: boolean = true) => {
+    // 关闭远程会话
+    if (shouldCloseRemote) {
+      try {
+        await fetch(`/api/terminal/close/${sessionId}`, {
+          method: 'POST',
+        });
+      } catch (error) {
+        console.error('Failed to close remote session:', error);
+      }
+    }
+
+    // 移除标签
+    setOpenTabs((prev) => {
+      const newTabs = prev.filter((tab) => tab.session_id !== sessionId);
+      
+      // 如果关闭的是当前激活标签，切换到前一个
+      if (activeTabId === sessionId && newTabs.length > 0) {
+        const closedIndex = prev.findIndex((tab) => tab.session_id === sessionId);
+        const newActiveIndex = Math.max(0, closedIndex - 1);
+        setActiveTabId(newTabs[newActiveIndex].session_id);
+      } else if (newTabs.length === 0) {
+        setActiveTabId(null);
+      }
+
+      return newTabs;
+    });
+
+    loadSessions();
+  };
+
+  // 处理终端断开
+  const handleTerminalDisconnect = (sessionId: string) => {
+    setOpenTabs((prev) =>
+      prev.map((tab) =>
+        tab.session_id === sessionId ? { ...tab, isConnected: false } : tab
+      )
+    );
+  };
+
+  const activeTab = openTabs.find((tab) => tab.session_id === activeTabId);
 
   return (
-    <div style={{ display: 'flex', height: '100vh' }}>
-      {/* 侧边栏 */}
+    <div style={{ display: 'flex', height: '100vh', background: '#1e1e1e' }}>
+      {/* 侧边栏 - 终端管理 */}
       <div
         style={{
           width: '250px',
           background: '#252526',
-          color: '#fff',
-          padding: '16px',
-          overflowY: 'auto',
+          color: '#cccccc',
+          display: 'flex',
+          flexDirection: 'column',
+          borderRight: '1px solid #3c3c3c',
         }}
       >
-        <h3>Terminal Sessions</h3>
-        <button
-          onClick={() => setShowCreateDialog(true)}
-          style={{
-            width: '100%',
-            padding: '8px',
-            marginBottom: '16px',
-            background: '#0e639c',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-          }}
-        >
-          + New Session
-        </button>
-
-        {sessions.map((session) => (
-          <div
-            key={session.session_id}
-            onClick={() => setActiveSessionId(session.session_id)}
+        <div style={{ padding: '16px', borderBottom: '1px solid #3c3c3c' }}>
+          <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 600 }}>
+            终端管理
+          </h3>
+          <button
+            onClick={() => setShowCreateDialog(true)}
             style={{
+              width: '100%',
               padding: '8px',
-              marginBottom: '8px',
-              background:
-                activeSessionId === session.session_id ? '#094771' : '#3c3c3c',
+              background: '#0e639c',
+              color: '#fff',
+              border: 'none',
               borderRadius: '4px',
               cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: 500,
             }}
           >
-            <div style={{ fontSize: '12px', fontWeight: 'bold' }}>
-              {session.shell_type}
+            + 新建终端
+          </button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
+          {allSessions.length === 0 ? (
+            <div style={{ padding: '16px', textAlign: 'center', color: '#888', fontSize: '12px' }}>
+              暂无终端会话
             </div>
-            <div style={{ fontSize: '10px', color: '#ccc' }}>
-              {session.session_id.substring(0, 12)}...
-            </div>
-            <div style={{ fontSize: '10px', color: '#888' }}>
-              {session.state}
-            </div>
-          </div>
-        ))}
+          ) : (
+            allSessions.map((session) => {
+              const isOpen = openTabs.some((tab) => tab.session_id === session.session_id);
+              const isConnected = ['opened', 'running'].includes(session.state);
+
+              return (
+                <div
+                  key={session.session_id}
+                  onClick={() => openSessionInTab(session)}
+                  style={{
+                    padding: '10px',
+                    marginBottom: '6px',
+                    background: isOpen ? '#094771' : '#2d2d30',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    border: isOpen ? '1px solid #0e639c' : '1px solid transparent',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isOpen) e.currentTarget.style.background = '#3c3c3c';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isOpen) e.currentTarget.style.background = '#2d2d30';
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+                    <span
+                      style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: isConnected ? '#4caf50' : '#888',
+                        marginRight: '8px',
+                      }}
+                    />
+                    <span style={{ fontSize: '13px', fontWeight: 600 }}>
+                      {session.shell_type}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#888', marginLeft: '16px' }}>
+                    {session.session_id.substring(0, 16)}...
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#666', marginLeft: '16px', marginTop: '2px' }}>
+                    {session.state}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <div style={{ padding: '12px', borderTop: '1px solid #3c3c3c' }}>
+          <button
+            onClick={loadSessions}
+            style={{
+              width: '100%',
+              padding: '6px',
+              background: '#3c3c3c',
+              color: '#cccccc',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '12px',
+            }}
+          >
+            🔄 刷新列表
+          </button>
+        </div>
       </div>
 
-      {/* 终端区域 */}
-      <div style={{ flex: 1 }}>
-        {activeSession ? (
-          <Terminal
-            key={activeSession.session_id}
-            sessionId={activeSession.session_id}
-            agentId={activeSession.agent_id}
-            shellType={activeSession.shell_type as any}
-            onClose={() => {
-              setActiveSessionId(null);
-              loadSessions();
-            }}
-          />
-        ) : (
-          <div
+      {/* 主工作区 */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {/* 标签栏 */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            background: '#2d2d30',
+            borderBottom: '1px solid #3c3c3c',
+            overflowX: 'auto',
+            minHeight: '40px',
+          }}
+        >
+          {/* 新建按钮 */}
+          <button
+            onClick={() => setShowCreateDialog(true)}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '100%',
-              color: '#888',
+              padding: '8px 16px',
+              background: 'transparent',
+              color: '#cccccc',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '18px',
+              minWidth: '40px',
+              height: '40px',
             }}
+            title="新建终端"
           >
-            Select a session or create a new one
-          </div>
-        )}
+            +
+          </button>
+
+          {/* 标签列表 */}
+          {openTabs.map((tab) => (
+            <div
+              key={tab.session_id}
+              onClick={() => setActiveTabId(tab.session_id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                padding: '8px 12px',
+                background: activeTabId === tab.session_id ? '#1e1e1e' : 'transparent',
+                borderRight: '1px solid #3c3c3c',
+                cursor: 'pointer',
+                minWidth: '150px',
+                maxWidth: '200px',
+                position: 'relative',
+              }}
+            >
+              <span
+                style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: tab.isConnected ? '#4caf50' : '#888',
+                  marginRight: '8px',
+                }}
+              />
+              <span
+                style={{
+                  flex: 1,
+                  fontSize: '13px',
+                  color: tab.isConnected ? '#cccccc' : '#888',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {tab.title}
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeTab(tab.session_id);
+                }}
+                style={{
+                  marginLeft: '8px',
+                  padding: '2px 6px',
+                  background: 'transparent',
+                  color: '#888',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  lineHeight: '1',
+                }}
+                title="关闭终端"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* 终端显示区域 */}
+        <div style={{ flex: 1, position: 'relative' }}>
+          {activeTab ? (
+            <Terminal
+              key={activeTab.session_id}
+              sessionId={activeTab.session_id}
+              agentId={activeTab.agent_id}
+              shellType={activeTab.shell_type as any}
+              onDisconnect={() => handleTerminalDisconnect(activeTab.session_id)}
+              onClose={() => closeTab(activeTab.session_id, false)}
+            />
+          ) : (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                color: '#888',
+                fontSize: '14px',
+              }}
+            >
+              从左侧选择一个终端会话，或点击 + 创建新终端
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 创建对话框 */}

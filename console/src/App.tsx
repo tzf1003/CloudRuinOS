@@ -13,6 +13,7 @@ import { StatusPage } from './pages/StatusPage';
 import { TokensPage } from './pages/TokensPage';
 import { ConfigManagementPage } from './pages/ConfigManagementPage';
 import { TerminalTestPage } from './pages/TerminalTestPage';
+import { TerminalPage } from './pages/TerminalPage';
 import { LoginPage } from './pages/LoginPage';
 import { UIProvider } from './contexts/UIContext';
 import { GlobalLoadingOverlay, OperationProgress } from './components/LoadingIndicator';
@@ -53,6 +54,11 @@ function App() {
                         <Route path="/devices" element={
                           <RouteErrorBoundary routeName="设备管理">
                             <DevicesPage />
+                          </RouteErrorBoundary>
+                        } />
+                        <Route path="/terminal" element={
+                          <RouteErrorBoundary routeName="终端管理">
+                            <TerminalPage />
                           </RouteErrorBoundary>
                         } />
                         <Route path="/files" element={

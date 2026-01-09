@@ -10,6 +10,7 @@ interface TerminalProps {
   sessionId: string;
   agentId: string;
   shellType: 'cmd' | 'powershell' | 'pwsh' | 'sh' | 'bash' | 'zsh';
+  onDisconnect?: () => void;
   onClose?: () => void;
 }
 
@@ -17,6 +18,7 @@ export const Terminal: React.FC<TerminalProps> = ({
   sessionId,
   agentId,
   shellType,
+  onDisconnect,
   onClose,
 }) => {
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -108,10 +110,12 @@ export const Terminal: React.FC<TerminalProps> = ({
         if (response.status === 404) {
           console.error('Session not found');
           setIsConnected(false);
-          onClose?.();
+          onDisconnect?.();
           return;
         }
         console.error('Failed to fetch output:', await response.text());
+        setIsConnected(false);
+        onDisconnect?.();
         return;
       }
 
@@ -137,6 +141,7 @@ export const Terminal: React.FC<TerminalProps> = ({
     } catch (error) {
       console.error('Failed to fetch output:', error);
       setIsConnected(false);
+      onDisconnect?.();
     }
   };
 
@@ -172,45 +177,66 @@ export const Terminal: React.FC<TerminalProps> = ({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div
-        style={{
-          padding: '8px',
-          background: '#2d2d2d',
-          color: '#fff',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <div>
-          <span>Session: {sessionId}</span>
-          <span style={{ marginLeft: '16px' }}>Shell: {shellType}</span>
-          <span
-            style={{
-              marginLeft: '16px',
-              color: isConnected ? '#4caf50' : '#f44336',
-            }}
-          >
-            {isConnected ? '● Connected' : '● Disconnected'}
-          </span>
-        </div>
-        <button
-          onClick={handleClose}
+        ref={terminalRef}
+        style={{ flex: 1, background: '#1e1e1e' }}
+      />
+      
+      {/* 断开连接提示 */}
+      {!isConnected && (
+        <div
           style={{
-            padding: '4px 12px',
-            background: '#f44336',
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            padding: '24px',
+            background: 'rgba(0, 0, 0, 0.9)',
+            border: '1px solid #f44336',
+            borderRadius: '8px',
             color: '#fff',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
+            textAlign: 'center',
+            zIndex: 1000,
           }}
         >
-          Close
-        </button>
-      </div>
-      <div
-        ref={terminalRef}
-        style={{ flex: 1, padding: '8px', background: '#1e1e1e' }}
-      />
+          <div style={{ fontSize: '16px', marginBottom: '12px', color: '#f44336' }}>
+            ⚠ 终端连接已断开
+          </div>
+          <div style={{ fontSize: '13px', color: '#ccc', marginBottom: '16px' }}>
+            会话 ID: {sessionId.substring(0, 16)}...
+          </div>
+          <button
+            onClick={() => {
+              setIsConnected(true);
+              setOutputCursor(0);
+              fetchOutput();
+            }}
+            style={{
+              padding: '8px 16px',
+              background: '#0e639c',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              marginRight: '8px',
+            }}
+          >
+            重新连接
+          </button>
+          <button
+            onClick={handleClose}
+            style={{
+              padding: '8px 16px',
+              background: '#3c3c3c',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+            }}
+          >
+            关闭
+          </button>
+        </div>
+      )}
     </div>
   );
 };

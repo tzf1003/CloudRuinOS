@@ -16,6 +16,7 @@ import { clsx } from 'clsx';
 const navigation = [
   { name: '系统概览', href: '/dashboard', icon: BarChart3 },
   { name: '设备管理', href: '/devices', icon: Monitor },
+  { name: '终端管理', href: '/terminal', icon: Terminal },
   { name: '文件浏览', href: '/files', icon: FolderOpen },
   { name: '会话管理', href: '/sessions', icon: Radio },
   { name: '访问令牌', href: '/tokens', icon: Key },
