@@ -6,6 +6,7 @@ import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { AlertCircle, RefreshCw, X } from 'lucide-react';
+import { apiClient } from '../lib/api-client';
 
 interface TerminalProps {
   sessionId: string;
@@ -17,8 +18,6 @@ interface TerminalProps {
 
 export const Terminal: React.FC<TerminalProps> = ({
   sessionId,
-  agentId,
-  shellType,
   onDisconnect,
   onClose,
 }) => {
@@ -40,7 +39,6 @@ export const Terminal: React.FC<TerminalProps> = ({
         background: '#0f172a',
         foreground: '#e2e8f0',
         cursor: '#60a5fa',
-        selection: '#334155',
         black: '#1e293b',
         red: '#ef4444',
         green: '#10b981',
@@ -100,18 +98,10 @@ export const Terminal: React.FC<TerminalProps> = ({
   // 发送输入
   const sendInput = async (data: string) => {
     try {
-      const response = await fetch('/api/terminal/input', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session_id: sessionId,
-          input_data: data,
-        }),
+      await apiClient.client.post('/terminal/input', {
+        session_id: sessionId,
+        input_data: data,
       });
-
-      if (!response.ok) {
-        console.error('Failed to send input:', await response.text());
-      }
     } catch (error) {
       console.error('Failed to send input:', error);
       setIsConnected(false);
@@ -121,24 +111,11 @@ export const Terminal: React.FC<TerminalProps> = ({
   // 拉取输出
   const fetchOutput = async () => {
     try {
-      const response = await fetch(
-        `/api/terminal/output/${sessionId}?from_cursor=${outputCursor}`
+      const response = await apiClient.client.get(
+        `/terminal/output/${sessionId}?from_cursor=${outputCursor}`
       );
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          console.error('Session not found');
-          setIsConnected(false);
-          onDisconnect?.();
-          return;
-        }
-        console.error('Failed to fetch output:', await response.text());
-        setIsConnected(false);
-        onDisconnect?.();
-        return;
-      }
-
-      const data = await response.json();
+      const data = response.data;
 
       if (data.output_data && data.output_data.length > 0) {
         // 检查是否有数据丢失警告
@@ -151,7 +128,13 @@ export const Terminal: React.FC<TerminalProps> = ({
       }
 
       setIsConnected(true);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        console.error('Session not found');
+        setIsConnected(false);
+        onDisconnect?.();
+        return;
+      }
       console.error('Failed to fetch output:', error);
       setIsConnected(false);
       onDisconnect?.();
@@ -161,14 +144,10 @@ export const Terminal: React.FC<TerminalProps> = ({
   // 调整窗口大小
   const resizeSession = async (cols: number, rows: number) => {
     try {
-      await fetch('/api/terminal/resize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session_id: sessionId,
-          cols,
-          rows,
-        }),
+      await apiClient.client.post('/terminal/resize', {
+        session_id: sessionId,
+        cols,
+        rows,
       });
     } catch (error) {
       console.error('Failed to resize session:', error);
@@ -178,9 +157,7 @@ export const Terminal: React.FC<TerminalProps> = ({
   // 关闭会话
   const handleClose = async () => {
     try {
-      await fetch(`/api/terminal/close/${sessionId}`, {
-        method: 'POST',
-      });
+      await apiClient.client.post(`/terminal/close/${sessionId}`);
       onClose?.();
     } catch (error) {
       console.error('Failed to close session:', error);

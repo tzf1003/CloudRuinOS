@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Terminal } from './Terminal';
 import { Plus, RefreshCw, Terminal as TerminalIcon, Circle } from 'lucide-react';
 import { clsx } from 'clsx';
+import { apiClient } from '../lib/api-client';
 
 interface Session {
   session_id: string;
@@ -40,22 +41,20 @@ export const TerminalManager: React.FC = () => {
   // 加载所有会话
   const loadSessions = useCallback(async () => {
     try {
-      const response = await fetch('/api/terminal/sessions');
-      if (response.ok) {
-        const data = await response.json();
-        setAllSessions(data);
+      const response = await apiClient.client.get('/terminal/sessions');
+      const data = response.data;
+      setAllSessions(data);
 
-        // 更新已打开标签的连接状态
-        setOpenTabs((prevTabs) =>
-          prevTabs.map((tab) => {
-            const session = data.find((s: Session) => s.session_id === tab.session_id);
-            return {
-              ...tab,
-              isConnected: session ? ['opened', 'running'].includes(session.state) : false,
-            };
-          })
-        );
-      }
+      // 更新已打开标签的连接状态
+      setOpenTabs((prevTabs) =>
+        prevTabs.map((tab) => {
+          const session = data.find((s: Session) => s.session_id === tab.session_id);
+          return {
+            ...tab,
+            isConnected: session ? ['opened', 'running'].includes(session.state) : false,
+          };
+        })
+      );
     } catch (error) {
       console.error('Failed to load sessions:', error);
     }
@@ -77,35 +76,29 @@ export const TerminalManager: React.FC = () => {
   // 创建新会话
   const createSession = async (agentId: string, shellType: string) => {
     try {
-      const response = await fetch('/api/terminal/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          agent_id: agentId,
-          shell_type: shellType,
-          cols: 80,
-          rows: 24,
-        }),
+      const response = await apiClient.client.post('/terminal/create', {
+        agent_id: agentId,
+        shell_type: shellType,
+        cols: 80,
+        rows: 24,
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        const sessionId = data.session_id;
+      const data = response.data;
+      const sessionId = data.session_id;
 
-        // 添加到标签栏
-        const newTab: OpenTab = {
-          session_id: sessionId,
-          agent_id: agentId,
-          shell_type: shellType,
-          title: `${shellType}-${sessionId.substring(0, 8)}`,
-          isConnected: true,
-        };
+      // 添加到标签栏
+      const newTab: OpenTab = {
+        session_id: sessionId,
+        agent_id: agentId,
+        shell_type: shellType,
+        title: `${shellType}-${sessionId.substring(0, 8)}`,
+        isConnected: true,
+      };
 
-        setOpenTabs((prev) => [...prev, newTab]);
-        setActiveTabId(sessionId);
-        setShowCreateDialog(false);
-        loadSessions();
-      }
+      setOpenTabs((prev) => [...prev, newTab]);
+      setActiveTabId(sessionId);
+      setShowCreateDialog(false);
+      loadSessions();
     } catch (error) {
       console.error('Failed to create session:', error);
     }
@@ -138,9 +131,7 @@ export const TerminalManager: React.FC = () => {
     // 关闭远程会话
     if (shouldCloseRemote) {
       try {
-        await fetch(`/api/terminal/close/${sessionId}`, {
-          method: 'POST',
-        });
+        await apiClient.client.post(`/terminal/close/${sessionId}`);
       } catch (error) {
         console.error('Failed to close remote session:', error);
       }
@@ -357,24 +348,21 @@ const CreateSessionDialog: React.FC<CreateSessionDialogProps> = ({
 
   const loadAgents = async () => {
     try {
-      const response = await fetch('/api/devices');
-      if (response.ok) {
-        const data = await response.json();
-        setAgents(data);
-        
-        // 默认选择第一个在线的 Agent
-        const onlineAgent = data.find((a: Agent) => a.status === 'online');
-        if (onlineAgent) {
-          setSelectedAgentId(onlineAgent.agent_id);
-          // 根据 OS 类型设置默认 shell
-          if (onlineAgent.os_type.toLowerCase().includes('windows')) {
-            setShellType('powershell');
-          } else {
-            setShellType('bash');
-          }
-        } else if (data.length > 0) {
-          setSelectedAgentId(data[0].agent_id);
+      const devices = await apiClient.getDevices();
+      setAgents(devices);
+      
+      // 默认选择第一个在线的 Agent
+      const onlineAgent = devices.find((a: Agent) => a.status === 'online');
+      if (onlineAgent) {
+        setSelectedAgentId(onlineAgent.agent_id);
+        // 根据 OS 类型设置默认 shell
+        if (onlineAgent.os_type.toLowerCase().includes('windows')) {
+          setShellType('powershell');
+        } else {
+          setShellType('bash');
         }
+      } else if (devices.length > 0) {
+        setSelectedAgentId(devices[0].agent_id);
       }
     } catch (error) {
       console.error('Failed to load agents:', error);
