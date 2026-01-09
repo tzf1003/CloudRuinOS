@@ -133,8 +133,10 @@ export async function createTerminal(
       body.agent_id,
       null,
       {
-        session_id: sessionId,
-        shell_type: body.shell_type,
+        terminal_create: {
+          session_id: sessionId,
+          shell_type: body.shell_type,
+        },
       },
       'success',
       undefined,
@@ -437,7 +439,9 @@ export async function closeTerminal(
       session.agent_id as string,
       null,
       {
-        session_id: sessionId,
+        terminal_close: {
+          session_id: sessionId,
+        },
       },
       'success',
       undefined,

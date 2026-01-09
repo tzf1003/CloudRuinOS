@@ -23,7 +23,9 @@ export type AuditEventType =
   | 'file_delete'
   | 'security_violation'
   | 'authentication_failure'
-  | 'rate_limit_exceeded';
+  | 'rate_limit_exceeded'
+  | 'terminal_create'
+  | 'terminal_close';
 
 // 审计事件数据接口
 export interface AuditEventData {
@@ -125,6 +127,16 @@ export interface AuditEventData {
     current_count: number;
     limit: number;
     window_seconds: number;
+  };
+
+  // 终端事件
+  terminal_create?: {
+    session_id: string;
+    shell_type: string;
+  };
+
+  terminal_close?: {
+    session_id: string;
   };
 }
 
@@ -580,6 +592,8 @@ export class AuditService {
       security_violation: 'file_op', // Map to existing type
       authentication_failure: 'register', // Map to existing type
       rate_limit_exceeded: 'heartbeat', // Map to existing type
+      terminal_create: 'session', // Map to session type
+      terminal_close: 'session', // Map to session type
     };
 
     return mapping[eventType] || 'file_op';
