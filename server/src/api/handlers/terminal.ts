@@ -289,11 +289,12 @@ export async function sendTerminalInput(
       headers: { 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Send terminal input error:', error);
     return new Response(JSON.stringify({
       success: false,
       error: 'Internal server error',
+      details: error.message,
     }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
@@ -363,11 +364,12 @@ export async function getTerminalOutput(
       headers: { 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Get terminal output error:', error);
     return new Response(JSON.stringify({
       success: false,
       error: 'Internal server error',
+      details: error.message,
     }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
@@ -411,10 +413,6 @@ export async function getTerminalSessions(
       details: error.message,
     }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-}
       headers: { 'Content-Type': 'application/json' },
     });
   }
@@ -470,20 +468,25 @@ export async function closeTerminal(
     ).run();
 
     // 记录审计日志
-    const auditService = createAuditService(env);
-    await auditService.logEvent(
-      'terminal_close',
-      session.agent_id as string,
-      null,
-      {
-        terminal_close: {
-          session_id: sessionId,
+    try {
+      const auditService = createAuditService(env);
+      await auditService.logEvent(
+        'terminal_close',
+        session.agent_id as string,
+        null,
+        {
+          terminal_close: {
+            session_id: sessionId,
+          },
         },
-      },
-      'success',
-      undefined,
-      request
-    );
+        'success',
+        undefined,
+        request
+      );
+    } catch (auditError: any) {
+      console.error('Audit log error:', auditError);
+      // 审计日志失败不影响主流程
+    }
 
     return new Response(JSON.stringify({
       success: true,
@@ -492,11 +495,12 @@ export async function closeTerminal(
       headers: { 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Close terminal error:', error);
     return new Response(JSON.stringify({
       success: false,
       error: 'Internal server error',
+      details: error.message,
     }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
@@ -583,11 +587,12 @@ export async function resizeTerminal(
       headers: { 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Resize terminal error:', error);
     return new Response(JSON.stringify({
       success: false,
       error: 'Internal server error',
+      details: error.message,
     }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },

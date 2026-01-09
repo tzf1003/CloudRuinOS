@@ -41,8 +41,7 @@ export const TerminalManager: React.FC = () => {
   // 加载所有会话
   const loadSessions = useCallback(async () => {
     try {
-      const response = await apiClient.client.get('/terminal/sessions');
-      const data = response.data;
+      const data = await apiClient.getTerminalSessions();
       setAllSessions(data);
 
       // 更新已打开标签的连接状态
@@ -76,14 +75,14 @@ export const TerminalManager: React.FC = () => {
   // 创建新会话
   const createSession = async (agentId: string, shellType: string) => {
     try {
-      const response = await apiClient.client.post('/terminal/create', {
-        agent_id: agentId,
-        shell_type: shellType,
-        cols: 80,
-        rows: 24,
-      });
+      const data = await apiClient.createTerminalSession(agentId, shellType, 80, 24);
+      
+      if (!data.success || !data.session_id) {
+        console.error('Failed to create session:', data.error);
+        alert(`创建终端失败: ${data.error || '未知错误'}`);
+        return;
+      }
 
-      const data = response.data;
       const sessionId = data.session_id;
 
       // 添加到标签栏
@@ -101,6 +100,7 @@ export const TerminalManager: React.FC = () => {
       loadSessions();
     } catch (error) {
       console.error('Failed to create session:', error);
+      alert(`创建终端失败: ${error}`);
     }
   };
 
@@ -131,7 +131,7 @@ export const TerminalManager: React.FC = () => {
     // 关闭远程会话
     if (shouldCloseRemote) {
       try {
-        await apiClient.client.post(`/terminal/close/${sessionId}`);
+        await apiClient.closeTerminalSession(sessionId);
       } catch (error) {
         console.error('Failed to close remote session:', error);
       }

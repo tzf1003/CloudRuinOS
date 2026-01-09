@@ -98,10 +98,7 @@ export const Terminal: React.FC<TerminalProps> = ({
   // 发送输入
   const sendInput = async (data: string) => {
     try {
-      await apiClient.client.post('/terminal/input', {
-        session_id: sessionId,
-        input_data: data,
-      });
+      await apiClient.sendTerminalInput(sessionId, data);
     } catch (error) {
       console.error('Failed to send input:', error);
       setIsConnected(false);
@@ -111,11 +108,7 @@ export const Terminal: React.FC<TerminalProps> = ({
   // 拉取输出
   const fetchOutput = async () => {
     try {
-      const response = await apiClient.client.get(
-        `/terminal/output/${sessionId}?from_cursor=${outputCursor}`
-      );
-
-      const data = response.data;
+      const data = await apiClient.getTerminalOutput(sessionId, outputCursor);
 
       if (data.output_data && data.output_data.length > 0) {
         // 检查是否有数据丢失警告
@@ -124,7 +117,7 @@ export const Terminal: React.FC<TerminalProps> = ({
         }
         
         xtermRef.current?.write(data.output_data);
-        setOutputCursor(data.to_cursor);
+        setOutputCursor(data.to_cursor || outputCursor);
       }
 
       setIsConnected(true);
@@ -144,11 +137,7 @@ export const Terminal: React.FC<TerminalProps> = ({
   // 调整窗口大小
   const resizeSession = async (cols: number, rows: number) => {
     try {
-      await apiClient.client.post('/terminal/resize', {
-        session_id: sessionId,
-        cols,
-        rows,
-      });
+      await apiClient.resizeTerminal(sessionId, cols, rows);
     } catch (error) {
       console.error('Failed to resize session:', error);
     }
@@ -157,7 +146,7 @@ export const Terminal: React.FC<TerminalProps> = ({
   // 关闭会话
   const handleClose = async () => {
     try {
-      await apiClient.client.post(`/terminal/close/${sessionId}`);
+      await apiClient.closeTerminalSession(sessionId);
       onClose?.();
     } catch (error) {
       console.error('Failed to close session:', error);

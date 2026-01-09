@@ -542,6 +542,66 @@ class ApiClient {
       errors
     };
   }
+
+  // Terminal Management
+  async getTerminalSessions(): Promise<any[]> {
+    const response = await this.client.get<any[]>('/terminal/sessions');
+    return response.data;
+  }
+
+  async createTerminalSession(agentId: string, shellType: string, cols: number = 80, rows: number = 24): Promise<{ success: boolean; session_id?: string; error?: string }> {
+    const response = await this.client.post<{ success: boolean; session_id?: string; error?: string }>('/terminal/create', {
+      agent_id: agentId,
+      shell_type: shellType,
+      cols,
+      rows,
+    });
+    return response.data;
+  }
+
+  async sendTerminalInput(sessionId: string, inputData: string, clientSeq?: number): Promise<{ success: boolean; error?: string }> {
+    const response = await this.client.post<{ success: boolean; error?: string }>('/terminal/input', {
+      session_id: sessionId,
+      input_data: inputData,
+      client_seq: clientSeq,
+    });
+    return response.data;
+  }
+
+  async getTerminalOutput(sessionId: string, fromCursor: number = 0): Promise<{
+    success: boolean;
+    session_id?: string;
+    from_cursor?: number;
+    to_cursor?: number;
+    output_data?: string;
+    state?: string;
+    error?: string;
+  }> {
+    const response = await this.client.get<{
+      success: boolean;
+      session_id?: string;
+      from_cursor?: number;
+      to_cursor?: number;
+      output_data?: string;
+      state?: string;
+      error?: string;
+    }>(`/terminal/output/${sessionId}?from_cursor=${fromCursor}`);
+    return response.data;
+  }
+
+  async closeTerminalSession(sessionId: string): Promise<{ success: boolean; error?: string }> {
+    const response = await this.client.post<{ success: boolean; error?: string }>(`/terminal/close/${sessionId}`);
+    return response.data;
+  }
+
+  async resizeTerminal(sessionId: string, cols: number, rows: number): Promise<{ success: boolean; error?: string }> {
+    const response = await this.client.post<{ success: boolean; error?: string }>('/terminal/resize', {
+      session_id: sessionId,
+      cols,
+      rows,
+    });
+    return response.data;
+  }
 }
 
 // Create singleton instance with environment-based URL
