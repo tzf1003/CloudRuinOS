@@ -86,20 +86,32 @@ export async function createTerminal(
     const userId = 'admin'; // TODO: 从 JWT 获取
 
     // 插入会话记录到数据库
-    await env.DB.prepare(`
-      INSERT INTO terminal_sessions 
-      (session_id, agent_id, user_id, shell_type, cwd, env, cols, rows, state, output_cursor, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'opening', 0, datetime('now'), datetime('now'))
-    `).bind(
-      sessionId,
-      body.agent_id,
-      userId,
-      body.shell_type,
-      body.cwd || null,
-      body.env ? JSON.stringify(body.env) : null,
-      body.cols || 80,
-      body.rows || 24
-    ).run();
+    try {
+      await env.DB.prepare(`
+        INSERT INTO terminal_sessions 
+        (session_id, agent_id, user_id, shell_type, cwd, env, cols, rows, state, output_cursor, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'opening', 0, datetime('now'), datetime('now'))
+      `).bind(
+        sessionId,
+        body.agent_id,
+        userId,
+        body.shell_type,
+        body.cwd || null,
+        body.env ? JSON.stringify(body.env) : null,
+        body.cols || 80,
+        body.rows || 24
+      ).run();
+    } catch (dbError: any) {
+      console.error('Database insert error:', dbError);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Database error',
+        details: dbError.message,
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
     // 创建任务到任务系统
     const taskId = `term-open-${sessionId}`;
@@ -112,36 +124,53 @@ export async function createTerminal(
       env: body.env,
     };
 
-    await env.DB.prepare(`
-      INSERT INTO tasks (id, device_id, type, desired_state, payload, revision, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      taskId,
-      body.agent_id,
-      'terminal_open',
-      'pending',
-      JSON.stringify(taskPayload),
-      1,
-      now,
-      now
-    ).run();
+    try {
+      await env.DB.prepare(`
+        INSERT INTO tasks (id, device_id, type, desired_state, payload, revision, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        taskId,
+        body.agent_id,
+        'terminal_open',
+        'pending',
+        JSON.stringify(taskPayload),
+        1,
+        now,
+        now
+      ).run();
+    } catch (taskError: any) {
+      console.error('Task creation error:', taskError);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Task creation error',
+        details: taskError.message,
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
     // 记录审计日志
-    const auditService = createAuditService(env);
-    await auditService.logEvent(
-      'terminal_create',
-      body.agent_id,
-      null,
-      {
-        terminal_create: {
-          session_id: sessionId,
-          shell_type: body.shell_type,
+    try {
+      const auditService = createAuditService(env);
+      await auditService.logEvent(
+        'terminal_create',
+        body.agent_id,
+        null,
+        {
+          terminal_create: {
+            session_id: sessionId,
+            shell_type: body.shell_type,
+          },
         },
-      },
-      'success',
-      undefined,
-      request
-    );
+        'success',
+        undefined,
+        request
+      );
+    } catch (auditError: any) {
+      console.error('Audit log error:', auditError);
+      // 审计日志失败不影响主流程
+    }
 
     const response: CreateTerminalResponse = {
       success: true,
@@ -153,11 +182,13 @@ export async function createTerminal(
       headers: { 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Create terminal error:', error);
+    console.error('Error stack:', error.stack);
     return new Response(JSON.stringify({
       success: false,
       error: 'Internal server error',
+      details: error.message,
     }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
