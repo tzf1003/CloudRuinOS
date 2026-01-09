@@ -3,6 +3,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Terminal } from './Terminal';
+import { Plus, RefreshCw, Terminal as TerminalIcon, Circle } from 'lucide-react';
+import { clsx } from 'clsx';
 
 interface Session {
   session_id: string;
@@ -26,6 +28,7 @@ export const TerminalManager: React.FC = () => {
   const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // 加载所有会话
   const loadSessions = useCallback(async () => {
@@ -56,6 +59,13 @@ export const TerminalManager: React.FC = () => {
     const interval = setInterval(loadSessions, 5000);
     return () => clearInterval(interval);
   }, [loadSessions]);
+
+  // 手动刷新
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await loadSessions();
+    setTimeout(() => setIsRefreshing(false), 500);
+  };
 
   // 创建新会话
   const createSession = async (agentId: string, shellType: string) => {
@@ -160,43 +170,30 @@ export const TerminalManager: React.FC = () => {
   const activeTab = openTabs.find((tab) => tab.session_id === activeTabId);
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: '#1e1e1e' }}>
+    <div className="flex h-screen bg-background">
       {/* 侧边栏 - 终端管理 */}
-      <div
-        style={{
-          width: '250px',
-          background: '#252526',
-          color: '#cccccc',
-          display: 'flex',
-          flexDirection: 'column',
-          borderRight: '1px solid #3c3c3c',
-        }}
-      >
-        <div style={{ padding: '16px', borderBottom: '1px solid #3c3c3c' }}>
-          <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 600 }}>
-            终端管理
-          </h3>
+      <aside className="w-64 glass-panel border-r border-white/5 flex flex-col">
+        {/* 标题区域 */}
+        <div className="p-4 border-b border-white/5">
+          <div className="flex items-center mb-4">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center mr-3 shadow-lg shadow-primary/20">
+              <TerminalIcon className="w-5 h-5 text-white" />
+            </div>
+            <h2 className="text-lg font-bold text-white">终端管理</h2>
+          </div>
           <button
             onClick={() => setShowCreateDialog(true)}
-            style={{
-              width: '100%',
-              padding: '8px',
-              background: '#0e639c',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: 500,
-            }}
+            className="w-full flex items-center justify-center px-4 py-2.5 text-sm font-medium rounded-lg text-white bg-primary hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
           >
-            + 新建终端
+            <Plus className="w-4 h-4 mr-2" />
+            新建终端
           </button>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
+        {/* 会话列表 */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {allSessions.length === 0 ? (
-            <div style={{ padding: '16px', textAlign: 'center', color: '#888', fontSize: '12px' }}>
+            <div className="text-center py-8 text-slate-400 text-sm">
               暂无终端会话
             </div>
           ) : (
@@ -205,99 +202,63 @@ export const TerminalManager: React.FC = () => {
               const isConnected = ['opened', 'running'].includes(session.state);
 
               return (
-                <div
+                <button
                   key={session.session_id}
                   onClick={() => openSessionInTab(session)}
-                  style={{
-                    padding: '10px',
-                    marginBottom: '6px',
-                    background: isOpen ? '#094771' : '#2d2d30',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    border: isOpen ? '1px solid #0e639c' : '1px solid transparent',
-                    transition: 'all 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isOpen) e.currentTarget.style.background = '#3c3c3c';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isOpen) e.currentTarget.style.background = '#2d2d30';
-                  }}
+                  className={clsx(
+                    'w-full text-left p-3 rounded-lg transition-all cursor-pointer',
+                    isOpen
+                      ? 'bg-primary/10 border border-primary/20 shadow-glow'
+                      : 'bg-white/5 border border-white/5 hover:bg-white/10'
+                  )}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
-                    <span
-                      style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: isConnected ? '#4caf50' : '#888',
-                        marginRight: '8px',
-                      }}
+                  <div className="flex items-center mb-2">
+                    <Circle
+                      className={clsx(
+                        'w-2 h-2 mr-2',
+                        isConnected ? 'fill-green-500 text-green-500' : 'fill-slate-500 text-slate-500'
+                      )}
                     />
-                    <span style={{ fontSize: '13px', fontWeight: 600 }}>
+                    <span className="text-sm font-semibold text-white">
                       {session.shell_type}
                     </span>
                   </div>
-                  <div style={{ fontSize: '11px', color: '#888', marginLeft: '16px' }}>
+                  <div className="text-xs text-slate-400 ml-4">
                     {session.session_id.substring(0, 16)}...
                   </div>
-                  <div style={{ fontSize: '10px', color: '#666', marginLeft: '16px', marginTop: '2px' }}>
+                  <div className="text-xs text-slate-500 ml-4 mt-1">
                     {session.state}
                   </div>
-                </div>
+                </button>
               );
             })
           )}
         </div>
 
-        <div style={{ padding: '12px', borderTop: '1px solid #3c3c3c' }}>
+        {/* 底部操作 */}
+        <div className="p-3 border-t border-white/5">
           <button
-            onClick={loadSessions}
-            style={{
-              width: '100%',
-              padding: '6px',
-              background: '#3c3c3c',
-              color: '#cccccc',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '12px',
-            }}
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="w-full flex items-center justify-center px-3 py-2 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all"
           >
-            🔄 刷新列表
+            <RefreshCw className={clsx('w-4 h-4 mr-2', isRefreshing && 'animate-spin')} />
+            刷新列表
           </button>
         </div>
-      </div>
+      </aside>
 
       {/* 主工作区 */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div className="flex-1 flex flex-col min-w-0">
         {/* 标签栏 */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            background: '#2d2d30',
-            borderBottom: '1px solid #3c3c3c',
-            overflowX: 'auto',
-            minHeight: '40px',
-          }}
-        >
+        <div className="flex items-center bg-slate-900/50 border-b border-white/5 overflow-x-auto">
           {/* 新建按钮 */}
           <button
             onClick={() => setShowCreateDialog(true)}
-            style={{
-              padding: '8px 16px',
-              background: 'transparent',
-              color: '#cccccc',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '18px',
-              minWidth: '40px',
-              height: '40px',
-            }}
+            className="flex-shrink-0 px-4 h-12 flex items-center text-slate-400 hover:text-white hover:bg-white/5 transition-all border-r border-white/5"
             title="新建终端"
           >
-            +
+            <Plus className="w-5 h-5" />
           </button>
 
           {/* 标签列表 */}
@@ -305,37 +266,20 @@ export const TerminalManager: React.FC = () => {
             <div
               key={tab.session_id}
               onClick={() => setActiveTabId(tab.session_id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '8px 12px',
-                background: activeTabId === tab.session_id ? '#1e1e1e' : 'transparent',
-                borderRight: '1px solid #3c3c3c',
-                cursor: 'pointer',
-                minWidth: '150px',
-                maxWidth: '200px',
-                position: 'relative',
-              }}
+              className={clsx(
+                'flex-shrink-0 flex items-center px-4 h-12 border-r border-white/5 cursor-pointer transition-all',
+                activeTabId === tab.session_id
+                  ? 'bg-background text-white'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              )}
             >
-              <span
-                style={{
-                  width: '6px',
-                  height: '6px',
-                  borderRadius: '50%',
-                  background: tab.isConnected ? '#4caf50' : '#888',
-                  marginRight: '8px',
-                }}
+              <Circle
+                className={clsx(
+                  'w-2 h-2 mr-2',
+                  tab.isConnected ? 'fill-green-500 text-green-500' : 'fill-slate-500 text-slate-500'
+                )}
               />
-              <span
-                style={{
-                  flex: 1,
-                  fontSize: '13px',
-                  color: tab.isConnected ? '#cccccc' : '#888',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
+              <span className="text-sm font-medium truncate max-w-[150px]">
                 {tab.title}
               </span>
               <button
@@ -343,16 +287,7 @@ export const TerminalManager: React.FC = () => {
                   e.stopPropagation();
                   closeTab(tab.session_id);
                 }}
-                style={{
-                  marginLeft: '8px',
-                  padding: '2px 6px',
-                  background: 'transparent',
-                  color: '#888',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  lineHeight: '1',
-                }}
+                className="ml-2 p-1 text-slate-500 hover:text-red-400 transition-colors"
                 title="关闭终端"
               >
                 ×
@@ -362,7 +297,7 @@ export const TerminalManager: React.FC = () => {
         </div>
 
         {/* 终端显示区域 */}
-        <div style={{ flex: 1, position: 'relative' }}>
+        <div className="flex-1 relative bg-background">
           {activeTab ? (
             <Terminal
               key={activeTab.session_id}
@@ -373,17 +308,12 @@ export const TerminalManager: React.FC = () => {
               onClose={() => closeTab(activeTab.session_id, false)}
             />
           ) : (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                color: '#888',
-                fontSize: '14px',
-              }}
-            >
-              从左侧选择一个终端会话，或点击 + 创建新终端
+            <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+              <div className="text-center">
+                <TerminalIcon className="w-16 h-16 mx-auto mb-4 text-slate-600" />
+                <p>从左侧选择一个终端会话</p>
+                <p className="mt-2">或点击 + 创建新终端</p>
+              </div>
             </div>
           )}
         </div>
@@ -420,124 +350,76 @@ const CreateSessionDialog: React.FC<CreateSessionDialogProps> = ({
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div
-        style={{
-          background: '#1e1e1e',
-          padding: '24px',
-          borderRadius: '8px',
-          minWidth: '400px',
-          color: '#fff',
-        }}
+        className="glass-panel max-w-md w-full p-6 animate-in fade-in zoom-in duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3>Create New Terminal Session</h3>
+        <h3 className="text-xl font-bold text-white mb-6">创建新终端会话</h3>
 
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{ display: 'block', marginBottom: '8px' }}>
-            Agent ID:
-          </label>
-          <input
-            type="text"
-            value={agentId}
-            onChange={(e) => setAgentId(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '8px',
-              background: '#3c3c3c',
-              border: '1px solid #555',
-              color: '#fff',
-              borderRadius: '4px',
-            }}
-          />
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Agent ID
+            </label>
+            <input
+              type="text"
+              value={agentId}
+              onChange={(e) => setAgentId(e.target.value)}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              placeholder="输入 Agent ID"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              操作系统
+            </label>
+            <select
+              value={os}
+              onChange={(e) => {
+                setOs(e.target.value as 'windows' | 'linux');
+                setShellType(shellOptions[e.target.value as 'windows' | 'linux'][0]);
+              }}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+            >
+              <option value="linux">Linux/macOS</option>
+              <option value="windows">Windows</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Shell 类型
+            </label>
+            <select
+              value={shellType}
+              onChange={(e) => setShellType(e.target.value)}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+            >
+              {shellOptions[os].map((shell) => (
+                <option key={shell} value={shell}>
+                  {shell}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{ display: 'block', marginBottom: '8px' }}>
-            Operating System:
-          </label>
-          <select
-            value={os}
-            onChange={(e) => {
-              setOs(e.target.value as 'windows' | 'linux');
-              setShellType(shellOptions[e.target.value as 'windows' | 'linux'][0]);
-            }}
-            style={{
-              width: '100%',
-              padding: '8px',
-              background: '#3c3c3c',
-              border: '1px solid #555',
-              color: '#fff',
-              borderRadius: '4px',
-            }}
-          >
-            <option value="linux">Linux/macOS</option>
-            <option value="windows">Windows</option>
-          </select>
-        </div>
-
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{ display: 'block', marginBottom: '8px' }}>
-            Shell Type:
-          </label>
-          <select
-            value={shellType}
-            onChange={(e) => setShellType(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '8px',
-              background: '#3c3c3c',
-              border: '1px solid #555',
-              color: '#fff',
-              borderRadius: '4px',
-            }}
-          >
-            {shellOptions[os].map((shell) => (
-              <option key={shell} value={shell}>
-                {shell}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+        <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
-            style={{
-              padding: '8px 16px',
-              background: '#3c3c3c',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
+            className="flex-1 px-4 py-2 text-sm font-medium text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-all"
           >
-            Cancel
+            取消
           </button>
           <button
             onClick={() => onCreate(agentId, shellType)}
-            style={{
-              padding: '8px 16px',
-              background: '#0e639c',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
+            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-all shadow-lg shadow-primary/20"
           >
-            Create
+            创建
           </button>
         </div>
       </div>

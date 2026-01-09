@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
+import { AlertCircle, RefreshCw, X } from 'lucide-react';
 
 interface TerminalProps {
   sessionId: string;
@@ -36,8 +37,26 @@ export const Terminal: React.FC<TerminalProps> = ({
       fontSize: 14,
       fontFamily: 'Consolas, "Courier New", monospace',
       theme: {
-        background: '#1e1e1e',
-        foreground: '#d4d4d4',
+        background: '#0f172a',
+        foreground: '#e2e8f0',
+        cursor: '#60a5fa',
+        selection: '#334155',
+        black: '#1e293b',
+        red: '#ef4444',
+        green: '#10b981',
+        yellow: '#f59e0b',
+        blue: '#3b82f6',
+        magenta: '#a855f7',
+        cyan: '#06b6d4',
+        white: '#f1f5f9',
+        brightBlack: '#475569',
+        brightRed: '#f87171',
+        brightGreen: '#34d399',
+        brightYellow: '#fbbf24',
+        brightBlue: '#60a5fa',
+        brightMagenta: '#c084fc',
+        brightCyan: '#22d3ee',
+        brightWhite: '#f8fafc',
       },
       rows: 24,
       cols: 80,
@@ -124,17 +143,11 @@ export const Terminal: React.FC<TerminalProps> = ({
       if (data.output_data && data.output_data.length > 0) {
         // 检查是否有数据丢失警告
         if (data.output_data.includes('[Warning:') && data.output_data.includes('data lost')) {
-          // 显示警告但继续
           console.warn('Output buffer overflow detected, some data may be lost');
         }
         
         xtermRef.current?.write(data.output_data);
         setOutputCursor(data.to_cursor);
-      }
-
-      // 如果 cursor 没有变化且连续多次，可能会话已关闭
-      if (data.to_cursor === outputCursor) {
-        // 可以添加计数器检测会话是否真的关闭
       }
 
       setIsConnected(true);
@@ -174,67 +187,46 @@ export const Terminal: React.FC<TerminalProps> = ({
     }
   };
 
+  // 重新连接
+  const handleReconnect = () => {
+    setIsConnected(true);
+    setOutputCursor(0);
+    fetchOutput();
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className="flex flex-col h-full bg-slate-950">
       <div
         ref={terminalRef}
-        style={{ flex: 1, background: '#1e1e1e' }}
+        className="flex-1"
       />
       
       {/* 断开连接提示 */}
       {!isConnected && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            padding: '24px',
-            background: 'rgba(0, 0, 0, 0.9)',
-            border: '1px solid #f44336',
-            borderRadius: '8px',
-            color: '#fff',
-            textAlign: 'center',
-            zIndex: 1000,
-          }}
-        >
-          <div style={{ fontSize: '16px', marginBottom: '12px', color: '#f44336' }}>
-            ⚠ 终端连接已断开
+        <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm z-10">
+          <div className="glass-panel max-w-md w-full p-6 text-center animate-in fade-in zoom-in duration-200">
+            <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-white mb-2">终端连接已断开</h3>
+            <p className="text-sm text-slate-400 mb-4">
+              会话 ID: {sessionId.substring(0, 16)}...
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleReconnect}
+                className="flex-1 inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-all shadow-lg shadow-primary/20"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                重新连接
+              </button>
+              <button
+                onClick={handleClose}
+                className="flex-1 inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-all"
+              >
+                <X className="w-4 h-4 mr-2" />
+                关闭
+              </button>
+            </div>
           </div>
-          <div style={{ fontSize: '13px', color: '#ccc', marginBottom: '16px' }}>
-            会话 ID: {sessionId.substring(0, 16)}...
-          </div>
-          <button
-            onClick={() => {
-              setIsConnected(true);
-              setOutputCursor(0);
-              fetchOutput();
-            }}
-            style={{
-              padding: '8px 16px',
-              background: '#0e639c',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              marginRight: '8px',
-            }}
-          >
-            重新连接
-          </button>
-          <button
-            onClick={handleClose}
-            style={{
-              padding: '8px 16px',
-              background: '#3c3c3c',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
-          >
-            关闭
-          </button>
         </div>
       )}
     </div>
