@@ -21,6 +21,7 @@ import { getAgentCommands, ackCommand, createCommand, getCommandStatus, getDevic
 import { receiveAuditLogs, getDeviceAuditLogs } from './handlers/agent-audit';
 import { syncConfig, getConfigs, updateConfig, deleteConfig } from './handlers/config';
 import { adminLogin, verifyAdminSession, adminLogout } from './handlers/admin-auth';
+import { createTask, getTask, listDeviceTasks, cancelTask } from './handlers/tasks';
 
 import { handleOptionsRequest } from '../middleware/cors';
 import { withAdminAuth } from '../middleware/auth';
@@ -96,14 +97,31 @@ export function createRouter() {
   router.post('/admin/config', withAdminAuth(updateConfig)); // Alias for PUT
   router.delete('/admin/config/:id', withAdminAuth(deleteConfig));
 
-  // 
   // 设备管理 API (管理员)
   router.get('/devices', withAdminAuth(getDevices));
   router.get('/devices/:id', withAdminAuth(getDevice));
   router.get('/devices/:id/commands', withAdminAuth(getDeviceCommandHistory));
   router.get('/devices/:id/audit', withAdminAuth(getDeviceAuditLogs));
+  router.get('/devices/:id/tasks', withAdminAuth((req, env, ctx) => {
+    const url = new URL(req.url);
+    const deviceId = url.pathname.split('/')[2];
+    return listDeviceTasks(req, env, ctx, deviceId);
+  }));
   router.put('/devices/:id', withAdminAuth(updateDevice));
   router.delete('/devices/:id', withAdminAuth(deleteDevice));
+
+  // 任务管理 API (管理员)
+  router.post('/admin/tasks', withAdminAuth(createTask));
+  router.get('/admin/tasks/:id', withAdminAuth((req, env, ctx) => {
+    const url = new URL(req.url);
+    const taskId = url.pathname.split('/')[3];
+    return getTask(req, env, ctx, taskId);
+  }));
+  router.post('/admin/tasks/:id/cancel', withAdminAuth((req, env, ctx) => {
+    const url = new URL(req.url);
+    const taskId = url.pathname.split('/')[3];
+    return cancelTask(req, env, ctx, taskId);
+  }));
 
   // 会话管理 API (管理员)
   router.get('/sessions', withAdminAuth(getSessions));

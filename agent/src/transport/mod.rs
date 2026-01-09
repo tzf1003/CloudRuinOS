@@ -83,6 +83,8 @@ pub struct TlsConfig {
     pub certificate_pinning: Option<Vec<String>>,
     pub min_tls_version: TlsVersion,
     pub cipher_suites: Option<Vec<String>>,
+    /// Debug模式：启用后将所有流量代理到127.0.0.1:8080并信任所有证书
+    pub debug_mode: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -107,6 +109,19 @@ impl TlsConfig {
             certificate_pinning: None,
             min_tls_version: TlsVersion::Tls12,
             cipher_suites: None,
+            debug_mode: false,
+        }
+    }
+
+    /// 创建Debug模式的 TLS 配置（代理到127.0.0.1:8080，信任所有证书）
+    pub fn debug() -> Self {
+        Self {
+            verify_mode: TlsVerifyMode::Strict,
+            #[cfg(feature = "tls-pinning")]
+            certificate_pinning: None,
+            min_tls_version: TlsVersion::Tls12,
+            cipher_suites: None,
+            debug_mode: true,
         }
     }
 
@@ -118,6 +133,7 @@ impl TlsConfig {
             certificate_pinning: Some(certificate_hashes),
             min_tls_version: TlsVersion::Tls12,
             cipher_suites: None,
+            debug_mode: false,
         }
     }
 
@@ -555,65 +571,81 @@ impl HttpClient {
     pub fn new(tls_config: TlsConfig) -> Result<Self> {
         let mut client_builder = reqwest::Client::builder().timeout(Duration::from_secs(30));
 
-        // 配置 TLS 验证
-        match tls_config.verify_mode {
-            TlsVerifyMode::Strict => {
-                // 启用严格的 TLS 验证
-                client_builder = client_builder
-                    .tls_built_in_root_certs(true)
-                    .danger_accept_invalid_certs(false);
-            }
-            #[cfg(feature = "tls-pinning")]
-            TlsVerifyMode::StrictWithPinning => {
-                // 严格验证 + 证书固定
-                // 使用自定义 TLS 连接器实现证书固定验证
-                use rustls::ClientConfig;
-                use std::sync::Arc;
-
-                // 创建带证书固定验证的 TLS 配置
-                let tls_config_clone = tls_config.clone();
-
-                // 构建自定义的 rustls 配置
-                let mut root_store = rustls::RootCertStore::empty();
-
-                // 加载系统根证书
+        // Debug模式：配置代理和禁用证书验证
+        if tls_config.debug_mode {
+            tracing::warn!("⚠️  DEBUG MODE ENABLED: All traffic will be proxied to http://127.0.0.1:8080 and all certificates will be trusted!");
+            
+            // 配置HTTP代理到127.0.0.1:8080
+            let proxy = reqwest::Proxy::all("http://127.0.0.1:8080")
+                .map_err(|e| anyhow::anyhow!("Failed to create proxy: {}", e))?;
+            
+            client_builder = client_builder
+                .proxy(proxy)
+                .danger_accept_invalid_certs(true)  // 信任所有证书
+                .danger_accept_invalid_hostnames(true);  // 接受无效的主机名
+            
+            tracing::info!("Debug proxy configured: http://127.0.0.1:8080");
+        } else {
+            // 配置 TLS 验证
+            match tls_config.verify_mode {
+                TlsVerifyMode::Strict => {
+                    // 启用严格的 TLS 验证
+                    client_builder = client_builder
+                        .tls_built_in_root_certs(true)
+                        .danger_accept_invalid_certs(false);
+                }
                 #[cfg(feature = "tls-pinning")]
-                {
-                    let cert_result = rustls_native_certs::load_native_certs();
-                    for cert in cert_result.certs {
-                        if let Err(e) = root_store.add(cert) {
-                            tracing::warn!("Failed to add root certificate: {:?}", e);
+                TlsVerifyMode::StrictWithPinning => {
+                    // 严格验证 + 证书固定
+                    // 使用自定义 TLS 连接器实现证书固定验证
+                    use rustls::ClientConfig;
+                    use std::sync::Arc;
+
+                    // 创建带证书固定验证的 TLS 配置
+                    let tls_config_clone = tls_config.clone();
+
+                    // 构建自定义的 rustls 配置
+                    let mut root_store = rustls::RootCertStore::empty();
+
+                    // 加载系统根证书
+                    #[cfg(feature = "tls-pinning")]
+                    {
+                        let cert_result = rustls_native_certs::load_native_certs();
+                        for cert in cert_result.certs {
+                            if let Err(e) = root_store.add(cert) {
+                                tracing::warn!("Failed to add root certificate: {:?}", e);
+                            }
+                        }
+                        if !cert_result.errors.is_empty() {
+                            tracing::warn!(
+                                "Some errors occurred while loading native certs: {:?}",
+                                cert_result.errors
+                            );
                         }
                     }
-                    if !cert_result.errors.is_empty() {
-                        tracing::warn!(
-                            "Some errors occurred while loading native certs: {:?}",
-                            cert_result.errors
-                        );
-                    }
+
+                    // 创建自定义证书验证器
+                    let cert_verifier = Arc::new(PinningCertVerifier::new(
+                        root_store,
+                        tls_config_clone.certificate_pinning.clone(),
+                    ));
+
+                    let config = ClientConfig::builder()
+                        .dangerous()
+                        .with_custom_certificate_verifier(cert_verifier)
+                        .with_no_client_auth();
+
+                    client_builder = client_builder.use_preconfigured_tls(config);
+
+                    tracing::info!(
+                        "Certificate pinning enabled with {} pinned certificates",
+                        tls_config
+                            .certificate_pinning
+                            .as_ref()
+                            .map(|v| v.len())
+                            .unwrap_or(0)
+                    );
                 }
-
-                // 创建自定义证书验证器
-                let cert_verifier = Arc::new(PinningCertVerifier::new(
-                    root_store,
-                    tls_config_clone.certificate_pinning.clone(),
-                ));
-
-                let config = ClientConfig::builder()
-                    .dangerous()
-                    .with_custom_certificate_verifier(cert_verifier)
-                    .with_no_client_auth();
-
-                client_builder = client_builder.use_preconfigured_tls(config);
-
-                tracing::info!(
-                    "Certificate pinning enabled with {} pinned certificates",
-                    tls_config
-                        .certificate_pinning
-                        .as_ref()
-                        .map(|v| v.len())
-                        .unwrap_or(0)
-                );
             }
         }
 
@@ -1074,6 +1106,7 @@ impl Default for TlsConfig {
             certificate_pinning: None,
             min_tls_version: TlsVersion::Tls12,
             cipher_suites: None,
+            debug_mode: false,
         }
     }
 }

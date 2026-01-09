@@ -188,6 +188,8 @@ impl HeartbeatClient {
         crypto_manager: &CryptoManager,
         state_manager: &StateManager,
         config_manager: &Arc<RwLock<ConfigManager>>,
+        task_manager: &Arc<crate::core::task_manager::TaskManager>,
+        cmd_executor: &Arc<crate::core::cmd_executor::CommandExecutor>,
     ) -> Result<()> {
         let (mut interval_duration, mut server_url) = {
             let cm = config_manager.read().await;
@@ -229,11 +231,17 @@ impl HeartbeatClient {
                 }
             }
             
-            // Prepare reports to send (move out of pending)
-            let reports_to_send = if pending_reports.is_empty() {
+            // 生成待上报的 reports（从 TaskManager）
+            let reports_from_manager = task_manager.generate_reports().await;
+            
+            // 合并待上报的 reports
+            let mut all_reports = pending_reports.clone();
+            all_reports.extend(reports_from_manager.clone());
+            
+            let reports_to_send = if all_reports.is_empty() {
                 None
             } else {
-                Some(pending_reports.clone())
+                Some(all_reports.clone())
             };
 
             match self
@@ -243,35 +251,52 @@ impl HeartbeatClient {
                 Ok(response) => {
                     debug!("Heartbeat successful");
                     
-                    // Clear sent reports
-                    if let Some(_) = reports_to_send {
-                         pending_reports.clear();
+                    // 确认 reports 已发送
+                    if let Some(ref reports) = reports_to_send {
+                        task_manager.confirm_reports_sent(reports).await;
+                        pending_reports.clear();
                     }
 
                     if let Err(e) = state_manager.update_heartbeat().await {
                          error!("Failed to update local heartbeat state: {}", e);
                     }
 
-                    // Process Tasks
+                    // 处理 Tasks
                     for task in response.tasks {
                         info!("Received Task: {} type={:?}", task.task_id, task.task_type);
                         
-                        let report = self.process_task(&task, state_manager, config_manager).await;
-                        pending_reports.push(report);
+                        // 接收任务到 TaskManager
+                        match task_manager.receive_task(&task).await {
+                            Ok(true) => {
+                                // 任务被接受，开始处理
+                                let report = self.process_task(&task, state_manager, config_manager, task_manager, cmd_executor).await;
+                                pending_reports.push(report);
+                            }
+                            Ok(false) => {
+                                // 任务被拒绝（旧版本）
+                                debug!("Task {} rejected (old revision)", task.task_id);
+                            }
+                            Err(e) => {
+                                error!("Failed to receive task {}: {}", task.task_id, e);
+                            }
+                        }
                     }
                     
-                    // Process Cancels
+                    // 处理 Cancels
                     for cancel in response.cancels {
                          info!("Received Cancel: {} rev={}", cancel.task_id, cancel.revision);
-                         let report = TaskReport {
-                            task_id: cancel.task_id,
-                            state: TaskState::Canceled,
-                            progress: None,
-                            output_chunk: Some("Task canceled by server".to_string()),
-                            output_cursor: None,
-                            error: None,
-                        };
-                        pending_reports.push(report);
+                         
+                         // 取消任务
+                         if let Err(e) = task_manager.cancel_task(&cancel.task_id, cancel.revision).await {
+                             error!("Failed to cancel task {}: {}", cancel.task_id, e);
+                         }
+                         
+                         // 如果命令正在执行，终止进程
+                         if cmd_executor.is_running(&cancel.task_id).await {
+                             if let Err(e) = cmd_executor.cancel_command(&cancel.task_id).await {
+                                 error!("Failed to cancel command for task {}: {}", cancel.task_id, e);
+                             }
+                         }
                     }
 
                     if response.next_heartbeat > 0 {
@@ -310,6 +335,8 @@ impl HeartbeatClient {
         task: &TaskItem,
         _state_manager: &StateManager,
         config_manager: &Arc<RwLock<ConfigManager>>,
+        task_manager: &Arc<crate::core::task_manager::TaskManager>,
+        cmd_executor: &Arc<crate::core::cmd_executor::CommandExecutor>,
     ) -> TaskReport {
         match task.task_type {
             TaskType::ConfigUpdate => {
@@ -347,13 +374,44 @@ impl HeartbeatClient {
                 }
             }
             TaskType::CmdExec => {
-                 TaskReport {
-                    task_id: task.task_id.clone(),
-                     state: TaskState::Failed,
-                     progress: None,
-                     output_chunk: None,
-                     output_cursor: None,
-                     error: Some("CmdExec not implemented in memory mode".to_string()),
+                // 解析命令
+                if let Some(cmd_str) = task.payload.get("cmd").and_then(|v| v.as_str()) {
+                    // 异步执行命令
+                    let task_id = task.task_id.clone();
+                    let cmd_str = cmd_str.to_string();
+                    let cmd_executor = cmd_executor.clone();
+                    
+                    tokio::spawn(async move {
+                        match crate::core::cmd_executor::parse_command(&cmd_str) {
+                            Ok((command, args)) => {
+                                if let Err(e) = cmd_executor.execute_command(task_id.clone(), command, args).await {
+                                    error!("Command execution failed for task {}: {}", task_id, e);
+                                }
+                            }
+                            Err(e) => {
+                                error!("Failed to parse command for task {}: {}", task_id, e);
+                            }
+                        }
+                    });
+                    
+                    // 立即返回 received 状态
+                    TaskReport {
+                        task_id: task.task_id.clone(),
+                        state: TaskState::Received,
+                        progress: None,
+                        output_chunk: Some("Command queued for execution".to_string()),
+                        output_cursor: None,
+                        error: None,
+                    }
+                } else {
+                    TaskReport {
+                        task_id: task.task_id.clone(),
+                        state: TaskState::Failed,
+                        progress: None,
+                        output_chunk: None,
+                        output_cursor: None,
+                        error: Some("Missing cmd payload".to_string()),
+                    }
                 }
             }
         }

@@ -51,6 +51,7 @@ dirs = { workspace = true }
 base64 = "0.21"
 sha2 = "0.10"
 hex = "0.4"
+shell-words = "1.1"
 
 # 可选依赖
 trust-dns-resolver = { workspace = true, optional = true }

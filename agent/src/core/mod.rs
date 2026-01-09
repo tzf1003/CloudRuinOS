@@ -8,6 +8,8 @@ pub mod protocol;
 pub mod reconnect;
 pub mod scheduler;
 pub mod state;
+pub mod task_manager;
+pub mod cmd_executor;
 
 #[cfg(test)]
 pub mod property_tests;
@@ -34,6 +36,8 @@ use self::heartbeat::{HeartbeatClient, HeartbeatConfig};
 use self::reconnect::ReconnectManager;
 use self::scheduler::{Scheduler, TaskType};
 use self::state::StateManager;
+use self::task_manager::TaskManager;
+use self::cmd_executor::CommandExecutor;
 use crate::core::protocol::EnrollmentStatus;
 
 #[allow(dead_code)]
@@ -48,6 +52,8 @@ pub struct Agent {
     reconnect_manager: ReconnectManager,
     command_executor: Box<dyn crate::platform::CommandExecutor + Send + Sync>,
     file_system: Box<dyn crate::platform::FileSystem + Send + Sync>,
+    task_manager: Arc<TaskManager>,
+    cmd_executor: Arc<CommandExecutor>,
 }
 
 impl Agent {
@@ -84,7 +90,19 @@ impl Agent {
         let scheduler = Scheduler::new();
 
         // 初始化 HTTP 客户端
-        let tls_config = TlsConfig::default();
+        // 检查是否启用debug模式（通过环境变量或编译时debug断言）
+        let debug_mode = std::env::var("AGENT_DEBUG_PROXY")
+            .map(|v| v == "1" || v.to_lowercase() == "true")
+            .unwrap_or(false)
+            || cfg!(debug_assertions); // 在debug编译模式下自动启用
+        
+        let tls_config = if debug_mode {
+            info!("🔧 Debug mode enabled - using debug proxy configuration");
+            TlsConfig::debug()
+        } else {
+            TlsConfig::default()
+        };
+        
         let http_client = HttpClient::new(tls_config)?;
 
         // 初始化心跳客户端
@@ -103,6 +121,12 @@ impl Agent {
         // 创建平台特定的执行器
         let command_executor = create_command_executor()?;
         let file_system = create_file_system()?;
+
+        // 初始化任务管理器
+        let task_manager = Arc::new(TaskManager::new());
+        
+        // 初始化命令执行器
+        let cmd_executor = Arc::new(CommandExecutor::new(task_manager.clone()));
 
         // 尝试加载现有凭证
         let credentials_file = config.credentials_path();
@@ -132,6 +156,8 @@ impl Agent {
             reconnect_manager,
             command_executor,
             file_system,
+            task_manager,
+            cmd_executor,
         })
     }
 
@@ -253,7 +279,9 @@ impl Agent {
                             let heartbeat_client = self.heartbeat_client.clone();
                             let crypto_manager = crypto_manager.clone();
                             let state_manager = self.state_manager.clone();
-                            let config_manager = self.config_manager.clone(); // Clone Arc
+                            let config_manager = self.config_manager.clone();
+                            let task_manager = self.task_manager.clone();
+                            let cmd_executor = self.cmd_executor.clone();
 
                             tokio::spawn(async move {
                                 if let Err(e) = heartbeat_client
@@ -261,6 +289,8 @@ impl Agent {
                                         &crypto_manager,
                                         &state_manager,
                                         &config_manager,
+                                        &task_manager,
+                                        &cmd_executor,
                                     )
                                     .await
                                 {
