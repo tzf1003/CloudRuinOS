@@ -203,24 +203,25 @@ export async function updateConfig(request: Request, env: Env): Promise<Response
             `).bind(scope, targetId, contentStr, now, now).run();
         }
 
-        // Push 'config_update' command to relevant device(s)
-        const kvManager = createKVManager(env.KV);
-        const commandPayload = { config: JSON.parse(contentStr) }; // Send the config content
-        const commandType = 'config_update';
-        const commandTTL = 86400; // 24 hours
+        // 创建 config_update 任务推送给相关设备
+        const configPayload = JSON.parse(contentStr);
 
         if (scope === 'device') {
-            await pushCommandToDevice(kvManager, targetId!, commandType, commandPayload, commandTTL);
+            // 为单个设备创建配置更新任务
+            await createConfigUpdateTask(env.DB, targetId!, configPayload, now);
         } else if (scope === 'token') {
-             // For group/token scope, we need to find all devices enrolled with this token
+             // 为 token 组下的所有设备创建配置更新任务
              const { results: devices } = await env.DB.prepare('SELECT id FROM devices WHERE enrollment_token = ?').bind(targetId).all<any>();
              for (const device of devices) {
-                 await pushCommandToDevice(kvManager, device.id, commandType, commandPayload, commandTTL);
+                 await createConfigUpdateTask(env.DB, device.id, configPayload, now);
              }
-        } 
-        // Note: Global scope updates might require a different strategy (e.g. version check during heartbeat) 
-        // to avoid enqueueing millions of commands. For now, we skip auto-push for global scope, 
-        // assuming global config is pulled on startup or periodic sync.
+        } else if (scope === 'global') {
+            // 为所有设备创建配置更新任务
+            const { results: devices } = await env.DB.prepare('SELECT id FROM devices WHERE status = ?').bind('online').all<any>();
+            for (const device of devices) {
+                await createConfigUpdateTask(env.DB, device.id, configPayload, now);
+            }
+        }
 
         return new Response(JSON.stringify({ status: 'ok' }), { headers: { 'Content-Type': 'application/json' } });
     } catch (e: any) {
@@ -228,22 +229,13 @@ export async function updateConfig(request: Request, env: Env): Promise<Response
     }
 }
 
-// Helper to push command
-async function pushCommandToDevice(kvManager: any, deviceId: string, type: string, payload: any, ttl: number) {
-    const commandId = crypto.randomUUID();
-    const command = {
-        id: commandId,
-        device_id: deviceId,
-        type: type,
-        priority: 'high',
-        payload: payload,
-        status: 'pending',
-        created_at: Date.now(),
-        expires_at: Date.now() + (ttl * 1000),
-        retry_count: 0,
-        max_retries: 3
-    };
-    await kvManager.enqueueCommand(command);
+// Helper: 创建配置更新任务
+async function createConfigUpdateTask(db: D1Database, deviceId: string, configPayload: any, now: number) {
+    const taskId = crypto.randomUUID();
+    await db.prepare(`
+        INSERT INTO tasks (id, device_id, type, revision, desired_state, payload, created_at, updated_at)
+        VALUES (?, ?, 'config_update', 1, 'pending', ?, ?, ?)
+    `).bind(taskId, deviceId, JSON.stringify({ config: configPayload }), now, now).run();
 }
 
 export async function deleteConfig(request: Request, env: Env): Promise<Response> {
