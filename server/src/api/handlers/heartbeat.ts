@@ -222,8 +222,36 @@ export async function heartbeat(
 
     // Process Reports from Agent
     if (body.reports && body.reports.length > 0) {
-      for (const report of body.reports) {
+      // 按状态优先级对 reports 排序：received < running < succeeded/failed/canceled
+      const statePriority: Record<string, number> = {
+        'received': 1,
+        'running': 2,
+        'succeeded': 3,
+        'failed': 3,
+        'canceled': 3
+      };
+      
+      const sortedReports = [...body.reports].sort((a, b) => {
+        if (a.task_id !== b.task_id) return 0;
+        return (statePriority[a.state] || 0) - (statePriority[b.state] || 0);
+      });
+
+      for (const report of sortedReports) {
         try {
+            // 检查当前状态，如果已经是终态，不允许更新为非终态
+            const currentState = await env.DB.prepare(`
+                SELECT state FROM task_states WHERE task_id = ? AND device_id = ?
+            `).bind(report.task_id, body.device_id).first<{ state: string }>();
+
+            const isCurrentFinal = currentState && ['succeeded', 'failed', 'canceled'].includes(currentState.state);
+            const isNewFinal = ['succeeded', 'failed', 'canceled'].includes(report.state);
+
+            // 如果当前是终态，且新状态不是终态，跳过更新
+            if (isCurrentFinal && !isNewFinal) {
+                console.log(`Skipping update for task ${report.task_id}: already in final state ${currentState.state}`);
+                continue;
+            }
+
             await env.DB.prepare(`
                 INSERT INTO task_states (task_id, device_id, state, progress, output_cursor, error, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
