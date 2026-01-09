@@ -113,8 +113,25 @@ export async function createTerminal(
       });
     }
 
-    // 创建任务到任务系统
+    // 检查是否已有创建任务
     const taskId = `term-open-${sessionId}`;
+    const existingTask = await env.DB.prepare(`
+      SELECT id FROM tasks WHERE id = ?
+    `).bind(taskId).first();
+
+    if (existingTask) {
+      // 任务已存在，返回成功（幂等性）
+      return new Response(JSON.stringify({
+        success: true,
+        session_id: sessionId,
+        message: 'Open task already exists',
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 创建任务到任务系统
     const taskPayload = {
       session_id: sessionId,
       shell_type: body.shell_type,
@@ -259,8 +276,24 @@ export async function sendTerminalInput(
       throw error;
     }
 
-    // 创建输入任务
+    // 检查是否已有输入任务
     const taskId = `term-input-${body.session_id}-${clientSeq}`;
+    const existingTask = await env.DB.prepare(`
+      SELECT id FROM tasks WHERE id = ?
+    `).bind(taskId).first();
+
+    if (existingTask) {
+      // 任务已存在，返回成功（幂等性）
+      return new Response(JSON.stringify({
+        success: true,
+        message: 'Input task already exists',
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 创建输入任务
     const now = Date.now();
     const taskPayload = {
       session_id: body.session_id,
@@ -268,19 +301,31 @@ export async function sendTerminalInput(
       client_seq: clientSeq,
     };
 
-    await env.DB.prepare(`
-      INSERT INTO tasks (id, device_id, type, desired_state, payload, revision, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      taskId,
-      session.agent_id,
-      'terminal_input',
-      'pending',
-      JSON.stringify(taskPayload),
-      1,
-      now,
-      now
-    ).run();
+    try {
+      await env.DB.prepare(`
+        INSERT INTO tasks (id, device_id, type, desired_state, payload, revision, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        taskId,
+        session.agent_id,
+        'terminal_input',
+        'pending',
+        JSON.stringify(taskPayload),
+        1,
+        now,
+        now
+      ).run();
+    } catch (taskError: any) {
+      console.error('Task creation error:', taskError);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Task creation error',
+        details: taskError.message,
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
     return new Response(JSON.stringify({
       success: true,
@@ -446,6 +491,22 @@ export async function closeTerminal(
       });
     }
 
+    // 检查是否已有关闭任务
+    const existingTask = await env.DB.prepare(`
+      SELECT id FROM tasks WHERE id = ?
+    `).bind(`term-close-${sessionId}`).first();
+
+    if (existingTask) {
+      // 任务已存在，返回成功（幂等性）
+      return new Response(JSON.stringify({
+        success: true,
+        message: 'Close task already exists',
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     // 创建关闭任务
     const taskId = `term-close-${sessionId}`;
     const now = Date.now();
@@ -453,19 +514,31 @@ export async function closeTerminal(
       session_id: sessionId,
     };
 
-    await env.DB.prepare(`
-      INSERT INTO tasks (id, device_id, type, desired_state, payload, revision, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      taskId,
-      session.agent_id,
-      'terminal_close',
-      'pending',
-      JSON.stringify(taskPayload),
-      1,
-      now,
-      now
-    ).run();
+    try {
+      await env.DB.prepare(`
+        INSERT INTO tasks (id, device_id, type, desired_state, payload, revision, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        taskId,
+        session.agent_id,
+        'terminal_close',
+        'pending',
+        JSON.stringify(taskPayload),
+        1,
+        now,
+        now
+      ).run();
+    } catch (taskError: any) {
+      console.error('Task creation error:', taskError);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Task creation error',
+        details: taskError.message,
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
     // 记录审计日志
     try {
@@ -557,7 +630,7 @@ export async function resizeTerminal(
       WHERE session_id = ?
     `).bind(body.cols, body.rows, body.session_id).run();
 
-    // 创建调整大小任务
+    // 创建调整大小任务（resize 使用时间戳保证唯一性，因为可能需要多次调整）
     const taskId = `term-resize-${body.session_id}-${Date.now()}`;
     const now = Date.now();
     const taskPayload = {
@@ -566,19 +639,31 @@ export async function resizeTerminal(
       rows: body.rows,
     };
 
-    await env.DB.prepare(`
-      INSERT INTO tasks (id, device_id, type, desired_state, payload, revision, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      taskId,
-      session.agent_id,
-      'terminal_resize',
-      'pending',
-      JSON.stringify(taskPayload),
-      1,
-      now,
-      now
-    ).run();
+    try {
+      await env.DB.prepare(`
+        INSERT INTO tasks (id, device_id, type, desired_state, payload, revision, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        taskId,
+        session.agent_id,
+        'terminal_resize',
+        'pending',
+        JSON.stringify(taskPayload),
+        1,
+        now,
+        now
+      ).run();
+    } catch (taskError: any) {
+      console.error('Task creation error:', taskError);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Task creation error',
+        details: taskError.message,
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
     return new Response(JSON.stringify({
       success: true,
