@@ -84,9 +84,8 @@ fn configure_windows_build() {
     println!("cargo:rustc-link-lib=userenv");
     println!("cargo:rustc-link-lib=advapi32");
 
-    // Windows 服务支持
+    // Windows 扩展功能支持
     if env::var("CARGO_FEATURE_WINDOWS").is_ok() {
-        println!("cargo:rustc-link-lib=winsvc");
         println!("cargo:rustc-link-lib=shell32");
     }
 }

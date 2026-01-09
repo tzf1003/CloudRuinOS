@@ -10,7 +10,7 @@ license = "MIT"
 default = ["tls-strict"]
 
 # 平台支持
-windows = ["winapi"]
+windows = []
 linux = ["nix"]
 macos = ["nix"]
 
@@ -60,7 +60,7 @@ mac_address = "1.1.8"
 
 # 平台特定依赖
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["winuser", "processthreadsapi", "winsvc", "winreg"], optional = true }
+windows = { version = "0.58", features = ["Win32_System_Services", "Win32_System_Threading", "Win32_System_Registry", "Win32_UI_WindowsAndMessaging"] }
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.27", optional = true }
