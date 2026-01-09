@@ -99,6 +99,7 @@ pub struct SessionResizePayload {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionClosePayload {
     pub session_id: String,
+    #[serde(default)]
     pub force: bool,
 }
 

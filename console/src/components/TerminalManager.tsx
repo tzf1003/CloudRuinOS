@@ -27,7 +27,7 @@ interface OpenTab {
 interface Agent {
   agent_id: string;
   hostname: string;
-  os_type: string;
+  platform: string; // 使用 platform 而不是 os_type
   status: string;
 }
 
@@ -355,14 +355,22 @@ const CreateSessionDialog: React.FC<CreateSessionDialogProps> = ({
       const onlineAgent = devices.find((a: Agent) => a.status === 'online');
       if (onlineAgent) {
         setSelectedAgentId(onlineAgent.agent_id);
-        // 根据 OS 类型设置默认 shell
-        if (onlineAgent.os_type.toLowerCase().includes('windows')) {
+        // 根据 platform 设置默认 shell
+        const platform = onlineAgent.platform.toLowerCase();
+        if (platform.includes('windows') || platform.includes('win32')) {
           setShellType('powershell');
         } else {
           setShellType('bash');
         }
       } else if (devices.length > 0) {
         setSelectedAgentId(devices[0].agent_id);
+        // 根据第一个设备的 platform 设置默认 shell
+        const platform = devices[0].platform.toLowerCase();
+        if (platform.includes('windows') || platform.includes('win32')) {
+          setShellType('powershell');
+        } else {
+          setShellType('bash');
+        }
       }
     } catch (error) {
       console.error('Failed to load agents:', error);
@@ -372,7 +380,10 @@ const CreateSessionDialog: React.FC<CreateSessionDialogProps> = ({
   };
 
   const selectedAgent = agents.find((a) => a.agent_id === selectedAgentId);
-  const isWindows = selectedAgent?.os_type.toLowerCase().includes('windows') || false;
+  const isWindows = selectedAgent 
+    ? (selectedAgent.platform.toLowerCase().includes('windows') || 
+       selectedAgent.platform.toLowerCase().includes('win32'))
+    : false;
 
   const shellOptions = isWindows
     ? ['cmd', 'powershell', 'pwsh']
@@ -419,8 +430,9 @@ const CreateSessionDialog: React.FC<CreateSessionDialogProps> = ({
                   setSelectedAgentId(e.target.value);
                   const agent = agents.find((a) => a.agent_id === e.target.value);
                   if (agent) {
-                    // 根据 OS 类型自动切换默认 shell
-                    if (agent.os_type.toLowerCase().includes('windows')) {
+                    // 根据 platform 自动切换默认 shell
+                    const platform = agent.platform.toLowerCase();
+                    if (platform.includes('windows') || platform.includes('win32')) {
                       setShellType('powershell');
                     } else {
                       setShellType('bash');
@@ -437,7 +449,7 @@ const CreateSessionDialog: React.FC<CreateSessionDialogProps> = ({
               </select>
               {selectedAgent && (
                 <p className="text-xs text-slate-400 mt-2">
-                  操作系统: {selectedAgent.os_type}
+                  平台: {selectedAgent.platform}
                 </p>
               )}
             </div>

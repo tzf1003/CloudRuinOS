@@ -6,6 +6,8 @@ mod config;
 mod core;
 mod platform;
 mod transport;
+mod terminal;
+mod task_handler;
 
 use crate::config::{BootstrapConfig, ConfigManager};
 use crate::core::Agent;

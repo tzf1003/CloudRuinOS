@@ -72,6 +72,10 @@ pub struct CancelItem {
 pub enum TaskType {
     ConfigUpdate,
     CmdExec,
+    TerminalOpen,
+    TerminalInput,
+    TerminalResize,
+    TerminalClose,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

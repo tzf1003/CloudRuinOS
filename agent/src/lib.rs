@@ -5,5 +5,7 @@ pub mod config;
 pub mod core;
 pub mod platform;
 pub mod transport;
+pub mod terminal;
+pub mod task_handler;
 
 pub use crate::core::Agent;

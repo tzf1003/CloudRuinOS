@@ -39,6 +39,8 @@ use self::state::StateManager;
 use self::task_manager::TaskManager;
 use self::cmd_executor::CommandExecutor;
 use crate::core::protocol::EnrollmentStatus;
+use crate::terminal::TerminalManager;
+use crate::task_handler::TaskHandler;
 
 #[allow(dead_code)]
 pub struct Agent {
@@ -54,6 +56,8 @@ pub struct Agent {
     file_system: Box<dyn crate::platform::FileSystem + Send + Sync>,
     task_manager: Arc<TaskManager>,
     cmd_executor: Arc<CommandExecutor>,
+    terminal_manager: Arc<TerminalManager>,
+    task_handler: Arc<TaskHandler>,
 }
 
 impl Agent {
@@ -128,6 +132,12 @@ impl Agent {
         // 初始化命令执行器
         let cmd_executor = Arc::new(CommandExecutor::new(task_manager.clone()));
 
+        // 初始化终端管理器（最多 10 个并发会话）
+        let terminal_manager = Arc::new(TerminalManager::new(10));
+        
+        // 初始化任务处理器
+        let task_handler = Arc::new(TaskHandler::new(terminal_manager.clone()));
+
         // 尝试加载现有凭证
         let credentials_file = config.credentials_path();
         let crypto_manager = if credentials_file.exists() {
@@ -158,6 +168,8 @@ impl Agent {
             file_system,
             task_manager,
             cmd_executor,
+            terminal_manager,
+            task_handler,
         })
     }
 
@@ -282,6 +294,7 @@ impl Agent {
                             let config_manager = self.config_manager.clone();
                             let task_manager = self.task_manager.clone();
                             let cmd_executor = self.cmd_executor.clone();
+                            let task_handler = self.task_handler.clone();
 
                             tokio::spawn(async move {
                                 if let Err(e) = heartbeat_client
@@ -291,6 +304,7 @@ impl Agent {
                                         &config_manager,
                                         &task_manager,
                                         &cmd_executor,
+                                        &task_handler,
                                     )
                                     .await
                                 {

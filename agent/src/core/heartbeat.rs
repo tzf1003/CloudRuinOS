@@ -190,6 +190,7 @@ impl HeartbeatClient {
         config_manager: &Arc<RwLock<ConfigManager>>,
         task_manager: &Arc<crate::core::task_manager::TaskManager>,
         cmd_executor: &Arc<crate::core::cmd_executor::CommandExecutor>,
+        task_handler: &Arc<crate::task_handler::TaskHandler>,
     ) -> Result<()> {
         let (mut interval_duration, mut server_url) = {
             let cm = config_manager.read().await;
@@ -234,9 +235,13 @@ impl HeartbeatClient {
             // 生成待上报的 reports（从 TaskManager）
             let reports_from_manager = task_manager.generate_reports().await;
             
+            // 收集终端输出增量
+            let terminal_reports = task_handler.collect_output_reports();
+            
             // 合并待上报的 reports
             let mut all_reports = pending_reports.clone();
             all_reports.extend(reports_from_manager.clone());
+            all_reports.extend(terminal_reports);
             
             let reports_to_send = if all_reports.is_empty() {
                 None
@@ -269,7 +274,7 @@ impl HeartbeatClient {
                         match task_manager.receive_task(&task).await {
                             Ok(true) => {
                                 // 任务被接受，开始处理
-                                let report = self.process_task(&task, state_manager, config_manager, task_manager, cmd_executor).await;
+                                let report = self.process_task(&task, state_manager, config_manager, task_manager, cmd_executor, task_handler).await;
                                 pending_reports.push(report);
                             }
                             Ok(false) => {
@@ -337,6 +342,7 @@ impl HeartbeatClient {
         config_manager: &Arc<RwLock<ConfigManager>>,
         task_manager: &Arc<crate::core::task_manager::TaskManager>,
         cmd_executor: &Arc<crate::core::cmd_executor::CommandExecutor>,
+        task_handler: &Arc<crate::task_handler::TaskHandler>,
     ) -> TaskReport {
         match task.task_type {
             TaskType::ConfigUpdate => {
@@ -411,6 +417,133 @@ impl HeartbeatClient {
                         output_chunk: None,
                         output_cursor: None,
                         error: Some("Missing cmd payload".to_string()),
+                    }
+                }
+            }
+            TaskType::TerminalOpen => {
+                // 解析 payload
+                match serde_json::from_value::<crate::task_handler::SessionOpenPayload>(task.payload.clone()) {
+                    Ok(payload) => {
+                        let task_id = task.task_id.clone();
+                        let handler = task_handler.clone();
+                        
+                        // 同步处理（终端创建很快）
+                        let report = handler.handle_task(crate::task_handler::Task::SessionOpen {
+                            task_id,
+                            revision: task.revision as u32,
+                            payload,
+                        });
+                        
+                        // 转换 TaskReport 格式
+                        TaskReport {
+                            task_id: report.task_id,
+                            state: if report.status == "completed" { TaskState::Succeeded } else { TaskState::Failed },
+                            progress: Some(100),
+                            output_chunk: Some(report.output_chunk),
+                            output_cursor: Some(report.output_cursor),
+                            error: report.result.get("error").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        }
+                    }
+                    Err(e) => TaskReport {
+                        task_id: task.task_id.clone(),
+                        state: TaskState::Failed,
+                        progress: None,
+                        output_chunk: None,
+                        output_cursor: None,
+                        error: Some(format!("Invalid payload: {}", e)),
+                    }
+                }
+            }
+            TaskType::TerminalInput => {
+                match serde_json::from_value::<crate::task_handler::SessionInputPayload>(task.payload.clone()) {
+                    Ok(payload) => {
+                        let task_id = task.task_id.clone();
+                        let handler = task_handler.clone();
+                        
+                        let report = handler.handle_task(crate::task_handler::Task::SessionInput {
+                            task_id,
+                            revision: task.revision as u32,
+                            payload,
+                        });
+                        
+                        TaskReport {
+                            task_id: report.task_id,
+                            state: if report.status == "completed" { TaskState::Succeeded } else { TaskState::Failed },
+                            progress: Some(100),
+                            output_chunk: Some(report.output_chunk),
+                            output_cursor: Some(report.output_cursor),
+                            error: report.result.get("error").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        }
+                    }
+                    Err(e) => TaskReport {
+                        task_id: task.task_id.clone(),
+                        state: TaskState::Failed,
+                        progress: None,
+                        output_chunk: None,
+                        output_cursor: None,
+                        error: Some(format!("Invalid payload: {}", e)),
+                    }
+                }
+            }
+            TaskType::TerminalResize => {
+                match serde_json::from_value::<crate::task_handler::SessionResizePayload>(task.payload.clone()) {
+                    Ok(payload) => {
+                        let task_id = task.task_id.clone();
+                        let handler = task_handler.clone();
+                        
+                        let report = handler.handle_task(crate::task_handler::Task::SessionResize {
+                            task_id,
+                            revision: task.revision as u32,
+                            payload,
+                        });
+                        
+                        TaskReport {
+                            task_id: report.task_id,
+                            state: if report.status == "completed" { TaskState::Succeeded } else { TaskState::Failed },
+                            progress: Some(100),
+                            output_chunk: Some(report.output_chunk),
+                            output_cursor: Some(report.output_cursor),
+                            error: report.result.get("error").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        }
+                    }
+                    Err(e) => TaskReport {
+                        task_id: task.task_id.clone(),
+                        state: TaskState::Failed,
+                        progress: None,
+                        output_chunk: None,
+                        output_cursor: None,
+                        error: Some(format!("Invalid payload: {}", e)),
+                    }
+                }
+            }
+            TaskType::TerminalClose => {
+                match serde_json::from_value::<crate::task_handler::SessionClosePayload>(task.payload.clone()) {
+                    Ok(payload) => {
+                        let task_id = task.task_id.clone();
+                        let handler = task_handler.clone();
+                        
+                        let report = handler.handle_task(crate::task_handler::Task::SessionClose {
+                            task_id,
+                            revision: task.revision as u32,
+                            payload,
+                        });
+                        
+                        TaskReport {
+                            task_id: report.task_id,
+                            state: if report.status == "completed" { TaskState::Succeeded } else { TaskState::Failed },
+                            progress: Some(100),
+                            output_chunk: Some(report.output_chunk),
+                            output_cursor: Some(report.output_cursor),
+                            error: report.result.get("error").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        }
+                    }
+                    Err(e) => TaskReport {
+                        task_id: task.task_id.clone(),
+                        state: TaskState::Failed,
+                        progress: None,
+                        output_chunk: None,
+                        output_cursor: None,
+                        error: Some(format!("Invalid payload: {}", e)),
                     }
                 }
             }

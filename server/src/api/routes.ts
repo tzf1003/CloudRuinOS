@@ -22,6 +22,14 @@ import { receiveAuditLogs, getDeviceAuditLogs } from './handlers/agent-audit';
 import { syncConfig, getConfigs, updateConfig, deleteConfig } from './handlers/config';
 import { adminLogin, verifyAdminSession, adminLogout } from './handlers/admin-auth';
 import { createTask, getTask, listDeviceTasks, cancelTask } from './handlers/tasks';
+import { 
+  createTerminal, 
+  sendTerminalInput, 
+  getTerminalOutput, 
+  getTerminalSessions, 
+  closeTerminal,
+  resizeTerminal 
+} from './handlers/terminal';
 
 import { handleOptionsRequest } from '../middleware/cors';
 import { withAdminAuth } from '../middleware/auth';
@@ -135,6 +143,22 @@ export function createRouter() {
 
   // 审计日志 API (管理员)
   router.get('/audit', withAdminAuth(getAuditLogsHandler));
+
+  // 终端管理 API (管理员)
+  router.post('/terminal/create', withAdminAuth(createTerminal));
+  router.post('/terminal/input', withAdminAuth(sendTerminalInput));
+  router.get('/terminal/output/:sessionId', withAdminAuth((req, env, ctx) => {
+    const url = new URL(req.url);
+    const sessionId = url.pathname.split('/')[3];
+    return getTerminalOutput(req, env, ctx, sessionId);
+  }));
+  router.get('/terminal/sessions', withAdminAuth(getTerminalSessions));
+  router.post('/terminal/close/:sessionId', withAdminAuth((req, env, ctx) => {
+    const url = new URL(req.url);
+    const sessionId = url.pathname.split('/')[3];
+    return closeTerminal(req, env, ctx, sessionId);
+  }));
+  router.post('/terminal/resize', withAdminAuth(resizeTerminal));
 
   // WebSocket 升级端点
   router.get('/ws', handleWebSocketUpgrade);
