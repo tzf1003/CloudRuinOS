@@ -435,11 +435,11 @@ export async function getTerminalSessions(
     // TODO: 从 JWT 获取用户 ID
     const userId = 'admin';
 
-    // 查询会话列表
+    // 查询会话列表（只返回未关闭的会话）
     const { results: sessions } = await env.DB.prepare(`
       SELECT session_id, agent_id, user_id, shell_type, state, output_cursor, cols, rows, created_at, updated_at
       FROM terminal_sessions
-      WHERE user_id = ?
+      WHERE user_id = ? AND state != 'closed'
       ORDER BY created_at DESC
       LIMIT 100
     `).bind(userId).all();
@@ -467,7 +467,7 @@ export async function getTerminalSessions(
  * 关闭终端会话
  * POST /terminal/close/:sessionId
  * 
- * 通过任务系统关闭终端
+ * 立即标记会话为关闭状态，同时通过任务系统通知 agent
  */
 export async function closeTerminal(
   request: Request,
@@ -491,53 +491,44 @@ export async function closeTerminal(
       });
     }
 
+    // 立即标记会话为关闭状态（软删除）
+    await env.DB.prepare(`
+      UPDATE terminal_sessions
+      SET state = 'closed', closed_at = datetime('now'), updated_at = datetime('now')
+      WHERE session_id = ?
+    `).bind(sessionId).run();
+
     // 检查是否已有关闭任务
     const existingTask = await env.DB.prepare(`
       SELECT id FROM tasks WHERE id = ?
     `).bind(`term-close-${sessionId}`).first();
 
-    if (existingTask) {
-      // 任务已存在，返回成功（幂等性）
-      return new Response(JSON.stringify({
-        success: true,
-        message: 'Close task already exists',
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
+    if (!existingTask) {
+      // 创建关闭任务通知 agent（如果 agent 在线的话）
+      const taskId = `term-close-${sessionId}`;
+      const now = Date.now();
+      const taskPayload = {
+        session_id: sessionId,
+      };
 
-    // 创建关闭任务
-    const taskId = `term-close-${sessionId}`;
-    const now = Date.now();
-    const taskPayload = {
-      session_id: sessionId,
-    };
-
-    try {
-      await env.DB.prepare(`
-        INSERT INTO tasks (id, device_id, type, desired_state, payload, revision, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(
-        taskId,
-        session.agent_id,
-        'terminal_close',
-        'pending',
-        JSON.stringify(taskPayload),
-        1,
-        now,
-        now
-      ).run();
-    } catch (taskError: any) {
-      console.error('Task creation error:', taskError);
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Task creation error',
-        details: taskError.message,
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      try {
+        await env.DB.prepare(`
+          INSERT INTO tasks (id, device_id, type, desired_state, payload, revision, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          taskId,
+          session.agent_id,
+          'terminal_close',
+          'pending',
+          JSON.stringify(taskPayload),
+          1,
+          now,
+          now
+        ).run();
+      } catch (taskError: any) {
+        console.error('Task creation error (non-critical):', taskError);
+        // 任务创建失败不影响关闭操作，因为会话已经标记为关闭
+      }
     }
 
     // 记录审计日志
