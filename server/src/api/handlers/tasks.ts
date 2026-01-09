@@ -116,14 +116,23 @@ export async function createTask(
 
     // 记录审计日志
     const auditService = createAuditService(env);
-    await auditService.logAction(
+    await auditService.logEvent(
+      'command_execute',
       body.device_id,
-      'task_created',
+      null,
       {
-        task_id: taskId,
-        type: body.type,
-        payload: body.payload,
+        command_execute: {
+          command: `task_created:${body.type}`,
+          args: [taskId],
+          exit_code: 0,
+          execution_time: 0,
+          stdout_length: 0,
+          stderr_length: 0,
+          is_sensitive: false,
+        },
       },
+      'success',
+      undefined,
       request
     );
 
@@ -323,13 +332,23 @@ export async function cancelTask(
 
     // 记录审计日志
     const auditService = createAuditService(env);
-    await auditService.logAction(
+    await auditService.logEvent(
+      'command_execute',
       task.device_id as string,
-      'task_canceled',
+      null,
       {
-        task_id: taskId,
-        revision: newRevision,
+        command_execute: {
+          command: 'task_canceled',
+          args: [taskId, newRevision.toString()],
+          exit_code: 0,
+          execution_time: 0,
+          stdout_length: 0,
+          stderr_length: 0,
+          is_sensitive: false,
+        },
       },
+      'success',
+      undefined,
       request
     );
 
