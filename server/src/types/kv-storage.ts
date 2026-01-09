@@ -128,6 +128,8 @@ export interface KVStorageManager {
   checkRateLimit(deviceId: string, endpoint: string, maxRequests: number, windowSeconds: number): Promise<boolean>;
   incrementRateLimit(deviceId: string, endpoint: string): Promise<RateLimitRecord>;
   getRateLimitStatus(deviceId: string, endpoint: string): Promise<RateLimitRecord | null>;
+  // 优化：合并检查和更新操作
+  checkAndIncrementRateLimit(deviceId: string, endpoint: string, maxRequests: number, windowSeconds: number): Promise<{ allowed: boolean; record: RateLimitRecord; remaining: number }>;
   
   // 会话缓存操作
   setSessionCache(sessionId: string, sessionData: SessionCache): Promise<boolean>;

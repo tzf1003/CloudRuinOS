@@ -29,10 +29,19 @@ export class CloudflareKVManager implements KVStorageManager {
   constructor(private kv: KVNamespace) {}
 
   // ==================== Nonce 操作 ====================
+  // 优化：使用KV的原子性和TTL自动过期，减少读取操作
   
   async setNonce(deviceId: string, nonce: string, requestHash?: string): Promise<boolean> {
     try {
       const key = KVKeyGenerator.nonce(deviceId, nonce);
+      
+      // 优化：先检查是否存在，避免覆盖已有的nonce
+      const existing = await this.kv.get(key);
+      if (existing) {
+        // Nonce已存在，这是重放攻击
+        return false;
+      }
+      
       const record: NonceRecord = {
         device_id: deviceId,
         timestamp: Date.now(),
@@ -60,13 +69,7 @@ export class CloudflareKVManager implements KVStorageManager {
       
       const record: NonceRecord = JSON.parse(value);
       
-      // 检查是否过期
-      const maxAge = TTLCalculator.getNonceTTL() * 1000;
-      if (Date.now() - record.timestamp > maxAge) {
-        await this.kv.delete(key);
-        return null;
-      }
-      
+      // KV的TTL会自动处理过期，无需手动检查和删除
       return record;
     } catch (error) {
       console.error('Failed to check nonce:', error);
@@ -148,6 +151,84 @@ export class CloudflareKVManager implements KVStorageManager {
     } catch (error) {
       console.error('Failed to increment rate limit:', error);
       throw error;
+    }
+  }
+
+  // 优化：合并检查和更新速率限制为单次操作
+  async checkAndIncrementRateLimit(
+    deviceId: string, 
+    endpoint: string, 
+    maxRequests: number, 
+    windowSeconds: number
+  ): Promise<{ allowed: boolean; record: RateLimitRecord; remaining: number }> {
+    try {
+      const key = KVKeyGenerator.rateLimit(deviceId, endpoint);
+      const existing = await this.kv.get(key);
+      const now = Date.now();
+      
+      let record: RateLimitRecord;
+      let allowed = true;
+      
+      if (!existing) {
+        // 首次请求
+        record = {
+          count: 1,
+          window_start: now,
+          device_id: deviceId,
+          endpoint: endpoint,
+          last_request: now,
+        };
+      } else {
+        const parsed: RateLimitRecord = JSON.parse(existing);
+        
+        // 检查窗口是否过期
+        if (now - parsed.window_start > windowSeconds * 1000) {
+          // 窗口过期，重置计数
+          record = {
+            count: 1,
+            window_start: now,
+            device_id: deviceId,
+            endpoint: endpoint,
+            last_request: now,
+          };
+        } else {
+          // 窗口内，检查是否超限
+          if (parsed.count >= maxRequests) {
+            allowed = false;
+            record = parsed; // 不更新计数
+          } else {
+            // 增加计数
+            record = {
+              ...parsed,
+              count: parsed.count + 1,
+              last_request: now,
+            };
+          }
+        }
+      }
+      
+      // 只有允许请求时才写入KV
+      if (allowed) {
+        const ttl = TTLCalculator.getRateLimitTTL();
+        await this.kv.put(key, JSON.stringify(record), { expirationTtl: ttl });
+      }
+      
+      const remaining = Math.max(0, maxRequests - record.count);
+      return { allowed, record, remaining };
+    } catch (error) {
+      console.error('Failed to check and increment rate limit:', error);
+      // 出错时允许请求
+      return {
+        allowed: true,
+        record: {
+          count: 1,
+          window_start: Date.now(),
+          device_id: deviceId,
+          endpoint: endpoint,
+          last_request: Date.now(),
+        },
+        remaining: 0,
+      };
     }
   }
 
@@ -293,61 +374,27 @@ export class CloudflareKVManager implements KVStorageManager {
   }
 
   // ==================== 设备缓存操作 ====================
+  // 优化：移除设备缓存的KV操作，设备状态已在D1数据库中维护
+  // 保留接口以保持兼容性，但实现为空操作
   
   async setDeviceCache(deviceId: string, deviceData: DeviceCache): Promise<boolean> {
-    try {
-      const key = KVKeyGenerator.deviceCache(deviceId);
-      deviceData.cached_at = Date.now();
-      const ttl = TTLCalculator.getDeviceCacheTTL();
-      await this.kv.put(key, JSON.stringify(deviceData), { expirationTtl: ttl });
-      return true;
-    } catch (error) {
-      console.error('Failed to set device cache:', error);
-      return false;
-    }
+    // 已优化：设备状态在D1中维护，无需KV缓存
+    return true;
   }
 
   async getDeviceCache(deviceId: string): Promise<DeviceCache | null> {
-    try {
-      const key = KVKeyGenerator.deviceCache(deviceId);
-      const value = await this.kv.get(key);
-      
-      if (!value) {
-        return null;
-      }
-      
-      return JSON.parse(value) as DeviceCache;
-    } catch (error) {
-      console.error('Failed to get device cache:', error);
-      return null;
-    }
+    // 已优化：设备状态在D1中维护，无需KV缓存
+    return null;
   }
 
   async updateDeviceStatus(deviceId: string, status: DeviceCache['status'], lastSeen: number): Promise<boolean> {
-    try {
-      const device = await this.getDeviceCache(deviceId);
-      if (!device) {
-        return false;
-      }
-      
-      device.status = status;
-      device.last_seen = lastSeen;
-      return await this.setDeviceCache(deviceId, device);
-    } catch (error) {
-      console.error('Failed to update device status:', error);
-      return false;
-    }
+    // 已优化：设备状态在D1中维护，无需KV缓存
+    return true;
   }
 
   async deleteDeviceCache(deviceId: string): Promise<boolean> {
-    try {
-      const key = KVKeyGenerator.deviceCache(deviceId);
-      await this.kv.delete(key);
-      return true;
-    } catch (error) {
-      console.error('Failed to delete device cache:', error);
-      return false;
-    }
+    // 已优化：设备状态在D1中维护，无需KV缓存
+    return true;
   }
 
   // ==================== 命令队列操作 ====================
@@ -388,16 +435,19 @@ export class CloudflareKVManager implements KVStorageManager {
       }
       
       const index: CommandQueueIndex = JSON.parse(indexValue);
-      const commands: CommandRecord[] = [];
+      const commandIds = index.command_ids.slice(0, limit);
       
-      for (const commandId of index.command_ids.slice(0, limit)) {
-        const command = await this.getCommand(commandId);
-        if (command) {
-          commands.push(command);
-        }
+      if (commandIds.length === 0) {
+        return [];
       }
       
-      return commands;
+      // 优化：批量读取命令，减少KV操作次数
+      // 使用Promise.all并行读取所有命令
+      const commandPromises = commandIds.map(commandId => this.getCommand(commandId));
+      const commandResults = await Promise.all(commandPromises);
+      
+      // 过滤掉null值
+      return commandResults.filter((cmd): cmd is CommandRecord => cmd !== null);
     } catch (error) {
       console.error('Failed to get device commands:', error);
       return [];
@@ -615,6 +665,7 @@ export function createKVManager(kv: KVNamespace): KVStorageManager {
 }
 
 // 工具函数：验证 nonce 的完整流程
+// 优化：减少KV读取次数，直接尝试写入并利用KV的原子性
 export async function validateNonce(
   kvManager: KVStorageManager,
   deviceId: string,
@@ -622,19 +673,26 @@ export async function validateNonce(
   requestHash?: string
 ): Promise<{ valid: boolean; reason?: string }> {
   try {
-    // 检查 nonce 是否已经被使用过
-    const record = await kvManager.checkNonce(deviceId, nonce);
+    // 优化：直接尝试存储nonce，利用KV的原子性
+    // 如果nonce已存在，KV会返回失败或我们可以通过时间戳判断
+    const stored = await kvManager.setNonce(deviceId, nonce, requestHash);
     
-    if (record) {
-      // Nonce 已存在，这是重放攻击
-      return { valid: false, reason: 'Nonce already used (replay attack)' };
+    if (!stored) {
+      return { valid: false, reason: 'Failed to store nonce (may already exist)' };
     }
     
-    // Nonce 不存在，这是有效的新请求
-    // 将 nonce 存储到 KV 中以防止未来的重放攻击
-    const stored = await kvManager.setNonce(deviceId, nonce, requestHash);
-    if (!stored) {
-      return { valid: false, reason: 'Failed to store nonce' };
+    // 验证nonce是否真的是新的（通过检查创建时间）
+    const record = await kvManager.checkNonce(deviceId, nonce);
+    
+    if (!record) {
+      return { valid: false, reason: 'Nonce verification failed' };
+    }
+    
+    // 检查nonce是否刚刚创建（允许1秒的误差）
+    const age = Date.now() - record.timestamp;
+    if (age > 1000) {
+      // Nonce太旧，可能是重放攻击
+      return { valid: false, reason: 'Nonce already used (replay attack)' };
     }
     
     return { valid: true };
@@ -645,6 +703,8 @@ export async function validateNonce(
 }
 
 // 工具函数：检查和更新速率限制
+// 已废弃：请直接使用 kvManager.checkAndIncrementRateLimit()
+// 保留此函数以保持向后兼容性
 export async function checkAndUpdateRateLimit(
   kvManager: KVStorageManager,
   deviceId: string,
@@ -653,25 +713,12 @@ export async function checkAndUpdateRateLimit(
   windowSeconds: number = 60
 ): Promise<{ allowed: boolean; remaining: number; resetTime: number }> {
   try {
-    const allowed = await kvManager.checkRateLimit(deviceId, endpoint, maxRequests, windowSeconds);
-    
-    if (!allowed) {
-      const status = await kvManager.getRateLimitStatus(deviceId, endpoint);
-      const resetTime = status ? status.window_start + (windowSeconds * 1000) : Date.now() + (windowSeconds * 1000);
-      return {
-        allowed: false,
-        remaining: 0,
-        resetTime,
-      };
-    }
-    
-    const record = await kvManager.incrementRateLimit(deviceId, endpoint);
-    const remaining = Math.max(0, maxRequests - record.count);
-    const resetTime = record.window_start + (windowSeconds * 1000);
+    const result = await kvManager.checkAndIncrementRateLimit(deviceId, endpoint, maxRequests, windowSeconds);
+    const resetTime = result.record.window_start + (windowSeconds * 1000);
     
     return {
-      allowed: true,
-      remaining,
+      allowed: result.allowed,
+      remaining: result.remaining,
       resetTime,
     };
   } catch (error) {

@@ -106,9 +106,8 @@ export async function heartbeat(
     const kvManager = createKVManager(env.KV);
     const now = Date.now();
     
-    // 速率限制检查 (每分钟最多60次心跳)
-    const rateLimitResult = await checkAndUpdateRateLimit(
-      kvManager,
+    // 优化：合并速率限制检查和更新为单次KV操作（从2读1写优化为1读1写）
+    const rateLimitResult = await kvManager.checkAndIncrementRateLimit(
       body.device_id,
       'heartbeat',
       60, // 最大请求数
@@ -116,14 +115,15 @@ export async function heartbeat(
     );
     
     if (!rateLimitResult.allowed) {
+      const resetTime = rateLimitResult.record.window_start + 60000;
       return createErrorResponse(
         'Rate limit exceeded',
         'RATE_LIMIT_EXCEEDED',
         429,
         {
-          'Retry-After': Math.ceil((rateLimitResult.resetTime - now) / 1000).toString(),
+          'Retry-After': Math.ceil((resetTime - now) / 1000).toString(),
           'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
-          'X-RateLimit-Reset': rateLimitResult.resetTime.toString(),
+          'X-RateLimit-Reset': resetTime.toString(),
         }
       );
     }
@@ -206,8 +206,8 @@ export async function heartbeat(
       return createErrorResponse('Failed to update device status', 'DATABASE_ERROR', 500);
     }
 
-    // 更新设备缓存
-    await kvManager.updateDeviceStatus(body.device_id, 'online', now);
+    // 优化：移除设备缓存的KV更新，设备状态已在D1数据库中维护
+    // await kvManager.updateDeviceStatus(body.device_id, 'online', now);
 
     // 记录成功的心跳事件
     const auditService = createAuditService(env);
@@ -374,7 +374,7 @@ export async function heartbeat(
       headers: {
         'Content-Type': 'application/json',
         'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
-        'X-RateLimit-Reset': rateLimitResult.resetTime.toString(),
+        'X-RateLimit-Reset': (rateLimitResult.record.window_start + 60000).toString(),
       },
     });
 
