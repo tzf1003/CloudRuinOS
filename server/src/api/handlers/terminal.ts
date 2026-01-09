@@ -371,13 +371,19 @@ export async function getTerminalSessions(
       headers: { 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Get terminal sessions error:', error);
+    console.error('Error details:', error.message, error.stack);
     return new Response(JSON.stringify({
       success: false,
       error: 'Internal server error',
+      details: error.message,
     }), {
       status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+}
       headers: { 'Content-Type': 'application/json' },
     });
   }

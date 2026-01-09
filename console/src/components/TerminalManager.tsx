@@ -25,9 +25,9 @@ interface OpenTab {
 }
 
 interface Agent {
-  agent_id: string;
-  hostname: string;
-  platform: string; // 使用 platform 而不是 os_type
+  deviceId: string;  // 使用 Device 接口的字段名
+  name?: string;
+  platform: string;
   status: string;
 }
 
@@ -354,7 +354,7 @@ const CreateSessionDialog: React.FC<CreateSessionDialogProps> = ({
       // 默认选择第一个在线的 Agent
       const onlineAgent = devices.find((a: Agent) => a.status === 'online');
       if (onlineAgent) {
-        setSelectedAgentId(onlineAgent.agent_id);
+        setSelectedAgentId(onlineAgent.deviceId);
         // 根据 platform 设置默认 shell
         const platform = onlineAgent.platform.toLowerCase();
         if (platform.includes('windows') || platform.includes('win32')) {
@@ -363,7 +363,7 @@ const CreateSessionDialog: React.FC<CreateSessionDialogProps> = ({
           setShellType('bash');
         }
       } else if (devices.length > 0) {
-        setSelectedAgentId(devices[0].agent_id);
+        setSelectedAgentId(devices[0].deviceId);
         // 根据第一个设备的 platform 设置默认 shell
         const platform = devices[0].platform.toLowerCase();
         if (platform.includes('windows') || platform.includes('win32')) {
@@ -379,7 +379,7 @@ const CreateSessionDialog: React.FC<CreateSessionDialogProps> = ({
     }
   };
 
-  const selectedAgent = agents.find((a) => a.agent_id === selectedAgentId);
+  const selectedAgent = agents.find((a) => a.deviceId === selectedAgentId);
   const isWindows = selectedAgent 
     ? (selectedAgent.platform.toLowerCase().includes('windows') || 
        selectedAgent.platform.toLowerCase().includes('win32'))
@@ -428,7 +428,7 @@ const CreateSessionDialog: React.FC<CreateSessionDialogProps> = ({
                 value={selectedAgentId}
                 onChange={(e) => {
                   setSelectedAgentId(e.target.value);
-                  const agent = agents.find((a) => a.agent_id === e.target.value);
+                  const agent = agents.find((a) => a.deviceId === e.target.value);
                   if (agent) {
                     // 根据 platform 自动切换默认 shell
                     const platform = agent.platform.toLowerCase();
@@ -442,8 +442,8 @@ const CreateSessionDialog: React.FC<CreateSessionDialogProps> = ({
                 className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
               >
                 {agents.map((agent) => (
-                  <option key={agent.agent_id} value={agent.agent_id}>
-                    {agent.hostname} ({agent.agent_id}) - {agent.status}
+                  <option key={agent.deviceId} value={agent.deviceId}>
+                    {agent.name || agent.deviceId} ({agent.deviceId.substring(0, 8)}) - {agent.status}
                   </option>
                 ))}
               </select>
