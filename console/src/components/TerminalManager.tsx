@@ -23,6 +23,13 @@ interface OpenTab {
   isConnected: boolean;
 }
 
+interface Agent {
+  agent_id: string;
+  hostname: string;
+  os_type: string;
+  status: string;
+}
+
 export const TerminalManager: React.FC = () => {
   const [allSessions, setAllSessions] = useState<Session[]>([]);
   const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
@@ -170,7 +177,7 @@ export const TerminalManager: React.FC = () => {
   const activeTab = openTabs.find((tab) => tab.session_id === activeTabId);
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-[calc(100vh-8rem)] bg-background rounded-lg overflow-hidden border border-white/5">
       {/* 侧边栏 - 终端管理 */}
       <aside className="w-64 glass-panel border-r border-white/5 flex flex-col">
         {/* 标题区域 */}
@@ -339,13 +346,56 @@ const CreateSessionDialog: React.FC<CreateSessionDialogProps> = ({
   onClose,
   onCreate,
 }) => {
-  const [agentId, setAgentId] = useState('agent-001');
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState('');
   const [shellType, setShellType] = useState('bash');
-  const [os, setOs] = useState<'windows' | 'linux'>('linux');
+  const [loading, setLoading] = useState(true);
 
-  const shellOptions = {
-    windows: ['cmd', 'powershell', 'pwsh'],
-    linux: ['sh', 'bash', 'zsh'],
+  useEffect(() => {
+    loadAgents();
+  }, []);
+
+  const loadAgents = async () => {
+    try {
+      const response = await fetch('/api/devices');
+      if (response.ok) {
+        const data = await response.json();
+        setAgents(data);
+        
+        // 默认选择第一个在线的 Agent
+        const onlineAgent = data.find((a: Agent) => a.status === 'online');
+        if (onlineAgent) {
+          setSelectedAgentId(onlineAgent.agent_id);
+          // 根据 OS 类型设置默认 shell
+          if (onlineAgent.os_type.toLowerCase().includes('windows')) {
+            setShellType('powershell');
+          } else {
+            setShellType('bash');
+          }
+        } else if (data.length > 0) {
+          setSelectedAgentId(data[0].agent_id);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load agents:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const selectedAgent = agents.find((a) => a.agent_id === selectedAgentId);
+  const isWindows = selectedAgent?.os_type.toLowerCase().includes('windows') || false;
+
+  const shellOptions = isWindows
+    ? ['cmd', 'powershell', 'pwsh']
+    : ['sh', 'bash', 'zsh'];
+
+  const handleCreate = () => {
+    if (!selectedAgentId) {
+      alert('请选择一个 Agent');
+      return;
+    }
+    onCreate(selectedAgentId, shellType);
   };
 
   return (
@@ -359,54 +409,69 @@ const CreateSessionDialog: React.FC<CreateSessionDialogProps> = ({
       >
         <h3 className="text-xl font-bold text-white mb-6">创建新终端会话</h3>
 
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Agent ID
-            </label>
-            <input
-              type="text"
-              value={agentId}
-              onChange={(e) => setAgentId(e.target.value)}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-              placeholder="输入 Agent ID"
-            />
+        {loading ? (
+          <div className="text-center py-8 text-slate-400">
+            <div className="loader-spinner w-8 h-8 mx-auto mb-3" />
+            正在加载 Agent 列表...
           </div>
+        ) : agents.length === 0 ? (
+          <div className="text-center py-8 text-slate-400">
+            <p>暂无可用的 Agent</p>
+            <p className="text-sm mt-2">请先启动 Agent 服务</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                选择 Agent
+              </label>
+              <select
+                value={selectedAgentId}
+                onChange={(e) => {
+                  setSelectedAgentId(e.target.value);
+                  const agent = agents.find((a) => a.agent_id === e.target.value);
+                  if (agent) {
+                    // 根据 OS 类型自动切换默认 shell
+                    if (agent.os_type.toLowerCase().includes('windows')) {
+                      setShellType('powershell');
+                    } else {
+                      setShellType('bash');
+                    }
+                  }
+                }}
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              >
+                {agents.map((agent) => (
+                  <option key={agent.agent_id} value={agent.agent_id}>
+                    {agent.hostname} ({agent.agent_id}) - {agent.status}
+                  </option>
+                ))}
+              </select>
+              {selectedAgent && (
+                <p className="text-xs text-slate-400 mt-2">
+                  操作系统: {selectedAgent.os_type}
+                </p>
+              )}
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              操作系统
-            </label>
-            <select
-              value={os}
-              onChange={(e) => {
-                setOs(e.target.value as 'windows' | 'linux');
-                setShellType(shellOptions[e.target.value as 'windows' | 'linux'][0]);
-              }}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-            >
-              <option value="linux">Linux/macOS</option>
-              <option value="windows">Windows</option>
-            </select>
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Shell 类型
+              </label>
+              <select
+                value={shellType}
+                onChange={(e) => setShellType(e.target.value)}
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              >
+                {shellOptions.map((shell) => (
+                  <option key={shell} value={shell}>
+                    {shell}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Shell 类型
-            </label>
-            <select
-              value={shellType}
-              onChange={(e) => setShellType(e.target.value)}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-            >
-              {shellOptions[os].map((shell) => (
-                <option key={shell} value={shell}>
-                  {shell}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+        )}
 
         <div className="flex gap-3 mt-6">
           <button
@@ -416,8 +481,9 @@ const CreateSessionDialog: React.FC<CreateSessionDialogProps> = ({
             取消
           </button>
           <button
-            onClick={() => onCreate(agentId, shellType)}
-            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-all shadow-lg shadow-primary/20"
+            onClick={handleCreate}
+            disabled={loading || agents.length === 0 || !selectedAgentId}
+            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-all shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             创建
           </button>
