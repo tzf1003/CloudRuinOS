@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Terminal } from './Terminal';
-import { Plus, RefreshCw, Terminal as TerminalIcon, Circle } from 'lucide-react';
+import { Plus, RefreshCw, Terminal as TerminalIcon, Circle, X } from 'lucide-react';
 import { clsx } from 'clsx';
 import { apiClient } from '../lib/api-client';
 
@@ -200,34 +200,61 @@ export const TerminalManager: React.FC = () => {
               const isConnected = ['opened', 'running'].includes(session.state);
 
               return (
-                <button
+                <div
                   key={session.session_id}
-                  onClick={() => openSessionInTab(session)}
                   className={clsx(
-                    'w-full text-left p-3 rounded-lg transition-all cursor-pointer',
+                    'relative w-full text-left p-3 rounded-lg transition-all group',
                     isOpen
                       ? 'bg-primary/10 border border-primary/20 shadow-glow'
                       : 'bg-white/5 border border-white/5 hover:bg-white/10'
                   )}
                 >
-                  <div className="flex items-center mb-2">
-                    <Circle
-                      className={clsx(
-                        'w-2 h-2 mr-2',
-                        isConnected ? 'fill-green-500 text-green-500' : 'fill-slate-500 text-slate-500'
-                      )}
-                    />
-                    <span className="text-sm font-semibold text-white">
-                      {session.shell_type}
-                    </span>
-                  </div>
-                  <div className="text-xs text-slate-400 ml-4">
-                    {session.session_id.substring(0, 16)}...
-                  </div>
-                  <div className="text-xs text-slate-500 ml-4 mt-1">
-                    {session.state}
-                  </div>
-                </button>
+                  <button
+                    onClick={() => openSessionInTab(session)}
+                    className="w-full text-left"
+                  >
+                    <div className="flex items-center mb-2">
+                      <Circle
+                        className={clsx(
+                          'w-2 h-2 mr-2',
+                          isConnected ? 'fill-green-500 text-green-500' : 'fill-slate-500 text-slate-500'
+                        )}
+                      />
+                      <span className="text-sm font-semibold text-white">
+                        {session.shell_type}
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-400 ml-4">
+                      {session.session_id.substring(0, 16)}...
+                    </div>
+                    <div className="text-xs text-slate-500 ml-4 mt-1">
+                      {session.state}
+                    </div>
+                  </button>
+                  
+                  {/* 删除按钮 */}
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (confirm(`确定要删除终端会话 ${session.shell_type}-${session.session_id.substring(0, 8)} 吗？`)) {
+                        try {
+                          await apiClient.closeTerminalSession(session.session_id);
+                          // 如果该会话已打开，也关闭标签
+                          closeTab(session.session_id, false);
+                          // 刷新会话列表
+                          loadSessions();
+                        } catch (error) {
+                          console.error('Failed to delete session:', error);
+                          alert('删除终端会话失败');
+                        }
+                      }
+                    }}
+                    className="absolute top-2 right-2 p-1.5 rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
+                    title="删除终端"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               );
             })
           )}
