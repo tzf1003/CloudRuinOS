@@ -5,7 +5,6 @@
  */
 
 import { Env } from '../../index';
-import { createKVManager, validateNonce, checkAndUpdateRateLimit } from '../../storage/kv-manager';
 import { verifyRequestIntegrity } from '../utils/crypto';
 import { getDeviceById, updateDevice } from '../utils/database';
 import { createAuditService } from '../utils/audit';
@@ -103,30 +102,10 @@ export async function heartbeat(
       return createErrorResponse('Missing required fields', 'INVALID_REQUEST', 400);
     }
 
-    const kvManager = createKVManager(env.KV);
     const now = Date.now();
     
-    // 优化：合并速率限制检查和更新为单次KV操作（从2读1写优化为1读1写）
-    const rateLimitResult = await kvManager.checkAndIncrementRateLimit(
-      body.device_id,
-      'heartbeat',
-      60, // 最大请求数
-      60  // 窗口时间（秒）
-    );
-    
-    if (!rateLimitResult.allowed) {
-      const resetTime = rateLimitResult.record.window_start + 60000;
-      return createErrorResponse(
-        'Rate limit exceeded',
-        'RATE_LIMIT_EXCEEDED',
-        429,
-        {
-          'Retry-After': Math.ceil((resetTime - now) / 1000).toString(),
-          'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
-          'X-RateLimit-Reset': resetTime.toString(),
-        }
-      );
-    }
+    // 优化：移除KV速率限制，依赖签名验证和证书固定
+    // 速率限制由心跳间隔本身控制（客户端每60秒发送一次）
 
     // 获取设备信息
     const device = await getDeviceById(env.DB, body.device_id);
@@ -175,25 +154,8 @@ export async function heartbeat(
       );
     }
 
-    // 验证 nonce 防重放
-    const nonceResult = await validateNonce(kvManager, body.device_id, body.nonce);
-    if (!nonceResult.valid) {
-      const auditService = createAuditService(env);
-      await auditService.logHeartbeat(
-        body.device_id,
-        body.system_info,
-        body.nonce,
-        'error',
-        `Nonce validation failed: ${nonceResult.reason}`,
-        request
-      );
-      
-      return createErrorResponse(
-        nonceResult.reason || 'Nonce validation failed',
-        'REPLAY_ATTACK',
-        401
-      );
-    }
+    // 优化：移除Nonce防重放检查，依赖签名验证和证书固定
+    // 后期通过证书固定(Certificate Pinning)提供更强的安全保障
 
     // 更新设备状态和时间戳
     const updateSuccess = await updateDevice(env.DB, body.device_id, {
@@ -205,9 +167,6 @@ export async function heartbeat(
     if (!updateSuccess) {
       return createErrorResponse('Failed to update device status', 'DATABASE_ERROR', 500);
     }
-
-    // 优化：移除设备缓存的KV更新，设备状态已在D1数据库中维护
-    // await kvManager.updateDeviceStatus(body.device_id, 'online', now);
 
     // 记录成功的心跳事件
     const auditService = createAuditService(env);
@@ -373,8 +332,6 @@ export async function heartbeat(
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
-        'X-RateLimit-Reset': (rateLimitResult.record.window_start + 60000).toString(),
       },
     });
 

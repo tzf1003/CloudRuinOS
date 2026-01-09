@@ -1,15 +1,15 @@
 use anyhow::{anyhow, Result};
 use serde_json::json;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
 use crate::config::ConfigManager;
-use crate::core::crypto::{CryptoManager, SignableData};
+use crate::core::crypto::CryptoManager;
 use crate::core::protocol::{
     HeartbeatRequest, HeartbeatResponse, SystemInfo, TaskReport,
-    TaskItem, TaskType, DesiredState, TaskState,
+    TaskItem, TaskType, TaskState,
 };
 use crate::core::state::StateManager;
 use crate::transport::HttpClient;
@@ -70,7 +70,9 @@ impl HeartbeatClient {
 
         // 生成 nonce
         let nonce = CryptoManager::generate_nonce();
-        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64;
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_millis() as u64;
 
         // 获取系统信息
         let system_info = SystemInfo::current();
@@ -241,7 +243,18 @@ impl HeartbeatClient {
             // 合并待上报的 reports
             let mut all_reports = pending_reports.clone();
             all_reports.extend(reports_from_manager.clone());
-            all_reports.extend(terminal_reports);
+            
+            // 转换 task_handler::TaskReport 到 protocol::TaskReport
+            for tr in terminal_reports {
+                all_reports.push(TaskReport {
+                    task_id: tr.task_id,
+                    state: if tr.status == "completed" { TaskState::Succeeded } else { TaskState::Failed },
+                    progress: Some(100),
+                    output_chunk: Some(tr.output_chunk),
+                    output_cursor: Some(tr.output_cursor),
+                    error: tr.result.get("error").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                });
+            }
             
             let reports_to_send = if all_reports.is_empty() {
                 None
@@ -829,8 +842,8 @@ del "%~f0"
             .json(&json!({
                 "version": version,
                 "status": status,
-                "timestamp": SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
+                "timestamp": std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
                     .unwrap()
                     .as_secs()
             }))
@@ -880,24 +893,34 @@ mod tests {
         // 测试心跳请求构建（不实际发送）
         let device_id = crypto_manager.device_id().unwrap();
         let nonce = CryptoManager::generate_nonce();
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
-            .as_secs();
+            .as_millis() as u64;
 
         let system_info = SystemInfo::current();
-        let signable_data = SignableData {
-            device_id: device_id.to_string(),
+        
+        // 构造签名数据
+        #[derive(serde::Serialize)]
+        struct HeartbeatSignData<'a> {
+            device_id: &'a str,
+            timestamp: u64,
+            nonce: &'a str,
+            protocol_version: &'a str,
+            system_info: &'a SystemInfo,
+        }
+
+        let sign_data = HeartbeatSignData {
+            device_id: &device_id,
             timestamp,
-            nonce: nonce.clone(),
-            data: json!({
-                "protocol_version": "1.0",
-                "system_info": system_info
-            }),
+            nonce: &nonce,
+            protocol_version: "1.0",
+            system_info: &system_info,
         };
 
-        let signature = crypto_manager.sign(&signable_data.to_bytes().unwrap());
-        let request = HeartbeatRequest::new(device_id.to_string(), nonce, signature, system_info);
+        let payload_str = serde_json::to_string(&sign_data).unwrap();
+        let signature = crypto_manager.sign(payload_str.as_bytes());
+        let request = HeartbeatRequest::new(device_id.to_string(), nonce, signature, system_info, timestamp);
 
         assert_eq!(request.device_id, device_id);
         assert_eq!(request.protocol_version, "1.0");

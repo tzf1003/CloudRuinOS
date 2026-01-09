@@ -3,19 +3,21 @@
 
 #[cfg(windows)]
 use std::collections::HashMap;
-use std::io::{self, Read, Write};
-use std::os::windows::io::{AsRawHandle, RawHandle};
+use std::io;
 use std::ptr;
 use winapi::shared::minwindef::{DWORD, FALSE};
 use winapi::shared::ntdef::HANDLE;
 use winapi::um::consoleapi::{ClosePseudoConsole, CreatePseudoConsole, ResizePseudoConsole};
 use winapi::um::handleapi::{CloseHandle, INVALID_HANDLE_VALUE};
-use winapi::um::namedpipeapi::CreatePipe;
+use winapi::um::namedpipeapi::{CreatePipe, SetNamedPipeHandleState};
 use winapi::um::processthreadsapi::{
-    CreateProcessW, GetExitCodeProcess, TerminateProcess, PROCESS_INFORMATION, STARTUPINFOEXW,
+    CreateProcessW, GetExitCodeProcess, TerminateProcess, PROCESS_INFORMATION,
+    InitializeProcThreadAttributeList, UpdateProcThreadAttribute, DeleteProcThreadAttributeList,
 };
-use winapi::um::winbase::{EXTENDED_STARTUPINFO_PRESENT, STARTF_USESTDHANDLES};
+use winapi::um::winbase::{EXTENDED_STARTUPINFO_PRESENT, STARTUPINFOEXW};
 use winapi::um::wincon::COORD;
+use winapi::um::heapapi::{HeapAlloc, HeapFree, GetProcessHeap};
+use winapi::um::fileapi::{ReadFile, WriteFile};
 
 pub struct WindowsPty {
     pseudo_console: HANDLE,
@@ -75,7 +77,7 @@ impl WindowsPty {
 
             // 设置管道为非阻塞模式
             let mut mode: DWORD = 0x00000001; // PIPE_NOWAIT
-            winapi::um::namedpipeapi::SetNamedPipeHandleState(
+            SetNamedPipeHandleState(
                 pipe_out_read,
                 &mut mode,
                 ptr::null_mut(),
@@ -142,41 +144,41 @@ impl WindowsPty {
 
             // 分配扩展启动信息
             let mut attr_list_size: usize = 0;
-            winapi::um::processthreadsapi::InitializeProcThreadAttributeList(
+            InitializeProcThreadAttributeList(
                 ptr::null_mut(),
                 1,
                 0,
                 &mut attr_list_size,
             );
 
-            let attr_list = winapi::um::heapapi::HeapAlloc(
-                winapi::um::processthreadsapi::GetProcessHeap(),
+            let attr_list = HeapAlloc(
+                GetProcessHeap(),
                 0,
                 attr_list_size,
-            ) as *mut winapi::um::winbase::PROC_THREAD_ATTRIBUTE_LIST;
+            ) as *mut winapi::ctypes::c_void;
 
             if attr_list.is_null() {
                 return Err(io::Error::last_os_error());
             }
 
-            if winapi::um::processthreadsapi::InitializeProcThreadAttributeList(
-                attr_list,
+            if InitializeProcThreadAttributeList(
+                attr_list as *mut _,
                 1,
                 0,
                 &mut attr_list_size,
             ) == 0
             {
-                winapi::um::heapapi::HeapFree(
-                    winapi::um::processthreadsapi::GetProcessHeap(),
+                HeapFree(
+                    GetProcessHeap(),
                     0,
-                    attr_list as *mut _,
+                    attr_list,
                 );
                 return Err(io::Error::last_os_error());
             }
 
             // 附加 ConPTY 句柄
-            if winapi::um::processthreadsapi::UpdateProcThreadAttribute(
-                attr_list,
+            if UpdateProcThreadAttribute(
+                attr_list as *mut _,
                 0,
                 22, // PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE
                 self.pseudo_console as *mut _,
@@ -185,16 +187,16 @@ impl WindowsPty {
                 ptr::null_mut(),
             ) == 0
             {
-                winapi::um::processthreadsapi::DeleteProcThreadAttributeList(attr_list);
-                winapi::um::heapapi::HeapFree(
-                    winapi::um::processthreadsapi::GetProcessHeap(),
+                DeleteProcThreadAttributeList(attr_list as *mut _);
+                HeapFree(
+                    GetProcessHeap(),
                     0,
-                    attr_list as *mut _,
+                    attr_list,
                 );
                 return Err(io::Error::last_os_error());
             }
 
-            startup_info.lpAttributeList = attr_list;
+            startup_info.lpAttributeList = attr_list as *mut _;
 
             let result = CreateProcessW(
                 ptr::null(),
@@ -212,11 +214,11 @@ impl WindowsPty {
             );
 
             // 清理属性列表
-            winapi::um::processthreadsapi::DeleteProcThreadAttributeList(attr_list);
-            winapi::um::heapapi::HeapFree(
-                winapi::um::processthreadsapi::GetProcessHeap(),
+            DeleteProcThreadAttributeList(attr_list as *mut _);
+            HeapFree(
+                GetProcessHeap(),
                 0,
-                attr_list as *mut _,
+                attr_list,
             );
 
             if result == 0 {
@@ -234,7 +236,7 @@ impl WindowsPty {
     pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
         unsafe {
             let mut bytes_read: DWORD = 0;
-            let result = winapi::um::fileapi::ReadFile(
+            let result = ReadFile(
                 self.pipe_out,
                 buf.as_mut_ptr() as *mut _,
                 buf.len() as DWORD,
@@ -259,7 +261,7 @@ impl WindowsPty {
     pub fn write(&self, data: &[u8]) -> io::Result<usize> {
         unsafe {
             let mut bytes_written: DWORD = 0;
-            let result = winapi::um::fileapi::WriteFile(
+            let result = WriteFile(
                 self.pipe_in,
                 data.as_ptr() as *const _,
                 data.len() as DWORD,
@@ -347,3 +349,8 @@ impl Drop for WindowsPty {
         }
     }
 }
+
+// WindowsPty 包含原始句柄，但这些句柄在 Windows 上是线程安全的
+// 我们需要手动实现 Send 和 Sync
+unsafe impl Send for WindowsPty {}
+unsafe impl Sync for WindowsPty {}

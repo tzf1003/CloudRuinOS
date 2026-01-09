@@ -2,7 +2,7 @@
 // 单个终端会话的状态与逻辑
 
 use std::collections::HashMap;
-use std::io::{self, Write};
+use std::io;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -28,32 +28,38 @@ pub enum ShellType {
 impl ShellType {
     /// 获取 shell 可执行文件路径
     pub fn get_shell_path(&self) -> io::Result<String> {
-        match self {
-            #[cfg(windows)]
-            ShellType::Cmd => Ok("cmd.exe".to_string()),
-            #[cfg(windows)]
-            ShellType::PowerShell => Ok("powershell.exe".to_string()),
-            #[cfg(windows)]
-            ShellType::Pwsh => Ok("pwsh.exe".to_string()),
-            
-            #[cfg(unix)]
-            ShellType::Sh => Ok("/bin/sh".to_string()),
-            #[cfg(unix)]
-            ShellType::Bash => Ok("/bin/bash".to_string()),
-            #[cfg(unix)]
-            ShellType::Zsh => {
-                // 尝试常见路径
-                if std::path::Path::new("/bin/zsh").exists() {
-                    Ok("/bin/zsh".to_string())
-                } else if std::path::Path::new("/usr/bin/zsh").exists() {
-                    Ok("/usr/bin/zsh".to_string())
-                } else {
-                    Err(io::Error::new(io::ErrorKind::NotFound, "zsh not found"))
-                }
+        #[cfg(windows)]
+        {
+            match self {
+                ShellType::Cmd => Ok("cmd.exe".to_string()),
+                ShellType::PowerShell => Ok("powershell.exe".to_string()),
+                ShellType::Pwsh => Ok("pwsh.exe".to_string()),
+                _ => Err(io::Error::new(io::ErrorKind::Unsupported, "Shell not supported on Windows")),
             }
-            
-            #[cfg(not(any(unix, windows)))]
-            _ => Err(io::Error::new(io::ErrorKind::Unsupported, "Unsupported platform")),
+        }
+        
+        #[cfg(unix)]
+        {
+            match self {
+                ShellType::Sh => Ok("/bin/sh".to_string()),
+                ShellType::Bash => Ok("/bin/bash".to_string()),
+                ShellType::Zsh => {
+                    // 尝试常见路径
+                    if std::path::Path::new("/bin/zsh").exists() {
+                        Ok("/bin/zsh".to_string())
+                    } else if std::path::Path::new("/usr/bin/zsh").exists() {
+                        Ok("/usr/bin/zsh".to_string())
+                    } else {
+                        Err(io::Error::new(io::ErrorKind::NotFound, "zsh not found"))
+                    }
+                }
+                _ => Err(io::Error::new(io::ErrorKind::Unsupported, "Shell not supported on Unix")),
+            }
+        }
+        
+        #[cfg(not(any(unix, windows)))]
+        {
+            Err(io::Error::new(io::ErrorKind::Unsupported, "Unsupported platform"))
         }
     }
 }
@@ -157,7 +163,7 @@ impl RingBuffer {
         let start_offset = if self.buffer.len() < self.capacity {
             cursor as usize
         } else {
-            ((cursor % self.capacity as u64) as usize)
+            (cursor % self.capacity as u64) as usize
         };
         
         let len = actual_available as usize;
@@ -185,6 +191,7 @@ impl RingBuffer {
 pub enum BufferError {
     CursorTooLarge,
     DataLost {
+        #[allow(dead_code)]
         requested_cursor: u64,
         oldest_available: u64,
     },
@@ -280,12 +287,13 @@ impl TerminalSession {
         let output_buffer = Arc::clone(&self.output_buffer);
         let output_cursor = Arc::clone(&self.output_cursor);
         let state = Arc::clone(&self.state);
-        let pty = Arc::new(Mutex::new(Some(pty)));
+        let pty_arc = Arc::new(Mutex::new(Some(pty)));
+        let pty_clone = Arc::clone(&pty_arc);
 
         let handle = thread::spawn(move || {
             let mut buf = [0u8; 4096];
             loop {
-                let pty_guard = pty.lock().unwrap();
+                let pty_guard = pty_clone.lock().unwrap();
                 if pty_guard.is_none() {
                     break;
                 }
@@ -314,7 +322,7 @@ impl TerminalSession {
         });
 
         *self.reader_thread.lock().unwrap() = Some(handle);
-        *self.pty.lock().unwrap() = Some(pty.lock().unwrap().take().unwrap());
+        *self.pty.lock().unwrap() = pty_arc.lock().unwrap().take();
 
         Ok(())
     }

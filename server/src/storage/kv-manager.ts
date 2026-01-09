@@ -34,14 +34,6 @@ export class CloudflareKVManager implements KVStorageManager {
   async setNonce(deviceId: string, nonce: string, requestHash?: string): Promise<boolean> {
     try {
       const key = KVKeyGenerator.nonce(deviceId, nonce);
-      
-      // 优化：先检查是否存在，避免覆盖已有的nonce
-      const existing = await this.kv.get(key);
-      if (existing) {
-        // Nonce已存在，这是重放攻击
-        return false;
-      }
-      
       const record: NonceRecord = {
         device_id: deviceId,
         timestamp: Date.now(),
@@ -665,7 +657,7 @@ export function createKVManager(kv: KVNamespace): KVStorageManager {
 }
 
 // 工具函数：验证 nonce 的完整流程
-// 优化：减少KV读取次数，直接尝试写入并利用KV的原子性
+// 优化：先检查后写入，减少一次读取操作
 export async function validateNonce(
   kvManager: KVStorageManager,
   deviceId: string,
@@ -673,26 +665,19 @@ export async function validateNonce(
   requestHash?: string
 ): Promise<{ valid: boolean; reason?: string }> {
   try {
-    // 优化：直接尝试存储nonce，利用KV的原子性
-    // 如果nonce已存在，KV会返回失败或我们可以通过时间戳判断
-    const stored = await kvManager.setNonce(deviceId, nonce, requestHash);
-    
-    if (!stored) {
-      return { valid: false, reason: 'Failed to store nonce (may already exist)' };
-    }
-    
-    // 验证nonce是否真的是新的（通过检查创建时间）
+    // 检查 nonce 是否已经被使用过
     const record = await kvManager.checkNonce(deviceId, nonce);
     
-    if (!record) {
-      return { valid: false, reason: 'Nonce verification failed' };
+    if (record) {
+      // Nonce 已存在，这是重放攻击
+      return { valid: false, reason: 'Nonce already used (replay attack)' };
     }
     
-    // 检查nonce是否刚刚创建（允许1秒的误差）
-    const age = Date.now() - record.timestamp;
-    if (age > 1000) {
-      // Nonce太旧，可能是重放攻击
-      return { valid: false, reason: 'Nonce already used (replay attack)' };
+    // Nonce 不存在，这是有效的新请求
+    // 将 nonce 存储到 KV 中以防止未来的重放攻击
+    const stored = await kvManager.setNonce(deviceId, nonce, requestHash);
+    if (!stored) {
+      return { valid: false, reason: 'Failed to store nonce' };
     }
     
     return { valid: true };
